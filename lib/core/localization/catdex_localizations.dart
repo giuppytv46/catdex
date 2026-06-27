@@ -74,6 +74,69 @@ class CatDexLocalizations {
     ja: 'Capture',
   );
 
+  String get captureHeading => _localizedValue(
+    en: 'Choose a cat photo',
+    it: 'Scegli una foto di gatto',
+    es: 'Elige una foto de gato',
+    fr: 'Choisis une photo de chat',
+    de: 'Wahle ein Katzenfoto',
+    ja: 'Choose a cat photo',
+  );
+
+  String get captureEmptyMessage => _localizedValue(
+    en: 'Take a new photo or import one from your gallery.',
+    it: 'Scatta una nuova foto o importane una dalla galleria.',
+    es: 'Toma una foto nueva o importala desde tu galeria.',
+    fr: 'Prends une nouvelle photo ou importe-en une.',
+    de: 'Mach ein neues Foto oder importiere eines.',
+    ja: 'Take a new photo or import one from your gallery.',
+  );
+
+  String get takePhotoAction => _localizedValue(
+    en: 'Take Photo',
+    it: 'Scatta Foto',
+    es: 'Tomar Foto',
+    fr: 'Prendre Photo',
+    de: 'Foto Machen',
+    ja: 'Take Photo',
+  );
+
+  String get importFromGalleryAction => _localizedValue(
+    en: 'Import from Gallery',
+    it: 'Importa dalla Galleria',
+    es: 'Importar de Galeria',
+    fr: 'Importer de la Galerie',
+    de: 'Aus Galerie Importieren',
+    ja: 'Import from Gallery',
+  );
+
+  String get removeSelectedImageAction => _localizedValue(
+    en: 'Remove selected image',
+    it: 'Rimuovi immagine selezionata',
+    es: 'Quitar imagen seleccionada',
+    fr: 'Retirer image selectionnee',
+    de: 'Ausgewahltes Bild entfernen',
+    ja: 'Remove selected image',
+  );
+
+  String get continueAction => _localizedValue(
+    en: 'Continue',
+    it: 'Continua',
+    es: 'Continuar',
+    fr: 'Continuer',
+    de: 'Weiter',
+    ja: 'Continue',
+  );
+
+  String get selectedImageLabel => _localizedValue(
+    en: 'Selected image preview',
+    it: 'Anteprima immagine selezionata',
+    es: 'Vista previa de imagen seleccionada',
+    fr: 'Apercu de image selectionnee',
+    de: 'Vorschau des ausgewahlten Bildes',
+    ja: 'Selected image preview',
+  );
+
   String get catDexTitle => _localizedValue(
     en: 'CatDex',
     it: 'CatDex',
