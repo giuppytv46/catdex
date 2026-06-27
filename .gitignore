@@ -1,0 +1,26 @@
+# Flutter and Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+coverage/
+
+# Android
+android/.gradle/
+android/local.properties
+android/**/generated/
+
+# iOS
+ios/Flutter/ephemeral/
+ios/Pods/
+ios/.symlinks/
+ios/Runner.xcworkspace/xcshareddata/
+
+# Editors
+.idea/
+.vscode/
+*.iml
+
+# macOS
+.DS_Store
