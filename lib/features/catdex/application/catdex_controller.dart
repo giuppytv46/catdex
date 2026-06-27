@@ -1,4 +1,6 @@
+import 'package:catdex/features/catdex/application/local_discovery_session_controller.dart';
 import 'package:catdex/features/catdex/data/seeds/catdex_seed_data.dart';
+import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/catdex_collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,7 +34,8 @@ class CatDexController extends Notifier<CatDexCollectionState> {
 
   @override
   CatDexCollectionState build() {
-    final entries = _buildEntries();
+    final sessionDiscoveries = ref.watch(localDiscoverySessionProvider);
+    final entries = _buildEntries(sessionDiscoveries);
     final variants = CatDexSeedData.variants
         .map(
           (variant) => CatDexVariantFilter(id: variant.id, name: variant.name),
@@ -138,17 +141,59 @@ class CatDexController extends Notifier<CatDexCollectionState> {
     );
   }
 
-  List<CatDexCollectionEntry> _buildEntries() {
+  List<CatDexCollectionEntry> _buildEntries(
+    List<CatDiscovery> sessionDiscoveries,
+  ) {
     return [
       for (final item in CatDexSeedData.species.indexed)
-        CatDexCollectionEntry(
-          species: item.$2,
-          variantName: _variantNameForIndex(item.$1),
-          variantId: _variantIdForIndex(item.$1),
-          discovered: _discoveredSpeciesIds.contains(item.$2.id),
-          collectionNumber: item.$1 + 1,
+        _entryForSpecies(
+          index: item.$1,
+          speciesId: item.$2.id,
+          sessionDiscoveries: sessionDiscoveries,
         ),
     ];
+  }
+
+  CatDexCollectionEntry _entryForSpecies({
+    required int index,
+    required String speciesId,
+    required List<CatDiscovery> sessionDiscoveries,
+  }) {
+    final species = CatDexSeedData.species[index];
+    final localDiscovery = _localDiscoveryForSpecies(
+      speciesId: speciesId,
+      sessionDiscoveries: sessionDiscoveries,
+    );
+
+    return CatDexCollectionEntry(
+      species: species,
+      variantName: localDiscovery == null
+          ? _variantNameForIndex(index)
+          : _variantNameById(localDiscovery.variantId),
+      variantId: localDiscovery?.variantId ?? _variantIdForIndex(index),
+      discovered:
+          _discoveredSpeciesIds.contains(species.id) || localDiscovery != null,
+      collectionNumber: index + 1,
+    );
+  }
+
+  CatDiscovery? _localDiscoveryForSpecies({
+    required String speciesId,
+    required List<CatDiscovery> sessionDiscoveries,
+  }) {
+    for (final discovery in sessionDiscoveries) {
+      if (discovery.speciesId == speciesId) {
+        return discovery;
+      }
+    }
+
+    return null;
+  }
+
+  String _variantNameById(String variantId) {
+    return CatDexSeedData.variants
+        .firstWhere((variant) => variant.id == variantId)
+        .name;
   }
 
   String _variantNameForIndex(int index) {

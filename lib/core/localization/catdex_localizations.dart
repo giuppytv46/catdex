@@ -308,6 +308,24 @@ class CatDexLocalizations {
     ja: 'Breed',
   );
 
+  String get catNameLabel => _localizedValue(
+    en: 'Cat Name',
+    it: 'Nome Gatto',
+    es: 'Nombre del Gato',
+    fr: 'Nom du Chat',
+    de: 'Katzenname',
+    ja: 'Cat Name',
+  );
+
+  String get catNamePlaceholder => _localizedValue(
+    en: 'Mochi',
+    it: 'Mochi',
+    es: 'Mochi',
+    fr: 'Mochi',
+    de: 'Mochi',
+    ja: 'Mochi',
+  );
+
   String get confidenceLabel => _localizedValue(
     en: 'Confidence',
     it: 'Confidenza',
@@ -342,6 +360,33 @@ class CatDexLocalizations {
     fr: 'Humeur',
     de: 'Stimmung',
     ja: 'Mood',
+  );
+
+  String get xpEarnedLabel => _localizedValue(
+    en: 'XP Earned',
+    it: 'XP Ottenuti',
+    es: 'XP Ganada',
+    fr: 'XP Gagnes',
+    de: 'XP Verdient',
+    ja: 'XP Earned',
+  );
+
+  String get saveToCatDexAction => _localizedValue(
+    en: 'Save to CatDex',
+    it: 'Salva nel CatDex',
+    es: 'Guardar en CatDex',
+    fr: 'Enregistrer dans CatDex',
+    de: 'In CatDex Speichern',
+    ja: 'Save to CatDex',
+  );
+
+  String get savedToCatDexLabel => _localizedValue(
+    en: 'Saved to CatDex',
+    it: 'Salvato nel CatDex',
+    es: 'Guardado en CatDex',
+    fr: 'Enregistre dans CatDex',
+    de: 'In CatDex Gespeichert',
+    ja: 'Saved to CatDex',
   );
 
   String get photoPreviewLabel => _localizedValue(

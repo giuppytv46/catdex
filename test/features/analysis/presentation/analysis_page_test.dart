@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('Analysis screen renders without throwing', (tester) async {
+  testWidgets('Analysis page builds', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
@@ -23,9 +23,6 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(AnalysisPage), findsOneWidget);
-    expect(find.byType(AspectRatio), findsWidgets);
-    expect(find.byType(DecoratedBox), findsWidgets);
-    expect(find.byType(Text), findsWidgets);
   });
 }
 

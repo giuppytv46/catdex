@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:catdex/core/localization/catdex_localizations.dart';
 import 'package:catdex/features/analysis/application/cat_analysis_controller.dart';
 import 'package:catdex/features/analysis/application/cat_analysis_state.dart';
+import 'package:catdex/features/analysis/application/local_discovery_save_controller.dart';
+import 'package:catdex/features/analysis/application/local_discovery_save_state.dart';
 import 'package:catdex/features/analysis/domain/entities/analysis_status.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_result.dart';
 import 'package:catdex/features/capture/domain/entities/captured_photo.dart';
@@ -189,17 +191,26 @@ class _AnalysisStatusCard extends StatelessWidget {
   }
 }
 
-class _AnalysisResultCard extends StatelessWidget {
+class _AnalysisResultCard extends ConsumerWidget {
   const _AnalysisResultCard({required this.result});
 
   final CatAnalysisResult result;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = CatDexLocalizations.of(context);
+    final saveState = ref.watch(localDiscoverySaveControllerProvider);
+    final previewReward = ref
+        .read(localDiscoverySaveControllerProvider.notifier)
+        .previewReward(result);
     final traits = result.visualTraits.notableTraits
         .map((trait) => '${trait.name}: ${trait.value}')
         .join(', ');
+    final currentSaveState = switch (saveState) {
+      AsyncData(:final value) => value,
+      _ => const LocalDiscoverySaveState.idle(),
+    };
+    final reward = currentSaveState.reward ?? previewReward;
 
     return DecoratedBox(
       decoration: _analysisDecoration(
@@ -218,6 +229,10 @@ class _AnalysisResultCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _ResultRow(
+              label: l10n.catNameLabel,
+              value: l10n.catNamePlaceholder,
+            ),
             _ResultRow(
               label: l10n.breedLabel,
               value: result.primaryBreed.species.displayName,
@@ -244,6 +259,7 @@ class _AnalysisResultCard extends StatelessWidget {
               label: l10n.moodLabel,
               value: _personalityName(result.personality),
             ),
+            _ResultRow(label: l10n.xpEarnedLabel, value: '+${reward.xp} XP'),
             const SizedBox(height: AppSpacing.md),
             Text(
               l10n.storyLabel,
@@ -253,6 +269,13 @@ class _AnalysisResultCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(result.story),
+            const SizedBox(height: AppSpacing.lg),
+            _SaveDiscoveryAction(
+              result: result,
+              state: currentSaveState,
+              saving:
+                  currentSaveState.status == LocalDiscoverySaveStatus.saving,
+            ),
           ],
         ),
       ),
@@ -274,6 +297,77 @@ class _AnalysisResultCard extends StatelessWidget {
       CatPersonality.relaxed => 'Relaxed',
       CatPersonality.playful => 'Playful',
     };
+  }
+}
+
+class _SaveDiscoveryAction extends ConsumerWidget {
+  const _SaveDiscoveryAction({
+    required this.result,
+    required this.state,
+    required this.saving,
+  });
+
+  final CatAnalysisResult result;
+  final LocalDiscoverySaveState state;
+  final bool saving;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = CatDexLocalizations.of(context);
+
+    if (state.status == LocalDiscoverySaveStatus.saved) {
+      return Semantics(
+        liveRegion: true,
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: AppColors.success),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                l10n.savedToCatDexLabel,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.success,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.icon(
+          onPressed: saving
+              ? null
+              : () {
+                  unawaited(
+                    ref
+                        .read(localDiscoverySaveControllerProvider.notifier)
+                        .save(result),
+                  );
+                },
+          icon: saving
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.bookmark_add_rounded),
+          label: Text(l10n.saveToCatDexAction),
+        ),
+        if (state.status == LocalDiscoverySaveStatus.failure) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            state.message ?? l10n.globalErrorTitle,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.danger),
+          ),
+        ],
+      ],
+    );
   }
 }
 

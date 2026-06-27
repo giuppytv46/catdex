@@ -1,4 +1,6 @@
+import 'package:catdex/features/catdex/application/local_discovery_session_controller.dart';
 import 'package:catdex/features/catdex/data/seeds/catdex_seed_data.dart';
+import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_species.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_variant.dart';
@@ -21,6 +23,7 @@ class HomeController extends Notifier<HomeDashboard> {
 
   @override
   HomeDashboard build() {
+    final localDiscoveries = ref.watch(localDiscoverySessionProvider);
     final level = _levelCalculator.levelForXp(_playerTotalXp);
     final progress = PlayerProgress(
       playerId: 'local-explorer',
@@ -62,34 +65,50 @@ class HomeController extends Notifier<HomeDashboard> {
           completed: false,
         ),
       ],
-      recentDiscoveries: [
-        _recentDiscovery(
-          catName: 'Mochi',
-          speciesId: 'maine_coon',
-          variantId: 'shiny',
-          rarity: CatRarity.rare,
-          location: 'Location placeholder',
-        ),
-        _recentDiscovery(
-          catName: 'Luna',
-          speciesId: 'domestic_black_cat',
-          variantId: 'midnight',
-          rarity: CatRarity.common,
-          location: 'Location placeholder',
-        ),
-        _recentDiscovery(
-          catName: 'Pixel',
-          speciesId: 'siamese',
-          variantId: 'normal',
-          rarity: CatRarity.uncommon,
-          location: 'Location placeholder',
-        ),
-      ],
+      recentDiscoveries: localDiscoveries.isEmpty
+          ? _mockRecentDiscoveries()
+          : localDiscoveries.take(3).map(_recentLocalDiscovery).toList(),
       currentEvent: const CurrentEvent(
         title: 'Summer Paw Festival',
         dateRange: 'Event dates placeholder',
         badgeName: 'Sun Paw Badge',
       ),
+    );
+  }
+
+  List<RecentDiscovery> _mockRecentDiscoveries() {
+    return [
+      _recentDiscovery(
+        catName: 'Mochi',
+        speciesId: 'maine_coon',
+        variantId: 'shiny',
+        rarity: CatRarity.rare,
+        location: 'Location placeholder',
+      ),
+      _recentDiscovery(
+        catName: 'Luna',
+        speciesId: 'domestic_black_cat',
+        variantId: 'midnight',
+        rarity: CatRarity.common,
+        location: 'Location placeholder',
+      ),
+      _recentDiscovery(
+        catName: 'Pixel',
+        speciesId: 'siamese',
+        variantId: 'normal',
+        rarity: CatRarity.uncommon,
+        location: 'Location placeholder',
+      ),
+    ];
+  }
+
+  RecentDiscovery _recentLocalDiscovery(CatDiscovery discovery) {
+    return _recentDiscovery(
+      catName: discovery.nickname ?? 'Mochi',
+      speciesId: discovery.speciesId,
+      variantId: discovery.variantId,
+      rarity: discovery.rarity,
+      location: _locationLabel(discovery),
     );
   }
 
@@ -135,5 +154,15 @@ class HomeController extends Notifier<HomeDashboard> {
       CatRarity.legendary => 'Legendary',
       CatRarity.mythic => 'Mythic',
     };
+  }
+
+  String _locationLabel(CatDiscovery discovery) {
+    final city = discovery.city;
+    final country = discovery.country;
+    if (city != null && country != null) {
+      return '$city, $country';
+    }
+
+    return 'Location placeholder';
   }
 }
