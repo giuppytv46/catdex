@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:catdex/core/localization/catdex_localizations.dart';
 import 'package:catdex/features/capture/application/capture_controller.dart';
 import 'package:catdex/features/capture/application/capture_state.dart';
+import 'package:catdex/features/location/application/location_controller.dart';
+import 'package:catdex/features/location/application/location_state.dart';
 import 'package:catdex/theme/app_colors.dart';
 import 'package:catdex/theme/app_spacing.dart';
 import 'package:flutter/material.dart';
@@ -15,7 +17,9 @@ class CapturePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = CatDexLocalizations.of(context);
     final captureState = ref.watch(captureControllerProvider);
+    final locationState = ref.watch(locationControllerProvider);
     final controller = ref.read(captureControllerProvider.notifier);
+    final locationController = ref.read(locationControllerProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.captureTitle)),
@@ -56,7 +60,12 @@ class CapturePage extends ConsumerWidget {
             if (captureState.photo != null)
               _SelectedImagePreview(
                 state: captureState,
-                onRemove: controller.removeSelectedPhoto,
+                locationState: locationState,
+                onDetectLocation: locationController.requestCurrentLocation,
+                onRemove: () {
+                  controller.removeSelectedPhoto();
+                  locationController.reset();
+                },
               ),
             const SizedBox(height: AppSpacing.lg),
             FilledButton(
@@ -167,35 +176,131 @@ class _CaptureActions extends StatelessWidget {
 class _SelectedImagePreview extends StatelessWidget {
   const _SelectedImagePreview({
     required this.state,
+    required this.locationState,
+    required this.onDetectLocation,
     required this.onRemove,
   });
 
   final CaptureState state;
+  final LocationState locationState;
+  final VoidCallback onDetectLocation;
   final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
 
-    return Semantics(
-      label: l10n.selectedImageLabel,
-      image: true,
-      child: Row(
+    return Column(
+      children: [
+        Semantics(
+          label: l10n.selectedImageLabel,
+          image: true,
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: AppColors.success),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  l10n.selectedImageLabel,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+              IconButton(
+                tooltip: l10n.removeSelectedImageAction,
+                onPressed: onRemove,
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        OutlinedButton.icon(
+          onPressed: _locationBusy ? null : onDetectLocation,
+          icon: const Icon(Icons.location_on_rounded),
+          label: Text(l10n.detectLocationAction),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _LocationSummary(state: locationState),
+      ],
+    );
+  }
+
+  bool get _locationBusy {
+    return locationState.status == LocationStatus.requestingPermission ||
+        locationState.status == LocationStatus.locating;
+  }
+}
+
+class _LocationSummary extends StatelessWidget {
+  const _LocationSummary({required this.state});
+
+  final LocationState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = CatDexLocalizations.of(context);
+    final location = state.location;
+    final message = state.message;
+
+    if (state.status == LocationStatus.idle) {
+      return const SizedBox.shrink();
+    }
+
+    if (state.status == LocationStatus.requestingPermission ||
+        state.status == LocationStatus.locating) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.check_circle_rounded, color: AppColors.success),
+          const SizedBox.square(
+            dimension: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
           const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              l10n.selectedImageLabel,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ),
-          IconButton(
-            tooltip: l10n.removeSelectedImageAction,
-            onPressed: onRemove,
-            icon: const Icon(Icons.close_rounded),
-          ),
+          Text(l10n.detectLocationAction),
         ],
+      );
+    }
+
+    final label = switch (state.status) {
+      LocationStatus.located when location != null =>
+        location.hasPlaceDetails
+            ? location.displayLabel
+            : l10n.coordinatesOnlyLabel,
+      LocationStatus.denied => l10n.locationUnavailableLabel,
+      LocationStatus.disabled => message ?? l10n.locationUnavailableLabel,
+      LocationStatus.failure => message ?? l10n.locationUnavailableLabel,
+      _ => l10n.locationUnavailableLabel,
+    };
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            const Icon(Icons.place_rounded, color: AppColors.skyBlue),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.detectedLocationLabel,
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -28,6 +28,8 @@
 	<string>CatDex uses the camera so you can choose a cat photo.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>CatDex uses your photo library so you can import a cat photo.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>CatDex uses your location to remember where a cat photo was discovered.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

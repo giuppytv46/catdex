@@ -137,6 +137,42 @@ class CatDexLocalizations {
     ja: 'Selected image preview',
   );
 
+  String get detectLocationAction => _localizedValue(
+    en: 'Detect Location',
+    it: 'Rileva Posizione',
+    es: 'Detectar Ubicacion',
+    fr: 'Detecter la Position',
+    de: 'Standort Erkennen',
+    ja: 'Detect Location',
+  );
+
+  String get detectedLocationLabel => _localizedValue(
+    en: 'Detected location',
+    it: 'Posizione rilevata',
+    es: 'Ubicacion detectada',
+    fr: 'Position detectee',
+    de: 'Erkannter Standort',
+    ja: 'Detected location',
+  );
+
+  String get coordinatesOnlyLabel => _localizedValue(
+    en: 'Coordinates only',
+    it: 'Solo coordinate',
+    es: 'Solo coordenadas',
+    fr: 'Coordonnees seulement',
+    de: 'Nur Koordinaten',
+    ja: 'Coordinates only',
+  );
+
+  String get locationUnavailableLabel => _localizedValue(
+    en: 'Location unavailable',
+    it: 'Posizione non disponibile',
+    es: 'Ubicacion no disponible',
+    fr: 'Position indisponible',
+    de: 'Standort nicht verfugbar',
+    ja: 'Location unavailable',
+  );
+
   String get catDexTitle => _localizedValue(
     en: 'CatDex',
     it: 'CatDex',
