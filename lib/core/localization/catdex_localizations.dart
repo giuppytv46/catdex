@@ -263,6 +263,96 @@ class CatDexLocalizations {
     ja: 'Continue',
   );
 
+  String get analysisTitle => _localizedValue(
+    en: 'Analysis',
+    it: 'Analisi',
+    es: 'Analisis',
+    fr: 'Analyse',
+    de: 'Analyse',
+    ja: 'Analysis',
+  );
+
+  String get analysisPreparingTitle => _localizedValue(
+    en: 'Reading cat magic...',
+    it: 'Lettura magia felina...',
+    es: 'Leyendo magia felina...',
+    fr: 'Lecture de magie feline...',
+    de: 'Katzenmagie wird gelesen...',
+    ja: 'Reading cat magic...',
+  );
+
+  String get analysisPreparingMessage => _localizedValue(
+    en: 'CatDex is preparing a local fake analysis result.',
+    it: 'CatDex sta preparando una finta analisi locale.',
+    es: 'CatDex prepara un resultado falso local.',
+    fr: 'CatDex prepare une fausse analyse locale.',
+    de: 'CatDex erstellt eine lokale Fake-Analyse.',
+    ja: 'CatDex is preparing a local fake analysis result.',
+  );
+
+  String get analysisResultTitle => _localizedValue(
+    en: 'Fake Analysis Result',
+    it: 'Risultato Analisi Finta',
+    es: 'Resultado Falso',
+    fr: 'Resultat Fictif',
+    de: 'Fake-Analyse Ergebnis',
+    ja: 'Fake Analysis Result',
+  );
+
+  String get breedLabel => _localizedValue(
+    en: 'Breed',
+    it: 'Razza',
+    es: 'Raza',
+    fr: 'Race',
+    de: 'Rasse',
+    ja: 'Breed',
+  );
+
+  String get confidenceLabel => _localizedValue(
+    en: 'Confidence',
+    it: 'Confidenza',
+    es: 'Confianza',
+    fr: 'Confiance',
+    de: 'Vertrauen',
+    ja: 'Confidence',
+  );
+
+  String get variantLabel => _localizedValue(
+    en: 'Variant',
+    it: 'Variante',
+    es: 'Variante',
+    fr: 'Variante',
+    de: 'Variante',
+    ja: 'Variant',
+  );
+
+  String get storyLabel => _localizedValue(
+    en: 'Story',
+    it: 'Storia',
+    es: 'Historia',
+    fr: 'Histoire',
+    de: 'Geschichte',
+    ja: 'Story',
+  );
+
+  String get moodLabel => _localizedValue(
+    en: 'Mood',
+    it: 'Umore',
+    es: 'Animo',
+    fr: 'Humeur',
+    de: 'Stimmung',
+    ja: 'Mood',
+  );
+
+  String get photoPreviewLabel => _localizedValue(
+    en: 'Photo preview',
+    it: 'Anteprima foto',
+    es: 'Vista previa',
+    fr: 'Apercu photo',
+    de: 'Fotovorschau',
+    ja: 'Photo preview',
+  );
+
   String get selectedImageLabel => _localizedValue(
     en: 'Selected image preview',
     it: 'Anteprima immagine selezionata',

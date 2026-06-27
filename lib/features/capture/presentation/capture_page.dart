@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:catdex/core/localization/catdex_localizations.dart';
@@ -5,10 +6,12 @@ import 'package:catdex/features/capture/application/capture_controller.dart';
 import 'package:catdex/features/capture/application/capture_state.dart';
 import 'package:catdex/features/location/application/location_controller.dart';
 import 'package:catdex/features/location/application/location_state.dart';
+import 'package:catdex/routing/app_routes.dart';
 import 'package:catdex/theme/app_colors.dart';
 import 'package:catdex/theme/app_spacing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 class CapturePage extends ConsumerWidget {
   const CapturePage({super.key});
@@ -69,7 +72,16 @@ class CapturePage extends ConsumerWidget {
               ),
             const SizedBox(height: AppSpacing.lg),
             FilledButton(
-              onPressed: captureState.canContinue ? () {} : null,
+              onPressed: captureState.canContinue
+                  ? () {
+                      unawaited(
+                        context.pushNamed(
+                          AppRoute.analysis.name,
+                          extra: captureState.photo,
+                        ),
+                      );
+                    }
+                  : null,
               child: Text(l10n.continueAction),
             ),
           ],

@@ -1,4 +1,6 @@
+import 'package:catdex/features/analysis/presentation/analysis_page.dart';
 import 'package:catdex/features/app_shell/presentation/catdex_app_shell.dart';
+import 'package:catdex/features/capture/domain/entities/captured_photo.dart';
 import 'package:catdex/features/capture/presentation/capture_page.dart';
 import 'package:catdex/features/catdex/presentation/catdex_page.dart';
 import 'package:catdex/features/error/presentation/global_error_page.dart';
@@ -85,6 +87,22 @@ final appRouterProvider = Provider<GoRouter>((_) {
         ],
       ),
       _animatedRoute(route: AppRoute.settings, child: const SettingsPage()),
+      GoRoute(
+        path: AppRoute.analysis.path,
+        name: AppRoute.analysis.name,
+        pageBuilder: (_, state) {
+          final extra = state.extra;
+          final child = extra is CapturedPhoto
+              ? AnalysisPage(photo: extra)
+              : const GlobalErrorPage();
+
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: child,
+            transitionsBuilder: _slideTransition,
+          );
+        },
+      ),
       _animatedRoute(route: AppRoute.offline, child: const OfflinePage()),
       _animatedRoute(
         route: AppRoute.globalError,
