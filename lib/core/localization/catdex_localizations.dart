@@ -317,6 +317,191 @@ class CatDexLocalizations {
     ja: 'CatDex',
   );
 
+  String get collectionProgressTitle => _localizedValue(
+    en: 'Collection Progress',
+    it: 'Progresso Collezione',
+    es: 'Progreso de Coleccion',
+    fr: 'Progression Collection',
+    de: 'Sammlungsfortschritt',
+    ja: 'Collection Progress',
+  );
+
+  String get totalEntriesLabel => _localizedValue(
+    en: 'Total Entries',
+    it: 'Entry Totali',
+    es: 'Entradas Totales',
+    fr: 'Entrees Totales',
+    de: 'Eintrage Gesamt',
+    ja: 'Total Entries',
+  );
+
+  String get discoveredLabel => _localizedValue(
+    en: 'Discovered',
+    it: 'Scoperti',
+    es: 'Descubiertos',
+    fr: 'Decouverts',
+    de: 'Entdeckt',
+    ja: 'Discovered',
+  );
+
+  String get completionLabel => _localizedValue(
+    en: 'Completion',
+    it: 'Completamento',
+    es: 'Completado',
+    fr: 'Completion',
+    de: 'Abschluss',
+    ja: 'Completion',
+  );
+
+  String get searchCatDexLabel => _localizedValue(
+    en: 'Search CatDex',
+    it: 'Cerca nel CatDex',
+    es: 'Buscar CatDex',
+    fr: 'Chercher CatDex',
+    de: 'CatDex Suchen',
+    ja: 'Search CatDex',
+  );
+
+  String get allFilterLabel => _localizedValue(
+    en: 'All',
+    it: 'Tutti',
+    es: 'Todo',
+    fr: 'Tous',
+    de: 'Alle',
+    ja: 'All',
+  );
+
+  String get undiscoveredLabel => _localizedValue(
+    en: 'Undiscovered',
+    it: 'Non scoperti',
+    es: 'No descubiertos',
+    fr: 'Non decouverts',
+    de: 'Unentdeckt',
+    ja: 'Undiscovered',
+  );
+
+  String get rarityFiltersTitle => _localizedValue(
+    en: 'Rarity',
+    it: 'Rarita',
+    es: 'Rareza',
+    fr: 'Rarete',
+    de: 'Seltenheit',
+    ja: 'Rarity',
+  );
+
+  String get variantFiltersTitle => _localizedValue(
+    en: 'Variant',
+    it: 'Variante',
+    es: 'Variante',
+    fr: 'Variante',
+    de: 'Variante',
+    ja: 'Variant',
+  );
+
+  String get originLabel => _localizedValue(
+    en: 'Origin',
+    it: 'Origine',
+    es: 'Origen',
+    fr: 'Origine',
+    de: 'Herkunft',
+    ja: 'Origin',
+  );
+
+  String get notDiscoveredYetLabel => _localizedValue(
+    en: 'Not discovered yet',
+    it: 'Non ancora scoperto',
+    es: 'Aun no descubierto',
+    fr: 'Pas encore decouvert',
+    de: 'Noch nicht entdeckt',
+    ja: 'Not discovered yet',
+  );
+
+  String get traitsLabel => _localizedValue(
+    en: 'Traits',
+    it: 'Tratti',
+    es: 'Rasgos',
+    fr: 'Traits',
+    de: 'Merkmale',
+    ja: 'Traits',
+  );
+
+  String get placeholderTraitsLabel => _localizedValue(
+    en: 'Curious, Friendly, Fluffy',
+    it: 'Curioso, Amichevole, Soffice',
+    es: 'Curioso, Amigable, Suave',
+    fr: 'Curieux, Amical, Doux',
+    de: 'Neugierig, Freundlich, Flauschig',
+    ja: 'Curious, Friendly, Fluffy',
+  );
+
+  String catDexDetailDescription({
+    required String speciesName,
+    required String origin,
+  }) {
+    return _localizedValue(
+      en: '$speciesName is a collectible CatDex entry from $origin.',
+      it: '$speciesName e una scheda collezionabile CatDex da $origin.',
+      es: '$speciesName es una entrada coleccionable CatDex de $origin.',
+      fr: '$speciesName est une entree CatDex de collection de $origin.',
+      de: '$speciesName ist ein CatDex-Sammeleintrag aus $origin.',
+      ja: '$speciesName is a collectible CatDex entry from $origin.',
+    );
+  }
+
+  String rarityName(String rarityCode) {
+    return switch (rarityCode) {
+      'common' => _localizedValue(
+        en: 'Common',
+        it: 'Comune',
+        es: 'Comun',
+        fr: 'Commun',
+        de: 'Gewohnlich',
+        ja: 'Common',
+      ),
+      'uncommon' => _localizedValue(
+        en: 'Uncommon',
+        it: 'Non comune',
+        es: 'Poco comun',
+        fr: 'Peu commun',
+        de: 'Ungewohnlich',
+        ja: 'Uncommon',
+      ),
+      'rare' => _localizedValue(
+        en: 'Rare',
+        it: 'Raro',
+        es: 'Raro',
+        fr: 'Rare',
+        de: 'Selten',
+        ja: 'Rare',
+      ),
+      'epic' => _localizedValue(
+        en: 'Epic',
+        it: 'Epico',
+        es: 'Epico',
+        fr: 'Epique',
+        de: 'Episch',
+        ja: 'Epic',
+      ),
+      'legendary' => _localizedValue(
+        en: 'Legendary',
+        it: 'Leggendario',
+        es: 'Legendario',
+        fr: 'Legendaire',
+        de: 'Legendar',
+        ja: 'Legendary',
+      ),
+      'mythic' => _localizedValue(
+        en: 'Mythic',
+        it: 'Mitico',
+        es: 'Mitico',
+        fr: 'Mythique',
+        de: 'Mythisch',
+        ja: 'Mythic',
+      ),
+      _ => rarityCode,
+    };
+  }
+
   String get friendsTitle => _localizedValue(
     en: 'Friends',
     it: 'Amici',
