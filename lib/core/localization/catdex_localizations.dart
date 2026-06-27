@@ -65,6 +65,141 @@ class CatDexLocalizations {
     ja: 'Home',
   );
 
+  String get playerLevelLabel => _localizedValue(
+    en: 'Level',
+    it: 'Livello',
+    es: 'Nivel',
+    fr: 'Niveau',
+    de: 'Level',
+    ja: 'Level',
+  );
+
+  String get xpProgressLabel => _localizedValue(
+    en: 'XP Progress',
+    it: 'Progresso XP',
+    es: 'Progreso XP',
+    fr: 'Progression XP',
+    de: 'XP Fortschritt',
+    ja: 'XP Progress',
+  );
+
+  String get pawPointsLabel => _localizedValue(
+    en: 'Paw Points',
+    it: 'Punti Zampa',
+    es: 'Puntos Garra',
+    fr: 'Points Patte',
+    de: 'Pfotenpunkte',
+    ja: 'Paw Points',
+  );
+
+  String get dailyMissionsTitle => _localizedValue(
+    en: 'Daily Missions',
+    it: 'Missioni Giornaliere',
+    es: 'Misiones Diarias',
+    fr: 'Missions du Jour',
+    de: 'Tagesmissionen',
+    ja: 'Daily Missions',
+  );
+
+  String get discoverOneCatMission => _localizedValue(
+    en: 'Discover 1 cat',
+    it: 'Scopri 1 gatto',
+    es: 'Descubre 1 gato',
+    fr: 'Decouvre 1 chat',
+    de: 'Entdecke 1 Katze',
+    ja: 'Discover 1 cat',
+  );
+
+  String get importOnePhotoMission => _localizedValue(
+    en: 'Import 1 photo',
+    it: 'Importa 1 foto',
+    es: 'Importa 1 foto',
+    fr: 'Importe 1 photo',
+    de: 'Importiere 1 Foto',
+    ja: 'Import 1 photo',
+  );
+
+  String get visitCatDexMission => _localizedValue(
+    en: 'Visit your CatDex',
+    it: 'Visita il tuo CatDex',
+    es: 'Visita tu CatDex',
+    fr: 'Visite ton CatDex',
+    de: 'Besuche dein CatDex',
+    ja: 'Visit your CatDex',
+  );
+
+  String get completedLabel => _localizedValue(
+    en: 'Completed',
+    it: 'Completata',
+    es: 'Completada',
+    fr: 'Terminee',
+    de: 'Abgeschlossen',
+    ja: 'Completed',
+  );
+
+  String get notCompletedLabel => _localizedValue(
+    en: 'Not completed',
+    it: 'Non completata',
+    es: 'No completada',
+    fr: 'Non terminee',
+    de: 'Nicht abgeschlossen',
+    ja: 'Not completed',
+  );
+
+  String get recentDiscoveriesTitle => _localizedValue(
+    en: 'Recent Discoveries',
+    it: 'Scoperte Recenti',
+    es: 'Descubrimientos Recientes',
+    fr: 'Decouvertes Recentes',
+    de: 'Neue Entdeckungen',
+    ja: 'Recent Discoveries',
+  );
+
+  String get currentEventTitle => _localizedValue(
+    en: 'Current Event',
+    it: 'Evento Attuale',
+    es: 'Evento Actual',
+    fr: 'Evenement Actuel',
+    de: 'Aktuelles Event',
+    ja: 'Current Event',
+  );
+
+  String get quickActionsTitle => _localizedValue(
+    en: 'Quick Actions',
+    it: 'Azioni Rapide',
+    es: 'Acciones Rapidas',
+    fr: 'Actions Rapides',
+    de: 'Schnellaktionen',
+    ja: 'Quick Actions',
+  );
+
+  String get captureCatAction => _localizedValue(
+    en: 'Capture Cat',
+    it: 'Cattura Gatto',
+    es: 'Capturar Gato',
+    fr: 'Capturer Chat',
+    de: 'Katze Fangen',
+    ja: 'Capture Cat',
+  );
+
+  String get openCatDexAction => _localizedValue(
+    en: 'Open CatDex',
+    it: 'Apri CatDex',
+    es: 'Abrir CatDex',
+    fr: 'Ouvrir CatDex',
+    de: 'CatDex Offnen',
+    ja: 'Open CatDex',
+  );
+
+  String get viewProfileAction => _localizedValue(
+    en: 'View Profile',
+    it: 'Vedi Profilo',
+    es: 'Ver Perfil',
+    fr: 'Voir Profil',
+    de: 'Profil Ansehen',
+    ja: 'View Profile',
+  );
+
   String get captureTitle => _localizedValue(
     en: 'Capture',
     it: 'Cattura',
