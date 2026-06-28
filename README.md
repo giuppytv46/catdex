@@ -82,6 +82,23 @@ flutter analyze
 flutter test
 ```
 
+## Current Sprint Status
+
+CatDex is in the Sprint 21 Beta QA + Stability Pass foundation.
+
+Stable foundations currently include:
+
+- Production Flutter structure with Riverpod and GoRouter.
+- Guest/local mode by default.
+- In-memory CatDex game core and discovery save flow.
+- Fake/local AI analysis fallback.
+- Supabase auth, Edge Function, database, storage, and repository switching foundations.
+- Premium and ads placeholder architecture with no real payments or real ads enabled.
+- Release preparation docs and build helper scripts.
+
+Known beta limitations are tracked in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+Beta QA coverage is tracked in [docs/BETA_QA_CHECKLIST.md](docs/BETA_QA_CHECKLIST.md).
+
 ## Release Preparation
 
 Sprint 20 adds store-readiness foundations only. CatDex is not published from this repository, and no store credentials are committed.

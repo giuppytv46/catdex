@@ -883,6 +883,27 @@ class CatDexLocalizations {
     ja: 'Offline',
   );
 
+  String get offlineMessage => _localizedValue(
+    en:
+        'CatDex can keep local progress available, but cloud sync and online '
+        'checks may wait until your connection returns.',
+    it:
+        'CatDex puo mantenere disponibili i progressi locali, ma sync cloud e '
+        'controlli online possono attendere il ritorno della connessione.',
+    es:
+        'CatDex puede mantener disponible el progreso local, pero la nube y '
+        'las comprobaciones online pueden esperar a que vuelva la conexion.',
+    fr:
+        'CatDex peut garder la progression locale disponible, mais la synchro '
+        'cloud et les controles en ligne attendront la connexion.',
+    de:
+        'CatDex kann lokalen Fortschritt weiter anzeigen. Cloud-Sync und '
+        'Online-Prufungen warten auf die Verbindung.',
+    ja:
+        'CatDex can keep local progress available, but cloud sync and online '
+        'checks may wait until your connection returns.',
+  );
+
   String get globalErrorTitle => _localizedValue(
     en: 'Something went wrong',
     it: 'Qualcosa non ha funzionato',
@@ -892,6 +913,27 @@ class CatDexLocalizations {
     ja: 'Something went wrong',
   );
 
+  String get globalErrorMessage => _localizedValue(
+    en:
+        'This screen could not load safely. Your local CatDex progress should '
+        'remain available.',
+    it:
+        'Questa schermata non si e caricata in modo sicuro. I progressi '
+        'locali del CatDex dovrebbero restare disponibili.',
+    es:
+        'Esta pantalla no pudo cargarse con seguridad. Tu progreso local de '
+        'CatDex deberia seguir disponible.',
+    fr:
+        'Cet ecran n a pas pu se charger correctement. Ta progression locale '
+        'CatDex devrait rester disponible.',
+    de:
+        'Dieser Bildschirm konnte nicht sicher geladen werden. Dein lokaler '
+        'CatDex-Fortschritt sollte verfugbar bleiben.',
+    ja:
+        'This screen could not load safely. Your local CatDex progress should '
+        'remain available.',
+  );
+
   String get unknownRouteTitle => _localizedValue(
     en: 'Page not found',
     it: 'Pagina non trovata',
@@ -899,6 +941,24 @@ class CatDexLocalizations {
     fr: 'Page introuvable',
     de: 'Seite nicht gefunden',
     ja: 'Page not found',
+  );
+
+  String get unknownRouteMessage => _localizedValue(
+    en: 'That CatDex path does not exist yet.',
+    it: 'Questo percorso CatDex non esiste ancora.',
+    es: 'Esta ruta de CatDex aun no existe.',
+    fr: 'Ce chemin CatDex n existe pas encore.',
+    de: 'Diesen CatDex-Pfad gibt es noch nicht.',
+    ja: 'That CatDex path does not exist yet.',
+  );
+
+  String get backHomeAction => _localizedValue(
+    en: 'Back Home',
+    it: 'Torna Home',
+    es: 'Volver al Inicio',
+    fr: 'Retour Accueil',
+    de: 'Zuruck Home',
+    ja: 'Back Home',
   );
 
   String _localizedValue({

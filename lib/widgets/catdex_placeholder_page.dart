@@ -6,12 +6,16 @@ class CatDexPlaceholderPage extends StatelessWidget {
   const CatDexPlaceholderPage({
     required this.title,
     required this.icon,
+    this.message,
+    this.primaryAction,
     this.action,
     super.key,
   });
 
   final String title;
   final IconData icon;
+  final String? message;
+  final Widget? primaryAction;
   final Widget? action;
 
   @override
@@ -74,6 +78,18 @@ class CatDexPlaceholderPage extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (message case final message?) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        message,
+                        textAlign: TextAlign.center,
+                        style: textTheme.bodyMedium,
+                      ),
+                    ],
+                    if (primaryAction case final primaryAction?) ...[
+                      const SizedBox(height: AppSpacing.lg),
+                      primaryAction,
+                    ],
                   ],
                 ),
               ),
