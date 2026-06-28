@@ -22,6 +22,23 @@ void main() {
     expect(client.lastBody?['metadata'], isA<Map<String, Object?>>());
   });
 
+  test('sends base64 image data when photo path is a local file', () async {
+    final tempDir = await Directory.systemTemp.createTemp('catdex_ai_test_');
+    addTearDown(() => tempDir.deleteSync(recursive: true));
+    final imageFile = File('${tempDir.path}/cat.jpg')
+      ..writeAsBytesSync([1, 2, 3, 4]);
+    final client = _FakeBackendClient(response: _json());
+    final repository = BackendCatAnalysisRepository(client: client);
+
+    await repository.analyzePhoto(_photo(path: imageFile.path));
+
+    expect(
+      client.lastBody?['base64_image'],
+      'data:image/jpeg;base64,AQIDBA==',
+    );
+    expect(client.lastBody?.containsKey('photoReference'), isFalse);
+  });
+
   test('sends image_url when photo path is remote', () async {
     final client = _FakeBackendClient(response: _json());
     final repository = BackendCatAnalysisRepository(client: client);

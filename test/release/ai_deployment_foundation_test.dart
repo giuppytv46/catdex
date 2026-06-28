@@ -26,5 +26,20 @@ void main() {
       expect(scriptText, isNot(contains('service_role=')));
       expect(scriptText, isNot(contains('OPENAI_API_KEY=')));
     });
+
+    test('Edge Function keeps OpenAI failures safe and debuggable', () {
+      final functionText = File(
+        'supabase/functions/analyze_cat_photo/index.ts',
+      ).readAsStringSync();
+
+      expect(functionText, contains('/v1/chat/completions'));
+      expect(functionText, contains('response_format'));
+      expect(functionText, contains('type: "image_url"'));
+      expect(functionText, contains(r'Authorization: `Bearer ${openAiKey}`'));
+      expect(functionText, contains('openAiFallbackReason'));
+      expect(functionText, contains('mockReason: safeForLog'));
+      expect(functionText, isNot(contains('ai_failed')));
+      expect(functionText, isNot(contains('502')));
+    });
   });
 }

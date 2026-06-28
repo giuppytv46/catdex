@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:catdex/features/analysis/data/backend_cat_analysis_client.dart';
 import 'package:catdex/features/analysis/data/cat_analysis_error_mapper.dart';
@@ -45,6 +47,8 @@ class BackendCatAnalysisRepository implements CatAnalysisRepository {
         'image_url': photo.path
       else if (photo.path.startsWith('data:image/'))
         'base64_image': photo.path
+      else if (File(photo.path).existsSync())
+        'base64_image': _localPhotoDataUrl(photo)
       else
         'photoReference': photo.path,
       'metadata': {
@@ -54,5 +58,17 @@ class BackendCatAnalysisRepository implements CatAnalysisRepository {
       },
       'locale': 'it',
     };
+  }
+
+  String _localPhotoDataUrl(CapturedPhoto photo) {
+    final bytes = File(photo.path).readAsBytesSync();
+    final contentType = switch (photo.extension) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'heic' => 'image/heic',
+      _ => 'image/jpeg',
+    };
+
+    return 'data:$contentType;base64,${base64Encode(bytes)}';
   }
 }

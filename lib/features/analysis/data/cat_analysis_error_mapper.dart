@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_failure.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CatAnalysisErrorMapper {
   const CatAnalysisErrorMapper();
@@ -29,18 +28,16 @@ class CatAnalysisErrorMapper {
       );
     }
 
-    if (error is FunctionException) {
-      return _mapFunctionException(error);
-    }
-
     return const CatAnalysisFailure(
       message: 'CatDex could not analyze this photo yet.',
     );
   }
 
-  CatAnalysisFailure _mapFunctionException(FunctionException error) {
-    final status = error.status;
-    final code = _errorCode(error.details);
+  CatAnalysisFailure mapFunctionFailure({
+    required int status,
+    Object? details,
+  }) {
+    final code = _errorCode(details);
     if (code == 'no_cat_detected') {
       return const CatAnalysisFailure(
         code: CatAnalysisFailureCode.noCatDetected,

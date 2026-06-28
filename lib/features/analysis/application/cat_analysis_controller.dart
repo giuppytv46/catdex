@@ -1,7 +1,7 @@
 import 'package:catdex/features/analysis/application/cat_analysis_state.dart';
-import 'package:catdex/features/analysis/data/backend_cat_analysis_client.dart';
 import 'package:catdex/features/analysis/data/backend_cat_analysis_repository.dart';
 import 'package:catdex/features/analysis/data/fake_cat_analysis_repository.dart';
+import 'package:catdex/features/analysis/data/supabase_cat_analysis_backend_client.dart';
 import 'package:catdex/features/analysis/domain/entities/analysis_status.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_exception.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_failure.dart';

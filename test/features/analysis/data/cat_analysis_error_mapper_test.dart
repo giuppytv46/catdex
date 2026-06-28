@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:catdex/features/analysis/data/cat_analysis_error_mapper.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_failure.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -17,7 +16,7 @@ void main() {
   });
 
   test('maps invalid image failures', () {
-    final failure = mapper.map(const FunctionException(status: 400));
+    final failure = mapper.mapFunctionFailure(status: 400);
 
     expect(failure.code, CatAnalysisFailureCode.invalidImage);
     expect(failure.message, isNotEmpty);
@@ -31,11 +30,9 @@ void main() {
   });
 
   test('maps no cat detected failures', () {
-    final failure = mapper.map(
-      const FunctionException(
-        status: 422,
-        details: {'error': 'no_cat_detected'},
-      ),
+    final failure = mapper.mapFunctionFailure(
+      status: 422,
+      details: {'error': 'no_cat_detected'},
     );
 
     expect(failure.code, CatAnalysisFailureCode.noCatDetected);
@@ -50,14 +47,14 @@ void main() {
   });
 
   test('maps backend unavailable failures', () {
-    final failure = mapper.map(const FunctionException(status: 503));
+    final failure = mapper.mapFunctionFailure(status: 503);
 
     expect(failure.code, CatAnalysisFailureCode.backendUnavailable);
     expect(failure.message, isNotEmpty);
   });
 
   test('maps AI failed failures', () {
-    final failure = mapper.map(const FunctionException(status: 429));
+    final failure = mapper.mapFunctionFailure(status: 429);
 
     expect(failure.code, CatAnalysisFailureCode.aiFailed);
     expect(failure.message, isNotEmpty);
