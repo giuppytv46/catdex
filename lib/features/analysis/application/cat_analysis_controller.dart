@@ -1,12 +1,25 @@
+import 'package:catdex/core/config/app_config.dart';
 import 'package:catdex/features/analysis/application/cat_analysis_state.dart';
+import 'package:catdex/features/analysis/data/backend_cat_analysis_client.dart';
+import 'package:catdex/features/analysis/data/backend_cat_analysis_repository.dart';
 import 'package:catdex/features/analysis/data/fake_cat_analysis_repository.dart';
 import 'package:catdex/features/analysis/domain/entities/analysis_status.dart';
+import 'package:catdex/features/analysis/domain/entities/cat_analysis_exception.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_failure.dart';
 import 'package:catdex/features/analysis/domain/repositories/cat_analysis_repository.dart';
 import 'package:catdex/features/capture/domain/entities/captured_photo.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 final catAnalysisRepositoryProvider = Provider<CatAnalysisRepository>((_) {
+  if (AppConfig.hasSupabaseConfig) {
+    return BackendCatAnalysisRepository(
+      client: SupabaseCatAnalysisBackendClient(
+        supabase.Supabase.instance.client,
+      ),
+    );
+  }
+
   return const FakeCatAnalysisRepository();
 });
 
@@ -35,6 +48,12 @@ class CatAnalysisController extends Notifier<CatAnalysisState> {
         status: AnalysisStatus.success,
         photo: photo,
         result: result,
+      );
+    } on CatAnalysisException catch (error) {
+      state = CatAnalysisState(
+        status: AnalysisStatus.failure,
+        photo: photo,
+        failure: error.failure,
       );
     } on Object {
       state = CatAnalysisState(
