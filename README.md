@@ -70,6 +70,11 @@ The app exposes Supabase health checks behind providers:
 
 These checks are repository/service level checks; widgets do not call Supabase directly.
 
+### Storage
+
+Cloud-mode photo upload uses a private Supabase Storage bucket named `cat-photos`.
+See [backend/supabase/STORAGE.md](backend/supabase/STORAGE.md) for bucket setup, path format, and policy guidance.
+
 ## Quality Checks
 
 ```sh

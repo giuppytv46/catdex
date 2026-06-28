@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:catdex/core/localization/catdex_localizations.dart';
 import 'package:catdex/features/capture/application/capture_controller.dart';
 import 'package:catdex/features/capture/application/capture_state.dart';
+import 'package:catdex/features/capture/application/photo_upload_controller.dart';
+import 'package:catdex/features/capture/application/photo_upload_state.dart';
 import 'package:catdex/features/location/application/location_controller.dart';
 import 'package:catdex/features/location/application/location_state.dart';
 import 'package:catdex/routing/app_routes.dart';
@@ -20,9 +22,12 @@ class CapturePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = CatDexLocalizations.of(context);
     final captureState = ref.watch(captureControllerProvider);
+    final uploadState = ref.watch(photoUploadControllerProvider);
     final locationState = ref.watch(locationControllerProvider);
     final controller = ref.read(captureControllerProvider.notifier);
+    final uploadController = ref.read(photoUploadControllerProvider.notifier);
     final locationController = ref.read(locationControllerProvider.notifier);
+    final uploading = uploadState.status == PhotoUploadStatus.uploading;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.captureTitle)),
@@ -53,11 +58,20 @@ class CapturePage extends ConsumerWidget {
             const SizedBox(height: AppSpacing.lg),
             if (captureState.message case final message?)
               _CaptureMessage(message: message),
+            if (uploadState.status == PhotoUploadStatus.failed &&
+                uploadState.message != null)
+              _CaptureMessage(message: uploadState.message!),
             const SizedBox(height: AppSpacing.md),
             _CaptureActions(
               state: captureState,
-              onTakePhoto: controller.takePhoto,
-              onImportFromGallery: controller.importFromGallery,
+              onTakePhoto: () {
+                uploadController.reset();
+                unawaited(controller.takePhoto());
+              },
+              onImportFromGallery: () {
+                uploadController.reset();
+                unawaited(controller.importFromGallery());
+              },
             ),
             const SizedBox(height: AppSpacing.lg),
             if (captureState.photo != null)
@@ -67,25 +81,51 @@ class CapturePage extends ConsumerWidget {
                 onDetectLocation: locationController.requestCurrentLocation,
                 onRemove: () {
                   controller.removeSelectedPhoto();
+                  uploadController.reset();
                   locationController.reset();
                 },
               ),
             const SizedBox(height: AppSpacing.lg),
             FilledButton(
-              onPressed: captureState.canContinue
-                  ? () {
-                      unawaited(
-                        context.pushNamed(
-                          AppRoute.analysis.name,
-                          extra: captureState.photo,
-                        ),
-                      );
-                    }
+              onPressed: captureState.canContinue && !uploading
+                  ? () => _continueToAnalysis(
+                      context: context,
+                      uploadController: uploadController,
+                      captureState: captureState,
+                    )
                   : null,
-              child: Text(l10n.continueAction),
+              child: uploading
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(l10n.continueAction),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _continueToAnalysis({
+    required BuildContext context,
+    required PhotoUploadController uploadController,
+    required CaptureState captureState,
+  }) async {
+    final photo = captureState.photo;
+    if (photo == null) {
+      return;
+    }
+
+    final uploadResult = await uploadController.prepareForAnalysis(photo);
+    if (!context.mounted || uploadResult == null) {
+      return;
+    }
+
+    unawaited(
+      context.pushNamed(
+        AppRoute.analysis.name,
+        extra: uploadResult.photo,
       ),
     );
   }
