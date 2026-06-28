@@ -5,8 +5,10 @@ import 'package:catdex/features/analysis/domain/entities/cat_analysis_result.dar
 import 'package:catdex/features/analysis/domain/services/cat_discovery_factory.dart';
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:catdex/features/catdex/application/local_discovery_session_controller.dart';
+import 'package:catdex/features/catdex/application/local_player_progress_session_controller.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/pending_discovery_sync.dart';
+import 'package:catdex/features/catdex/domain/entities/player_progress.dart';
 import 'package:catdex/features/catdex/domain/services/discovery_reward.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -63,8 +65,9 @@ class LocalDiscoverySaveController
       );
 
       await discoveryRepository.saveDiscovery(discovery);
-      await _applyProgressReward(reward);
+      final progress = await _applyProgressReward(reward);
       ref.read(localDiscoverySessionProvider.notifier).addDiscovery(discovery);
+      ref.read(localPlayerProgressSessionProvider.notifier).progress = progress;
       state = AsyncData(
         LocalDiscoverySaveState(
           status: LocalDiscoverySaveStatus.saved,
@@ -101,7 +104,11 @@ class LocalDiscoverySaveController
         );
   }
 
-  Future<void> _applyProgressReward(DiscoveryReward reward) async {
+  void reset() {
+    state = const AsyncData(LocalDiscoverySaveState.idle());
+  }
+
+  Future<PlayerProgress> _applyProgressReward(DiscoveryReward reward) async {
     final activeSession = ref.read(activeCatDexSessionProvider);
     final progressRepository = ref.read(playerProgressRepositoryProvider);
     final levelCalculator = ref.read(levelCalculatorProvider);
@@ -110,16 +117,18 @@ class LocalDiscoverySaveController
     );
     final totalXp = progress.totalXp + reward.xp;
 
-    await progressRepository.saveProgress(
-      progress.copyWith(
-        totalXp: totalXp,
-        level: levelCalculator.levelForXp(totalXp),
-        coins: progress.coins + reward.coins,
-        discoveryCount: progress.discoveryCount + 1,
-        duplicateDiscoveryCount:
-            progress.duplicateDiscoveryCount + (reward.duplicate ? 1 : 0),
-      ),
+    final updatedProgress = progress.copyWith(
+      totalXp: totalXp,
+      level: levelCalculator.levelForXp(totalXp),
+      coins: progress.coins + reward.coins,
+      discoveryCount: progress.discoveryCount + 1,
+      duplicateDiscoveryCount:
+          progress.duplicateDiscoveryCount + (reward.duplicate ? 1 : 0),
     );
+
+    await progressRepository.saveProgress(updatedProgress);
+
+    return updatedProgress;
   }
 
   Future<PendingDiscoverySync?> _queuePendingSync({

@@ -1,4 +1,3 @@
-import 'package:catdex/core/config/app_config.dart';
 import 'package:catdex/features/analysis/application/cat_analysis_state.dart';
 import 'package:catdex/features/analysis/data/backend_cat_analysis_client.dart';
 import 'package:catdex/features/analysis/data/backend_cat_analysis_repository.dart';
@@ -8,14 +7,14 @@ import 'package:catdex/features/analysis/domain/entities/cat_analysis_exception.
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_failure.dart';
 import 'package:catdex/features/analysis/domain/repositories/cat_analysis_repository.dart';
 import 'package:catdex/features/capture/domain/entities/captured_photo.dart';
+import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
-final catAnalysisRepositoryProvider = Provider<CatAnalysisRepository>((_) {
-  if (AppConfig.hasSupabaseConfig) {
+final catAnalysisRepositoryProvider = Provider<CatAnalysisRepository>((ref) {
+  if (ref.watch(supabaseConfiguredProvider)) {
     return BackendCatAnalysisRepository(
       client: SupabaseCatAnalysisBackendClient(
-        supabase.Supabase.instance.client,
+        ref.watch(supabaseClientProvider),
       ),
     );
   }

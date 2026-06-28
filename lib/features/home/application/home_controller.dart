@@ -1,10 +1,10 @@
 import 'package:catdex/features/catdex/application/local_discovery_session_controller.dart';
+import 'package:catdex/features/catdex/application/local_player_progress_session_controller.dart';
 import 'package:catdex/features/catdex/data/seeds/catdex_seed_data.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_species.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_variant.dart';
-import 'package:catdex/features/catdex/domain/entities/player_progress.dart';
 import 'package:catdex/features/catdex/domain/services/discovery_reward_calculator.dart';
 import 'package:catdex/features/catdex/domain/services/level_calculator.dart';
 import 'package:catdex/features/home/domain/entities/home_dashboard.dart';
@@ -15,8 +15,26 @@ final homeControllerProvider = NotifierProvider<HomeController, HomeDashboard>(
 );
 
 class HomeController extends Notifier<HomeDashboard> {
-  static const _playerTotalXp = 1860;
-  static const _pawPoints = 420;
+  static const _baseDiscoveredSpeciesIds = {
+    'domestic_black_cat',
+    'domestic_white_cat',
+    'domestic_tuxedo_cat',
+    'domestic_calico_cat',
+    'domestic_tabby_cat',
+    'domestic_orange_cat',
+    'domestic_gray_cat',
+    'domestic_tortoiseshell_cat',
+    'domestic_colorpoint_cat',
+    'domestic_longhair_cat',
+    'domestic_shorthair_cat',
+    'maine_coon',
+    'siamese',
+    'persian',
+    'ragdoll',
+    'bengal',
+    'sphynx',
+    'british_shorthair',
+  };
 
   final _levelCalculator = const LevelCalculator();
   final _rewardCalculator = const DiscoveryRewardCalculator();
@@ -24,24 +42,20 @@ class HomeController extends Notifier<HomeDashboard> {
   @override
   HomeDashboard build() {
     final localDiscoveries = ref.watch(localDiscoverySessionProvider);
-    final level = _levelCalculator.levelForXp(_playerTotalXp);
-    final progress = PlayerProgress(
-      playerId: 'local-explorer',
-      totalXp: _playerTotalXp,
-      level: level,
-      coins: _pawPoints,
-      discoveryCount: 3,
-      duplicateDiscoveryCount: 0,
-      achievementIds: const [],
-      badgeIds: const [],
-    );
+    final progress = ref.watch(localPlayerProgressSessionProvider);
+    final discoveredSpeciesIds = {
+      ..._baseDiscoveredSpeciesIds,
+      for (final discovery in localDiscoveries) discovery.speciesId,
+    };
 
     return HomeDashboard(
       playerName: 'Explorer',
       playerProgress: progress,
-      currentLevelXp: _levelCalculator.xpRequiredForLevel(level),
-      nextLevelXp: _levelCalculator.xpRequiredForLevel(level + 1),
-      pawPoints: _pawPoints,
+      currentLevelXp: _levelCalculator.xpRequiredForLevel(progress.level),
+      nextLevelXp: _levelCalculator.xpRequiredForLevel(progress.level + 1),
+      pawPoints: progress.coins,
+      collectionCompletion:
+          discoveredSpeciesIds.length / CatDexSeedData.species.length,
       dailyMissions: const [
         DailyMission(
           titleKey: DailyMissionTitleKey.discoverOneCat,

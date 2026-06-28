@@ -167,6 +167,13 @@ class _PlayerHeader extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: AppSpacing.sm),
+            _Pill(
+              label:
+                  '${l10n.completionLabel} '
+                  '${(dashboard.collectionCompletion * 100).round()}%',
+              icon: Icons.style_rounded,
+            ),
           ],
         ),
       ),

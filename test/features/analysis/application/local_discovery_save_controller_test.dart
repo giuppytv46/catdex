@@ -5,8 +5,10 @@ import 'package:catdex/features/analysis/domain/entities/cat_analysis_result.dar
 import 'package:catdex/features/analysis/domain/entities/cat_breed_candidate.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_visual_traits.dart';
 import 'package:catdex/features/catdex/application/active_catdex_session.dart';
+import 'package:catdex/features/catdex/application/catdex_controller.dart';
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:catdex/features/catdex/application/local_discovery_session_controller.dart';
+import 'package:catdex/features/catdex/application/local_player_progress_session_controller.dart';
 import 'package:catdex/features/catdex/application/local_player_session.dart';
 import 'package:catdex/features/catdex/data/repositories/in_memory_discovery_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/in_memory_pending_sync_queue_repository.dart';
@@ -16,6 +18,7 @@ import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/repositories/discovery_repository.dart';
+import 'package:catdex/features/home/application/home_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -72,6 +75,41 @@ void main() {
     expect(progress.coins, saveState.value?.reward?.coins);
     expect(progress.discoveryCount, 1);
     expect(progress.level, greaterThanOrEqualTo(1));
+  });
+
+  test('updates live Home and CatDex state after saving', () async {
+    final discoveryRepository = InMemoryDiscoveryRepository();
+    final progressRepository = InMemoryPlayerProgressRepository();
+    final container = _container(
+      discoveryRepository: discoveryRepository,
+      progressRepository: progressRepository,
+    );
+    addTearDown(container.dispose);
+    final initialHome = container.read(homeControllerProvider);
+
+    await container.read(localDiscoverySaveControllerProvider.future);
+    await container
+        .read(localDiscoverySaveControllerProvider.notifier)
+        .save(_analysisResult());
+
+    final progressSession = container.read(localPlayerProgressSessionProvider);
+    final home = container.read(homeControllerProvider);
+    final catDex = container.read(catDexControllerProvider);
+    final savedSpeciesId = _analysisResult().primaryBreed.species.id;
+
+    expect(progressSession.discoveryCount, 1);
+    expect(home.playerProgress.totalXp, progressSession.totalXp);
+    expect(home.recentDiscoveries.first.speciesName, isNotEmpty);
+    expect(
+      home.collectionCompletion,
+      greaterThanOrEqualTo(initialHome.collectionCompletion),
+    );
+    expect(
+      catDex.entries
+          .singleWhere((entry) => entry.species.id == savedSpeciesId)
+          .discovered,
+      isTrue,
+    );
   });
 
   test(

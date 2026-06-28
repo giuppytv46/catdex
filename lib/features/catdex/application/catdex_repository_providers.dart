@@ -67,7 +67,9 @@ final playerProgressRepositoryProvider = Provider<PlayerProgressRepository>((
     return SupabasePlayerProgressRepository(ref.watch(supabaseClientProvider));
   }
 
-  return InMemoryPlayerProgressRepository();
+  return InMemoryPlayerProgressRepository(
+    progress: const [LocalPlayerSession.initialProgress],
+  );
 });
 
 final pendingSyncQueueRepositoryProvider = Provider<PendingSyncQueueRepository>(

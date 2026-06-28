@@ -527,6 +527,51 @@ class CatDexLocalizations {
     ja: 'Save to CatDex',
   );
 
+  String get addToCatDexAction => _localizedValue(
+    en: 'Add to CatDex',
+    it: 'Aggiungi al CatDex',
+    es: 'Anadir al CatDex',
+    fr: 'Ajouter au CatDex',
+    de: 'Zu CatDex Hinzufugen',
+    ja: 'Add to CatDex',
+  );
+
+  String get revealDiscoveryAction => _localizedValue(
+    en: 'Reveal Discovery',
+    it: 'Rivela Scoperta',
+    es: 'Revelar Descubrimiento',
+    fr: 'Reveler la Decouverte',
+    de: 'Entdeckung Anzeigen',
+    ja: 'Reveal Discovery',
+  );
+
+  String get discoveryRevealTitle => _localizedValue(
+    en: 'Discovery Reveal',
+    it: 'Rivelazione Scoperta',
+    es: 'Revelacion',
+    fr: 'Revelation',
+    de: 'Entdeckung',
+    ja: 'Discovery Reveal',
+  );
+
+  String get discoveryUnlockedLabel => _localizedValue(
+    en: 'New Cat Unlocked',
+    it: 'Nuovo Gatto Sbloccato',
+    es: 'Nuevo Gato Desbloqueado',
+    fr: 'Nouveau Chat Debloque',
+    de: 'Neue Katze Freigeschaltet',
+    ja: 'New Cat Unlocked',
+  );
+
+  String get coinsEarnedLabel => _localizedValue(
+    en: 'Coins Earned',
+    it: 'Monete Ottenute',
+    es: 'Monedas Ganadas',
+    fr: 'Pieces Gagnees',
+    de: 'Munzen Verdient',
+    ja: 'Coins Earned',
+  );
+
   String get savedToCatDexLabel => _localizedValue(
     en: 'Saved to CatDex',
     it: 'Salvato nel CatDex',

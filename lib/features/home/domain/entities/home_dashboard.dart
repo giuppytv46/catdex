@@ -7,6 +7,7 @@ class HomeDashboard {
     required this.currentLevelXp,
     required this.nextLevelXp,
     required this.pawPoints,
+    required this.collectionCompletion,
     required this.dailyMissions,
     required this.recentDiscoveries,
     required this.currentEvent,
@@ -17,6 +18,7 @@ class HomeDashboard {
   final int currentLevelXp;
   final int nextLevelXp;
   final int pawPoints;
+  final double collectionCompletion;
   final List<DailyMission> dailyMissions;
   final List<RecentDiscovery> recentDiscoveries;
   final CurrentEvent currentEvent;

@@ -1,4 +1,6 @@
+import 'package:catdex/features/analysis/domain/entities/discovery_reveal_args.dart';
 import 'package:catdex/features/analysis/presentation/analysis_page.dart';
+import 'package:catdex/features/analysis/presentation/discovery_reveal_page.dart';
 import 'package:catdex/features/app_shell/presentation/catdex_app_shell.dart';
 import 'package:catdex/features/capture/domain/entities/captured_photo.dart';
 import 'package:catdex/features/capture/presentation/capture_page.dart';
@@ -94,6 +96,22 @@ final appRouterProvider = Provider<GoRouter>((_) {
           final extra = state.extra;
           final child = extra is CapturedPhoto
               ? AnalysisPage(photo: extra)
+              : const GlobalErrorPage();
+
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: child,
+            transitionsBuilder: _slideTransition,
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoute.discoveryReveal.path,
+        name: AppRoute.discoveryReveal.name,
+        pageBuilder: (_, state) {
+          final extra = state.extra;
+          final child = extra is DiscoveryRevealArgs
+              ? DiscoveryRevealPage(args: extra)
               : const GlobalErrorPage();
 
           return CustomTransitionPage<void>(
