@@ -70,6 +70,7 @@ class CatDexCollectionEntry {
     required this.variantId,
     required this.discovered,
     required this.collectionNumber,
+    this.discoveredPhotoPath,
   });
 
   final CatSpecies species;
@@ -77,6 +78,7 @@ class CatDexCollectionEntry {
   final String variantId;
   final bool discovered;
   final int collectionNumber;
+  final String? discoveredPhotoPath;
 }
 
 class CatDexVariantFilter {

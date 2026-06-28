@@ -16,6 +16,7 @@ class CatDiscovery {
     this.nickname,
     this.city,
     this.country,
+    this.photoPath,
     this.favorite = false,
   }) : assert(friendshipPoints >= 0, 'friendshipPoints cannot be negative');
 
@@ -31,5 +32,6 @@ class CatDiscovery {
   final String? nickname;
   final String? city;
   final String? country;
+  final String? photoPath;
   final bool favorite;
 }

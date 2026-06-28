@@ -29,7 +29,7 @@ class LocalDiscoverySaveController
     return const LocalDiscoverySaveState.idle();
   }
 
-  Future<void> save(CatAnalysisResult result) async {
+  Future<void> save(CatAnalysisResult result, {String? photoPath}) async {
     state = const AsyncData(
       LocalDiscoverySaveState(status: LocalDiscoverySaveStatus.saving),
     );
@@ -62,6 +62,7 @@ class LocalDiscoverySaveController
         playerId: activeSession.playerId,
         discoveredAt: DateTime.now().toUtc(),
         friendshipPoints: reward.friendshipPoints,
+        photoPath: photoPath,
       );
 
       await discoveryRepository.saveDiscovery(discovery);

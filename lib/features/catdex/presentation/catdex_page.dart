@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:catdex/core/localization/catdex_localizations.dart';
 import 'package:catdex/features/catdex/application/catdex_controller.dart';
@@ -582,8 +583,9 @@ class CatDexDetailPage extends StatelessWidget {
               padding: const EdgeInsets.all(AppSpacing.lg),
               child: Column(
                 children: [
-                  _CatVisual(
+                  _CatDetailVisual(
                     discovered: discovered,
+                    photoPath: entry.discoveredPhotoPath,
                     rarity: entry.species.baseRarity,
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -607,6 +609,64 @@ class CatDexDetailPage extends StatelessWidget {
           else
             _LockedDetail(entry: entry),
         ],
+      ),
+    );
+  }
+}
+
+class _CatDetailVisual extends StatelessWidget {
+  const _CatDetailVisual({
+    required this.discovered,
+    required this.rarity,
+    required this.photoPath,
+  });
+
+  final bool discovered;
+  final CatRarity rarity;
+  final String? photoPath;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = photoPath?.trim();
+    if (discovered && path != null && path.isNotEmpty) {
+      if (path.startsWith('http://') || path.startsWith('https://')) {
+        return _PhotoVisual(
+          image: Image.network(path, fit: BoxFit.cover),
+          fallback: _CatVisual(discovered: discovered, rarity: rarity),
+        );
+      }
+
+      final file = File(path);
+      if (file.existsSync()) {
+        return _PhotoVisual(
+          image: Image.file(file, fit: BoxFit.cover),
+          fallback: _CatVisual(discovered: discovered, rarity: rarity),
+        );
+      }
+    }
+
+    return _CatVisual(discovered: discovered, rarity: rarity);
+  }
+}
+
+class _PhotoVisual extends StatelessWidget {
+  const _PhotoVisual({required this.image, required this.fallback});
+
+  final Image image;
+  final Widget fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(32),
+      child: SizedBox(
+        width: 180,
+        height: 180,
+        child: Image(
+          image: image.image,
+          fit: image.fit,
+          errorBuilder: (_, _, _) => fallback,
+        ),
       ),
     );
   }

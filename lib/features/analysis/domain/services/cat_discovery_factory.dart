@@ -11,6 +11,7 @@ class CatDiscoveryFactory {
     required DateTime discoveredAt,
     required int friendshipPoints,
     String nickname = 'Mochi',
+    String? photoPath,
   }) {
     return CatDiscovery(
       id: discoveryId,
@@ -23,6 +24,7 @@ class CatDiscoveryFactory {
       discoveredAt: discoveredAt,
       friendshipPoints: friendshipPoints,
       nickname: nickname,
+      photoPath: photoPath,
     );
   }
 }

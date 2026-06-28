@@ -174,6 +174,7 @@ class CatDexController extends Notifier<CatDexCollectionState> {
       discovered:
           _discoveredSpeciesIds.contains(species.id) || localDiscovery != null,
       collectionNumber: index + 1,
+      discoveredPhotoPath: localDiscovery?.photoPath,
     );
   }
 

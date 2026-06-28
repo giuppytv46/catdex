@@ -102,6 +102,7 @@ class SupabaseDiscoveryRepository implements DiscoveryRepository {
       nickname: row['nickname'] as String?,
       city: row['city'] as String?,
       country: row['country'] as String?,
+      photoPath: row['photo_url'] as String?,
       favorite: row['favorite'] as bool? ?? false,
     );
   }
@@ -129,6 +130,7 @@ class SupabaseDiscoveryRepository implements DiscoveryRepository {
       'nickname': discovery.nickname,
       'city': discovery.city,
       'country': discovery.country,
+      'photo_url': discovery.photoPath,
       'favorite': discovery.favorite,
       'discovered_at': discovery.discoveredAt.toIso8601String(),
     };

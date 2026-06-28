@@ -24,7 +24,7 @@ void main() {
       ProviderScope(
         overrides: [
           localDiscoverySaveControllerProvider.overrideWith(
-            _NoopLocalDiscoverySaveController.new,
+            _ResettingLocalDiscoverySaveController.new,
           ),
         ],
         child: MaterialApp(
@@ -42,10 +42,14 @@ void main() {
   });
 }
 
-class _NoopLocalDiscoverySaveController extends LocalDiscoverySaveController {
+class _ResettingLocalDiscoverySaveController
+    extends LocalDiscoverySaveController {
   @override
   Future<LocalDiscoverySaveState> build() async {
-    return const LocalDiscoverySaveState.idle();
+    return const LocalDiscoverySaveState(
+      status: LocalDiscoverySaveStatus.failure,
+      message: 'stale state',
+    );
   }
 
   @override
@@ -59,7 +63,9 @@ class _NoopLocalDiscoverySaveController extends LocalDiscoverySaveController {
   }
 
   @override
-  void reset() {}
+  void reset() {
+    state = const AsyncData(LocalDiscoverySaveState.idle());
+  }
 }
 
 DiscoveryRevealArgs _args() {

@@ -1,7 +1,0 @@
-// Copy this file to a local, untracked release xcconfig when iOS signing is ready.
-// Do not commit Apple certificates, provisioning profiles, or App Store Connect keys.
-
-PRODUCT_BUNDLE_IDENTIFIER = com.catdex.app
-DEVELOPMENT_TEAM = REPLACE_WITH_TEAM_ID
-CODE_SIGN_STYLE = Manual
-PROVISIONING_PROFILE_SPECIFIER = REPLACE_WITH_PROFILE_NAME

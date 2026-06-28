@@ -34,7 +34,6 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
   @override
   void initState() {
     super.initState();
-    ref.read(localDiscoverySaveControllerProvider.notifier).reset();
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -47,7 +46,14 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
       CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
     );
     unawaited(_controller.forward());
-    unawaited(Future<void>.microtask(_playRevealSound));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      ref.read(localDiscoverySaveControllerProvider.notifier).reset();
+      _playRevealSound();
+    });
   }
 
   @override
@@ -149,7 +155,7 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
   Future<void> _saveDiscovery(BuildContext context) async {
     final notifier = ref.read(localDiscoverySaveControllerProvider.notifier);
 
-    await notifier.save(widget.args.result);
+    await notifier.save(widget.args.result, photoPath: widget.args.photo.path);
 
     final state = ref.read(localDiscoverySaveControllerProvider).value;
     if (!context.mounted || state?.status != LocalDiscoverySaveStatus.saved) {
