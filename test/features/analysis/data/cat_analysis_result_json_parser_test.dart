@@ -41,12 +41,13 @@ void main() {
     final result = parser.parse(_realJson());
 
     expect(result.primaryBreed.species.id, 'domestic_tabby_cat');
+    expect(result.displayBreed, 'domestic_tabby_cat');
     expect(result.breedCandidates, hasLength(2));
     expect(result.visualTraits.coatPattern, 'Tabby');
     expect(result.variant.id, 'normal');
   });
 
-  test('falls back to domestic shorthair for low-confidence exotic breed', () {
+  test('preserves backend breed instead of applying local conversion', () {
     const parser = CatAnalysisResultJsonParser();
     final json = _realJson()
       ..['breed'] = 'cymric'
@@ -57,20 +58,21 @@ void main() {
 
     final result = parser.parse(json);
 
-    expect(result.primaryBreed.species.id, 'domestic_shorthair_cat');
+    expect(result.primaryBreed.species.id, 'cymric');
+    expect(result.displayBreed, 'cymric');
     expect(result.confidence.score, 0.61);
   });
 
-  test('prevents Event Edition when no active event context exists', () {
+  test('preserves backend variant instead of applying local conversion', () {
     const parser = CatAnalysisResultJsonParser();
     final json = _realJson()..['variant'] = 'event_edition';
 
     final result = parser.parse(json);
 
-    expect(result.variant.id, 'normal');
+    expect(result.variant.id, 'event_edition');
   });
 
-  test('downgrades unrealistic legendary rarity', () {
+  test('preserves backend rarity instead of applying local conversion', () {
     const parser = CatAnalysisResultJsonParser();
     final json = _realJson()
       ..['rarity'] = 'legendary'
@@ -78,7 +80,28 @@ void main() {
 
     final result = parser.parse(json);
 
-    expect(result.rarity, CatRarity.rare);
+    expect(result.rarity, CatRarity.legendary);
+  });
+
+  test('preserves backend visual values unchanged', () {
+    const parser = CatAnalysisResultJsonParser();
+    final json = _realJson()
+      ..['breed'] = 'domestic_orange_cat'
+      ..['coatColor'] = 'arancione'
+      ..['coatPattern'] = 'tabby'
+      ..['eyeColor'] = 'ambra'
+      ..['hairLength'] = 'corto'
+      ..['traits'] = <Map<String, Object?>>[];
+
+    final result = parser.parse(json);
+
+    expect(result.displayBreed, 'domestic_orange_cat');
+    expect(result.primaryBreed.species.id, 'domestic_orange_cat');
+    expect(result.visualTraits.coatColor, 'arancione');
+    expect(result.visualTraits.coatPattern, 'tabby');
+    expect(result.visualTraits.eyeColor, 'ambra');
+    expect(result.visualTraits.hairLength, 'corto');
+    expect(result.visualTraits.notableTraits, isEmpty);
   });
 
   test('falls back safely for malformed response', () {

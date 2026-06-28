@@ -16,6 +16,7 @@ class CatAnalysisResult {
     required this.personality,
     required this.story,
     required this.analyzedAt,
+    this.backendBreed,
   });
 
   final CatBreedCandidate primaryBreed;
@@ -27,4 +28,7 @@ class CatAnalysisResult {
   final CatPersonality personality;
   final String story;
   final DateTime analyzedAt;
+  final String? backendBreed;
+
+  String get displayBreed => backendBreed ?? primaryBreed.species.displayName;
 }

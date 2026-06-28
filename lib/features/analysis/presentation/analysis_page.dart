@@ -235,7 +235,7 @@ class _AnalysisResultCard extends StatelessWidget {
             ),
             _ResultRow(
               label: l10n.breedLabel,
-              value: result.primaryBreed.species.displayName,
+              value: result.displayBreed,
             ),
             _ResultRow(
               label: l10n.confidenceLabel,
@@ -243,12 +243,24 @@ class _AnalysisResultCard extends StatelessWidget {
                   '${result.confidence.percentage}% ${result.confidence.label}',
             ),
             _ResultRow(
+              label: l10n.coatColorLabel,
+              value: result.visualTraits.coatColor,
+            ),
+            _ResultRow(
+              label: l10n.coatPatternLabel,
+              value: result.visualTraits.coatPattern,
+            ),
+            _ResultRow(
+              label: l10n.eyeColorLabel,
+              value: result.visualTraits.eyeColor,
+            ),
+            _ResultRow(
+              label: l10n.hairLengthLabel,
+              value: result.visualTraits.hairLength,
+            ),
+            _ResultRow(
               label: l10n.traitsLabel,
-              value:
-                  '${result.visualTraits.coatColor}, '
-                  '${result.visualTraits.coatPattern}, '
-                  '${result.visualTraits.eyeColor} eyes, '
-                  '${result.visualTraits.hairLength} hair, $traits',
+              value: traits.isEmpty ? 'Unknown' : traits,
             ),
             _ResultRow(
               label: l10n.rarityFiltersTitle,

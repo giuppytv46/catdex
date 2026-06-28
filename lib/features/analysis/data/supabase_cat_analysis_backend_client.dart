@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:developer';
+
 import 'package:catdex/features/analysis/data/backend_cat_analysis_client.dart';
 import 'package:catdex/features/analysis/data/cat_analysis_error_mapper.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_exception.dart';
@@ -19,6 +22,10 @@ class SupabaseCatAnalysisBackendClient implements CatAnalysisBackendClient {
         'analyze_cat_photo',
         body: body,
       );
+      log(
+        _safeJson(response.data),
+        name: 'CatDexAI.rawSupabaseResponse',
+      );
 
       return response.data;
     } on FunctionException catch (error) {
@@ -28,6 +35,14 @@ class SupabaseCatAnalysisBackendClient implements CatAnalysisBackendClient {
           details: error.details,
         ),
       );
+    }
+  }
+
+  String _safeJson(Object? value) {
+    try {
+      return jsonEncode(value);
+    } on Object {
+      return value.toString();
     }
   }
 }

@@ -22,30 +22,17 @@ class CatAnalysisResultJsonParser {
       final primaryBreed = _primaryBreed(map);
       final candidates = _candidates(map, primaryBreed);
       final confidence = _confidence(map['confidence']);
-      final realisticPrimaryBreed = _realisticPrimaryBreed(
-        primaryBreed,
-        confidence,
-      );
-      final realisticCandidates = _realisticCandidates(
-        candidates,
-        realisticPrimaryBreed,
-      );
 
       return CatAnalysisResult(
-        primaryBreed: realisticPrimaryBreed,
-        breedCandidates: realisticCandidates,
+        primaryBreed: primaryBreed,
+        breedCandidates: candidates,
         visualTraits: _visualTraits(map),
         confidence: confidence,
-        rarity: _realisticRarity(
-          _rarity(_optionalString(map['rarity']) ?? 'common'),
-          confidence,
-        ),
-        variant: _realisticVariant(
-          _variant(
-            _optionalString(map['variantId']) ??
-                _optionalString(map['variant']) ??
-                'normal',
-          ),
+        rarity: _rarity(_optionalString(map['rarity']) ?? 'common'),
+        variant: _variant(
+          _optionalString(map['variantId']) ??
+              _optionalString(map['variant']) ??
+              'normal',
         ),
         personality: _personality(
           _optionalString(map['personality']) ?? 'curious',
@@ -55,6 +42,7 @@ class CatAnalysisResultJsonParser {
           _optionalString(map['analyzedAt']) ??
               DateTime.utc(2026, 6, 28).toIso8601String(),
         ),
+        backendBreed: _optionalString(map['breed']),
       );
     } on FormatException {
       return _safeFallback();
@@ -85,38 +73,6 @@ class CatAnalysisResultJsonParser {
       ),
       confidence: _confidence(map['confidence']),
     );
-  }
-
-  CatBreedCandidate _realisticPrimaryBreed(
-    CatBreedCandidate primaryBreed,
-    CatAnalysisConfidence confidence,
-  ) {
-    if (confidence.score < 0.8 ||
-        (_rareBreedIds.contains(primaryBreed.species.id) &&
-            confidence.score < 0.9)) {
-      return CatBreedCandidate(
-        species: _species('domestic_shorthair_cat'),
-        confidence: confidence,
-      );
-    }
-
-    return primaryBreed;
-  }
-
-  List<CatBreedCandidate> _realisticCandidates(
-    List<CatBreedCandidate> candidates,
-    CatBreedCandidate primaryBreed,
-  ) {
-    final filtered = candidates
-        .where((candidate) => !_rareBreedIds.contains(candidate.species.id))
-        .toList(growable: false);
-
-    if (filtered.isEmpty ||
-        filtered.first.species.id != primaryBreed.species.id) {
-      return [primaryBreed, ...filtered].take(3).toList(growable: false);
-    }
-
-    return filtered.take(3).toList(growable: false);
   }
 
   List<CatBreedCandidate> _candidates(
@@ -155,9 +111,7 @@ class CatAnalysisResultJsonParser {
       coatPattern: _optionalString(map['coatPattern']) ?? 'Unknown',
       eyeColor: _optionalString(map['eyeColor']) ?? 'Unknown',
       hairLength: _optionalString(map['hairLength']) ?? 'Unknown',
-      notableTraits: traits.isEmpty
-          ? const [CatTrait(name: 'Mood', value: 'Curious')]
-          : traits,
+      notableTraits: traits,
     );
   }
 
@@ -192,29 +146,6 @@ class CatAnalysisResultJsonParser {
     }
 
     throw FormatException('Unknown variant id: $rawValue');
-  }
-
-  CatVariant _realisticVariant(CatVariant variant) {
-    if (variant.id == 'event_edition') {
-      return _variant('normal');
-    }
-
-    return variant;
-  }
-
-  CatRarity _realisticRarity(
-    CatRarity rarity,
-    CatAnalysisConfidence confidence,
-  ) {
-    if (rarity == CatRarity.legendary && confidence.score < 0.98) {
-      return CatRarity.rare;
-    }
-
-    if (rarity == CatRarity.mythic && confidence.score < 0.99) {
-      return CatRarity.rare;
-    }
-
-    return rarity;
   }
 
   CatRarity _rarity(String name) {
@@ -315,7 +246,7 @@ class CatAnalysisResultJsonParser {
         coatPattern: 'Unknown',
         eyeColor: 'Unknown',
         hairLength: 'Unknown',
-        notableTraits: [CatTrait(name: 'Mood', value: 'Curious')],
+        notableTraits: [],
       ),
       confidence: confidence,
       rarity: CatRarity.common,
@@ -334,16 +265,3 @@ class CatAnalysisResultJsonParser {
       'This mysterious local cat keeps a few secrets, but still earns a cozy '
       'CatDex card.';
 }
-
-const _rareBreedIds = {
-  'cymric',
-  'lykoi',
-  'khao_manee',
-  'peterbald',
-  'sokoke',
-  'toyger',
-  'chausie',
-  'savannah',
-  'serengeti',
-  'burmilla',
-};

@@ -650,6 +650,42 @@ class CatDexLocalizations {
     ja: 'Confidence',
   );
 
+  String get coatColorLabel => _localizedValue(
+    en: 'Coat color',
+    it: 'Colore mantello',
+    es: 'Color del pelaje',
+    fr: 'Couleur du pelage',
+    de: 'Fellfarbe',
+    ja: 'Coat color',
+  );
+
+  String get coatPatternLabel => _localizedValue(
+    en: 'Coat pattern',
+    it: 'Pattern mantello',
+    es: 'Patron del pelaje',
+    fr: 'Motif du pelage',
+    de: 'Fellmuster',
+    ja: 'Coat pattern',
+  );
+
+  String get eyeColorLabel => _localizedValue(
+    en: 'Eye color',
+    it: 'Colore occhi',
+    es: 'Color de ojos',
+    fr: 'Couleur des yeux',
+    de: 'Augenfarbe',
+    ja: 'Eye color',
+  );
+
+  String get hairLengthLabel => _localizedValue(
+    en: 'Hair length',
+    it: 'Lunghezza pelo',
+    es: 'Longitud del pelo',
+    fr: 'Longueur du poil',
+    de: 'Felllange',
+    ja: 'Hair length',
+  );
+
   String get variantLabel => _localizedValue(
     en: 'Variant',
     it: 'Variante',
