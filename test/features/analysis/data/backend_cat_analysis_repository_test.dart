@@ -21,6 +21,16 @@ void main() {
     expect(client.lastBody?['metadata'], isA<Map<String, Object?>>());
   });
 
+  test('sends image_url when photo path is remote', () async {
+    final client = _FakeBackendClient(response: _json());
+    final repository = BackendCatAnalysisRepository(client: client);
+
+    await repository.analyzePhoto(_photo(path: 'https://example.com/cat.jpg'));
+
+    expect(client.lastBody?['image_url'], 'https://example.com/cat.jpg');
+    expect(client.lastBody?.containsKey('photoReference'), isFalse);
+  });
+
   test('maps backend client failures into CatAnalysisException', () async {
     const repository = BackendCatAnalysisRepository(
       client: _FailingBackendClient(SocketException('offline')),
@@ -57,9 +67,9 @@ void main() {
   });
 }
 
-CapturedPhoto _photo() {
+CapturedPhoto _photo({String path = 'cat.jpg'}) {
   return CapturedPhoto(
-    path: 'cat.jpg',
+    path: path,
     source: PhotoSource.gallery,
     sizeBytes: 1024,
     capturedAt: DateTime.utc(2026),

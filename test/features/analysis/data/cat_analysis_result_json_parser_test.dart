@@ -20,7 +20,7 @@ void main() {
     expect(result.story, isNotEmpty);
   });
 
-  test('throws FormatException for unknown seed ids', () {
+  test('falls back safely for unknown seed ids', () {
     const parser = CatAnalysisResultJsonParser();
     final json = _json();
     final primaryBreed = Map<String, Object?>.from(
@@ -29,7 +29,30 @@ void main() {
     primaryBreed['speciesId'] = 'not_a_cat';
     json['primaryBreed'] = primaryBreed;
 
-    expect(() => parser.parse(json), throwsA(isA<FormatException>()));
+    final result = parser.parse(json);
+
+    expect(result.primaryBreed.species.id, 'domestic_shorthair_cat');
+    expect(result.confidence.score, 0.35);
+  });
+
+  test('parses real Edge Function response shape', () {
+    const parser = CatAnalysisResultJsonParser();
+
+    final result = parser.parse(_realJson());
+
+    expect(result.primaryBreed.species.id, 'domestic_tabby_cat');
+    expect(result.breedCandidates, hasLength(2));
+    expect(result.visualTraits.coatPattern, 'Tabby');
+    expect(result.variant.id, 'normal');
+  });
+
+  test('falls back safely for malformed response', () {
+    const parser = CatAnalysisResultJsonParser();
+
+    final result = parser.parse({'unexpected': 'shape'});
+
+    expect(result.primaryBreed.species.id, 'domestic_shorthair_cat');
+    expect(result.visualTraits.coatColor, 'Unknown');
   });
 }
 
@@ -67,6 +90,40 @@ Map<String, Object?> _json() {
     'variantId': 'normal',
     'personality': 'curious',
     'story': 'A curious local cat joins CatDex.',
+    'analyzedAt': '2026-06-28T12:00:00.000Z',
+  };
+}
+
+Map<String, Object?> _realJson() {
+  return {
+    'breed': 'domestic_tabby_cat',
+    'confidence': 0.82,
+    'candidates': [
+      {
+        'breed': 'domestic_tabby_cat',
+        'confidence': 0.82,
+      },
+      {
+        'breed': 'domestic_shorthair_cat',
+        'confidence': 0.64,
+      },
+    ],
+    'coatColor': 'Brown',
+    'coatPattern': 'Tabby',
+    'eyeColor': 'Green',
+    'hairLength': 'Short',
+    'traits': [
+      {
+        'name': 'Mood',
+        'value': 'Curious',
+        'rarityWeight': 1,
+      },
+    ],
+    'personality': 'curious',
+    'rarity': 'common',
+    'variant': 'normal',
+    'story': 'A curious local cat joins CatDex.',
+    'safetyStatus': 'safe',
     'analyzedAt': '2026-06-28T12:00:00.000Z',
   };
 }

@@ -28,14 +28,7 @@ class BackendCatAnalysisRepository implements CatAnalysisRepository {
   Future<CatAnalysisResult> analyzePhoto(CapturedPhoto photo) async {
     try {
       final response = await _client
-          .analyzeCatPhoto({
-            'photoReference': photo.path,
-            'metadata': {
-              'source': photo.source.name,
-              'sizeBytes': photo.sizeBytes,
-              'capturedAt': photo.capturedAt.toIso8601String(),
-            },
-          })
+          .analyzeCatPhoto(_requestBody(photo))
           .timeout(_timeout);
 
       return _parser.parse(response);
@@ -44,5 +37,21 @@ class BackendCatAnalysisRepository implements CatAnalysisRepository {
     } on Object catch (error) {
       throw CatAnalysisException(_errorMapper.map(error));
     }
+  }
+
+  Map<String, Object?> _requestBody(CapturedPhoto photo) {
+    return {
+      if (photo.path.startsWith('http://') || photo.path.startsWith('https://'))
+        'image_url': photo.path
+      else if (photo.path.startsWith('data:image/'))
+        'base64_image': photo.path
+      else
+        'photoReference': photo.path,
+      'metadata': {
+        'source': photo.source.name,
+        'sizeBytes': photo.sizeBytes,
+        'capturedAt': photo.capturedAt.toIso8601String(),
+      },
+    };
   }
 }

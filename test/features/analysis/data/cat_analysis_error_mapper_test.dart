@@ -17,9 +17,28 @@ void main() {
   });
 
   test('maps invalid image failures', () {
-    final failure = mapper.map(const FormatException('bad image'));
+    final failure = mapper.map(const FunctionException(status: 400));
 
     expect(failure.code, CatAnalysisFailureCode.invalidImage);
+    expect(failure.message, isNotEmpty);
+  });
+
+  test('maps malformed AI response failures', () {
+    final failure = mapper.map(const FormatException('bad ai json'));
+
+    expect(failure.code, CatAnalysisFailureCode.malformedAiResponse);
+    expect(failure.message, isNotEmpty);
+  });
+
+  test('maps no cat detected failures', () {
+    final failure = mapper.map(
+      const FunctionException(
+        status: 422,
+        details: {'error': 'no_cat_detected'},
+      ),
+    );
+
+    expect(failure.code, CatAnalysisFailureCode.noCatDetected);
     expect(failure.message, isNotEmpty);
   });
 

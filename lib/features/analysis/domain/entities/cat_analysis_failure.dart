@@ -1,9 +1,11 @@
 enum CatAnalysisFailureCode {
   noInternet,
   invalidImage,
+  noCatDetected,
   backendUnavailable,
   aiFailed,
   timeout,
+  malformedAiResponse,
   unknown,
 }
 
