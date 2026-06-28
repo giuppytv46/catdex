@@ -7,8 +7,8 @@ import 'package:catdex/features/analysis/application/cat_analysis_state.dart';
 import 'package:catdex/features/analysis/domain/entities/analysis_status.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_result.dart';
 import 'package:catdex/features/analysis/domain/entities/discovery_reveal_args.dart';
+import 'package:catdex/features/analysis/presentation/cat_analysis_display_text.dart';
 import 'package:catdex/features/capture/domain/entities/captured_photo.dart';
-import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/routing/app_routes.dart';
 import 'package:catdex/theme/app_colors.dart';
 import 'package:catdex/theme/app_spacing.dart';
@@ -208,9 +208,8 @@ class _AnalysisResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
-    final traits = result.visualTraits.notableTraits
-        .map((trait) => '${trait.name}: ${trait.value}')
-        .join(', ');
+    const displayText = CatAnalysisDisplayText();
+    final traits = displayText.traitSummary(result);
 
     return DecoratedBox(
       decoration: _analysisDecoration(
@@ -244,19 +243,19 @@ class _AnalysisResultCard extends StatelessWidget {
             ),
             _ResultRow(
               label: l10n.coatColorLabel,
-              value: result.visualTraits.coatColor,
+              value: displayText.coatColor(result.visualTraits.coatColor),
             ),
             _ResultRow(
               label: l10n.coatPatternLabel,
-              value: result.visualTraits.coatPattern,
+              value: displayText.coatPattern(result.visualTraits.coatPattern),
             ),
             _ResultRow(
               label: l10n.eyeColorLabel,
-              value: result.visualTraits.eyeColor,
+              value: displayText.eyeColor(result.visualTraits.eyeColor),
             ),
             _ResultRow(
               label: l10n.hairLengthLabel,
-              value: result.visualTraits.hairLength,
+              value: displayText.hairLength(result.visualTraits.hairLength),
             ),
             _ResultRow(
               label: l10n.traitsLabel,
@@ -269,7 +268,7 @@ class _AnalysisResultCard extends StatelessWidget {
             _ResultRow(label: l10n.variantLabel, value: result.variant.name),
             _ResultRow(
               label: l10n.moodLabel,
-              value: _personalityName(result.personality),
+              value: displayText.personality(result.personality),
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
@@ -297,23 +296,6 @@ class _AnalysisResultCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _personalityName(CatPersonality personality) {
-    return switch (personality) {
-      CatPersonality.sleepy => 'Sleepy',
-      CatPersonality.curious => 'Curious',
-      CatPersonality.boss => 'Boss',
-      CatPersonality.friendly => 'Friendly',
-      CatPersonality.royal => 'Royal',
-      CatPersonality.mischievous => 'Mischievous',
-      CatPersonality.silly => 'Silly',
-      CatPersonality.mysterious => 'Mysterious',
-      CatPersonality.brave => 'Brave',
-      CatPersonality.lazy => 'Lazy',
-      CatPersonality.relaxed => 'Relaxed',
-      CatPersonality.playful => 'Playful',
-    };
   }
 }
 

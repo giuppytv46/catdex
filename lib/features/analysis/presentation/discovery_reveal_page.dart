@@ -6,7 +6,7 @@ import 'package:catdex/features/analysis/application/discovery_reveal_sound_hook
 import 'package:catdex/features/analysis/application/local_discovery_save_controller.dart';
 import 'package:catdex/features/analysis/application/local_discovery_save_state.dart';
 import 'package:catdex/features/analysis/domain/entities/discovery_reveal_args.dart';
-import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
+import 'package:catdex/features/analysis/presentation/cat_analysis_display_text.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/routing/app_routes.dart';
 import 'package:catdex/theme/app_colors.dart';
@@ -258,7 +258,7 @@ class _RevealCard extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Text(
-                        result.primaryBreed.species.displayName,
+                        result.displayBreed,
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(
@@ -277,7 +277,9 @@ class _RevealCard extends StatelessWidget {
                           ),
                           _RevealBadge(label: result.variant.name),
                           _RevealBadge(
-                            label: _personalityName(result.personality),
+                            label: const CatAnalysisDisplayText().personality(
+                              result.personality,
+                            ),
                           ),
                         ],
                       ),
@@ -501,9 +503,8 @@ class _ResultDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
     final result = args.result;
-    final traits = result.visualTraits.notableTraits
-        .map((trait) => '${trait.name}: ${trait.value}')
-        .join(', ');
+    const displayText = CatAnalysisDisplayText();
+    final traits = displayText.traitSummary(result);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -522,12 +523,7 @@ class _ResultDetails extends StatelessWidget {
             ),
             _DetailLine(
               label: l10n.traitsLabel,
-              value:
-                  '${result.visualTraits.coatColor}, '
-                  '${result.visualTraits.coatPattern}, '
-                  '${result.visualTraits.eyeColor} eyes, '
-                  '${result.visualTraits.hairLength} hair'
-                  '${traits.isEmpty ? '' : ', $traits'}',
+              value: traits.isEmpty ? 'Unknown' : traits,
             ),
             _DetailLine(label: l10n.storyLabel, value: result.story),
           ],
@@ -602,22 +598,5 @@ Color _rarityColor(CatRarity rarity) {
     CatRarity.epic => const Color(0xFFEC4899),
     CatRarity.legendary => AppColors.warning,
     CatRarity.mythic => const Color(0xFFEF4444),
-  };
-}
-
-String _personalityName(CatPersonality personality) {
-  return switch (personality) {
-    CatPersonality.sleepy => 'Sleepy',
-    CatPersonality.curious => 'Curious',
-    CatPersonality.boss => 'Boss',
-    CatPersonality.friendly => 'Friendly',
-    CatPersonality.royal => 'Royal',
-    CatPersonality.mischievous => 'Mischievous',
-    CatPersonality.silly => 'Silly',
-    CatPersonality.mysterious => 'Mysterious',
-    CatPersonality.brave => 'Brave',
-    CatPersonality.lazy => 'Lazy',
-    CatPersonality.relaxed => 'Relaxed',
-    CatPersonality.playful => 'Playful',
   };
 }

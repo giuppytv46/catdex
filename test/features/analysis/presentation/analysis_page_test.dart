@@ -66,11 +66,16 @@ void main() {
     await _expectVisibleText(tester, 'Variante');
     await _expectVisibleText(tester, 'Umore');
     await _expectVisibleText(tester, 'Storia');
-    await _expectVisibleText(tester, 'arancione');
-    await _expectVisibleText(tester, 'tabby');
-    await _expectVisibleText(tester, 'ambra');
-    await _expectVisibleText(tester, 'corto');
-    await _expectVisibleText(tester, 'Posa: seduto');
+    await _expectVisibleText(tester, 'Marrone');
+    await _expectVisibleText(tester, 'Tigrato');
+    await _expectVisibleText(tester, 'Occhi ambrati');
+    await _expectVisibleText(tester, 'Pelo corto');
+    await _expectVisibleText(
+      tester,
+      'Marrone, Tigrato, Occhi ambrati, Pelo corto, '
+      'Posa: in osservazione',
+    );
+    await _expectVisibleText(tester, 'Rilassato');
     await _expectVisibleText(
       tester,
       'Un gatto arancione osserva il mondo con calma.',
@@ -79,6 +84,7 @@ void main() {
     expect(find.textContaining('Tortoiseshell'), findsNothing);
     expect(find.textContaining('Blue eyes'), findsNothing);
     expect(find.textContaining('Soft hair'), findsNothing);
+    expect(find.textContaining('curved whiskers'), findsNothing);
   });
 }
 
@@ -108,14 +114,15 @@ Map<String, Object?> _backendJson() {
     'candidates': [
       {'breed': 'domestic_orange_cat', 'confidence': 0.91},
     ],
-    'coatColor': 'arancione',
-    'coatPattern': 'tabby',
-    'eyeColor': 'ambra',
-    'hairLength': 'corto',
+    'coatColor': 'Brown',
+    'coatPattern': 'Tabby',
+    'eyeColor': 'Amber eyes',
+    'hairLength': 'Short hair',
     'traits': [
-      {'name': 'Posa', 'value': 'seduto', 'rarityWeight': 1},
+      {'name': 'Posa', 'value': 'watching', 'rarityWeight': 1},
+      {'name': 'Whiskers', 'value': 'curved whiskers', 'rarityWeight': 1},
     ],
-    'personality': 'curious',
+    'personality': 'relaxed',
     'rarity': 'common',
     'variant': 'normal',
     'story': 'Un gatto arancione osserva il mondo con calma.',
