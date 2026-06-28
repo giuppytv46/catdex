@@ -1,0 +1,8 @@
+// CatDex release configuration example.
+// Copy this file to ReleaseConfig.xcconfig for local release builds.
+// Do not commit real signing credentials or secrets.
+
+APP_DISPLAY_NAME=CatDex
+PRODUCT_BUNDLE_IDENTIFIER=com.catdex.app
+MARKETING_VERSION=0.1.0
+CURRENT_PROJECT_VERSION=1
