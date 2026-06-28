@@ -72,7 +72,9 @@ class CatAnalysisErrorMapper {
     if (status >= 500) {
       return const CatAnalysisFailure(
         code: CatAnalysisFailureCode.backendUnavailable,
-        message: 'CatDex analysis is resting right now. Try again soon.',
+        message:
+            'CatDex AI is unavailable right now. You can keep playing locally '
+            'and try analysis again soon.',
       );
     }
 

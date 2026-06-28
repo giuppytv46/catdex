@@ -70,6 +70,15 @@ The app exposes Supabase health checks behind providers:
 
 These checks are repository/service level checks; widgets do not call Supabase directly.
 
+### AI Edge Function
+
+Real AI analysis is handled by the Supabase Edge Function
+`analyze_cat_photo`. Deployment steps are documented in
+[docs/AI_DEPLOYMENT.md](docs/AI_DEPLOYMENT.md).
+
+Flutter never stores OpenAI keys. If Supabase is not configured, CatDex falls
+back to the local fake analyzer for guest/local mode.
+
 ### Storage
 
 Cloud-mode photo upload uses a private Supabase Storage bucket named `cat-photos`.
