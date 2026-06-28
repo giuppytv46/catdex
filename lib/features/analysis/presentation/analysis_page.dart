@@ -355,12 +355,18 @@ class _SaveDiscoveryAction extends ConsumerWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.bookmark_add_rounded),
-          label: Text(l10n.saveToCatDexAction),
+          label: Text(
+            state.status == LocalDiscoverySaveStatus.failure
+                ? l10n.retrySaveAction
+                : l10n.saveToCatDexAction,
+          ),
         ),
         if (state.status == LocalDiscoverySaveStatus.failure) ...[
           const SizedBox(height: AppSpacing.sm),
           Text(
-            state.message ?? l10n.globalErrorTitle,
+            state.pendingSync == null
+                ? state.message ?? l10n.globalErrorTitle
+                : l10n.saveToCatDexFailedLabel,
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: AppColors.danger),

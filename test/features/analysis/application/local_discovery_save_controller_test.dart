@@ -4,14 +4,18 @@ import 'package:catdex/features/analysis/domain/entities/cat_analysis_confidence
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_result.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_breed_candidate.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_visual_traits.dart';
+import 'package:catdex/features/catdex/application/active_catdex_session.dart';
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:catdex/features/catdex/application/local_discovery_session_controller.dart';
 import 'package:catdex/features/catdex/application/local_player_session.dart';
 import 'package:catdex/features/catdex/data/repositories/in_memory_discovery_repository.dart';
+import 'package:catdex/features/catdex/data/repositories/in_memory_pending_sync_queue_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/in_memory_player_progress_repository.dart';
 import 'package:catdex/features/catdex/data/seeds/catdex_seed_data.dart';
+import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
+import 'package:catdex/features/catdex/domain/repositories/discovery_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -98,6 +102,41 @@ void main() {
       expect(progress.duplicateDiscoveryCount, 1);
     },
   );
+
+  test('queues pending sync when cloud save fails', () async {
+    final pendingQueue = InMemoryPendingSyncQueueRepository();
+    final progressRepository = InMemoryPlayerProgressRepository();
+    final container = ProviderContainer(
+      overrides: [
+        activeCatDexSessionProvider.overrideWithValue(
+          const ActiveCatDexSession.cloud(playerId: 'cloud-user'),
+        ),
+        discoveryRepositoryProvider.overrideWithValue(
+          const _FailingDiscoveryRepository(),
+        ),
+        playerProgressRepositoryProvider.overrideWithValue(progressRepository),
+        pendingSyncQueueRepositoryProvider.overrideWithValue(pendingQueue),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(localDiscoverySaveControllerProvider.future);
+    await container
+        .read(localDiscoverySaveControllerProvider.notifier)
+        .save(_analysisResult());
+
+    final saveState = container.read(localDiscoverySaveControllerProvider);
+    final pendingItems = await pendingQueue.pendingDiscoveriesForPlayer(
+      'cloud-user',
+    );
+    final sessionDiscoveries = container.read(localDiscoverySessionProvider);
+
+    expect(saveState.value?.status, LocalDiscoverySaveStatus.failure);
+    expect(saveState.value?.pendingSync, isNotNull);
+    expect(saveState.value?.message, contains('retry'));
+    expect(pendingItems, hasLength(1));
+    expect(sessionDiscoveries, hasLength(1));
+  });
 }
 
 ProviderContainer _container({
@@ -110,6 +149,33 @@ ProviderContainer _container({
       playerProgressRepositoryProvider.overrideWithValue(progressRepository),
     ],
   );
+}
+
+class _FailingDiscoveryRepository implements DiscoveryRepository {
+  const _FailingDiscoveryRepository();
+
+  @override
+  Future<CatDiscovery?> getDiscoveryById(String id) async {
+    return null;
+  }
+
+  @override
+  Future<List<CatDiscovery>> getDiscoveriesForPlayer(String playerId) async {
+    return const [];
+  }
+
+  @override
+  Future<bool> hasDiscoveredSpecies({
+    required String playerId,
+    required String speciesId,
+  }) async {
+    return false;
+  }
+
+  @override
+  Future<void> saveDiscovery(CatDiscovery discovery) async {
+    throw StateError('cloud unavailable');
+  }
 }
 
 CatAnalysisResult _analysisResult() {

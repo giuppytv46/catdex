@@ -69,6 +69,7 @@ void main() {
   });
 
   test('serializes CatDiscovery for Supabase', () {
+    const trait = CatTrait(name: 'Mood', value: 'Curious');
     final row = SupabaseDiscoveryRepository.toDiscoveryRow(
       CatDiscovery(
         id: 'discovery-1',
@@ -77,18 +78,26 @@ void main() {
         variantId: 'normal',
         rarity: CatRarity.common,
         personality: CatPersonality.curious,
-        traits: const [CatTrait(name: 'Mood', value: 'Curious')],
+        traits: const [trait],
         discoveredAt: DateTime.utc(2026, 6, 28, 12),
         friendshipPoints: 30,
         nickname: 'Mochi',
       ),
       'cloud-user',
     );
+    final traitRow = SupabaseDiscoveryRepository.toTraitRow(
+      discoveryId: 'discovery-1',
+      userId: 'cloud-user',
+      trait: trait,
+    );
 
     expect(row['id'], 'discovery-1');
     expect(row['user_id'], 'cloud-user');
     expect(row['rarity'], 'common');
     expect(row['personality'], 'curious');
+    expect(traitRow['discovery_id'], 'discovery-1');
+    expect(traitRow['user_id'], 'cloud-user');
+    expect(traitRow['trait_name'], 'Mood');
   });
 
   test('maps Supabase progress rows', () {

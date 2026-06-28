@@ -536,6 +536,24 @@ class CatDexLocalizations {
     ja: 'Saved to CatDex',
   );
 
+  String get saveToCatDexFailedLabel => _localizedValue(
+    en: 'Save failed. Your discovery is waiting to sync.',
+    it: 'Salvataggio non riuscito. La scoperta attende la sincronizzazione.',
+    es: 'No se pudo guardar. Tu descubrimiento espera sincronizarse.',
+    fr: 'Echec de sauvegarde. La decouverte attend la synchronisation.',
+    de: 'Speichern fehlgeschlagen. Deine Entdeckung wartet auf Sync.',
+    ja: 'Save failed. Your discovery is waiting to sync.',
+  );
+
+  String get retrySaveAction => _localizedValue(
+    en: 'Retry Save',
+    it: 'Riprova Salvataggio',
+    es: 'Reintentar Guardado',
+    fr: 'Reessayer',
+    de: 'Speichern Wiederholen',
+    ja: 'Retry Save',
+  );
+
   String get photoPreviewLabel => _localizedValue(
     en: 'Photo preview',
     it: 'Anteprima foto',

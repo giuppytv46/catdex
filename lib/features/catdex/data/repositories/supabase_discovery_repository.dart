@@ -60,10 +60,16 @@ class SupabaseDiscoveryRepository implements DiscoveryRepository {
         .from('discoveries')
         .upsert(toDiscoveryRow(discovery, _userId));
 
+    await _client
+        .from('discovery_traits')
+        .delete()
+        .eq('user_id', _userId)
+        .eq('discovery_id', discovery.id);
+
     if (discovery.traits.isNotEmpty) {
       await _client
           .from('discovery_traits')
-          .upsert(
+          .insert(
             discovery.traits
                 .map((trait) {
                   return toTraitRow(

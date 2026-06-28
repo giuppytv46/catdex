@@ -1,4 +1,5 @@
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
+import 'package:catdex/features/catdex/domain/entities/pending_discovery_sync.dart';
 import 'package:catdex/features/catdex/domain/services/discovery_reward.dart';
 
 enum LocalDiscoverySaveStatus {
@@ -14,6 +15,7 @@ class LocalDiscoverySaveState {
     this.discovery,
     this.reward,
     this.message,
+    this.pendingSync,
   });
 
   const LocalDiscoverySaveState.idle()
@@ -23,4 +25,5 @@ class LocalDiscoverySaveState {
   final CatDiscovery? discovery;
   final DiscoveryReward? reward;
   final String? message;
+  final PendingDiscoverySync? pendingSync;
 }

@@ -1,11 +1,14 @@
 import 'package:catdex/features/catdex/data/repositories/in_memory_catdex_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/in_memory_discovery_repository.dart';
+import 'package:catdex/features/catdex/data/repositories/in_memory_pending_sync_queue_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/in_memory_player_progress_repository.dart';
 import 'package:catdex/features/catdex/data/seeds/catdex_seed_data.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
+import 'package:catdex/features/catdex/domain/entities/pending_discovery_sync.dart';
 import 'package:catdex/features/catdex/domain/entities/player_progress.dart';
+import 'package:catdex/features/catdex/domain/services/discovery_reward.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -81,6 +84,39 @@ void main() {
       await repository.saveProgress(progress);
 
       expect(await repository.getProgress('player-1'), progress);
+    });
+  });
+
+  group('InMemoryPendingSyncQueueRepository', () {
+    test('queues and removes pending discovery sync items', () async {
+      final repository = InMemoryPendingSyncQueueRepository();
+      final pendingSync = PendingDiscoverySync(
+        id: 'pending-1',
+        discovery: _discovery(
+          id: 'discovery-1',
+          playerId: 'player-1',
+          speciesId: 'maine_coon',
+        ),
+        reward: const DiscoveryReward(
+          xp: 100,
+          coins: 10,
+          friendshipPoints: 20,
+          duplicate: false,
+        ),
+        reason: PendingDiscoverySyncReason.cloudSaveFailed,
+        createdAt: DateTime.utc(2026),
+        lastErrorMessage: 'Cloud save failed.',
+      );
+
+      await repository.enqueueDiscovery(pendingSync);
+
+      expect(await repository.pendingDiscoveriesForPlayer('player-1'), [
+        pendingSync,
+      ]);
+
+      await repository.removePendingDiscovery('pending-1');
+
+      expect(await repository.pendingDiscoveriesForPlayer('player-1'), isEmpty);
     });
   });
 }
