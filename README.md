@@ -1,8 +1,6 @@
 # CatDex
 
-CatDex is a Flutter mobile game foundation for a relaxed cat discovery and collection experience. This repository currently contains the production-ready foundation and Sprint 2 application shell.
-
-No gameplay, authentication, Supabase, Firebase, AI, camera, GPS, maps, monetization, or collection logic is implemented yet.
+CatDex is a Flutter mobile game for a relaxed cat discovery and collection experience. The app supports a guest/local mode by default and can connect to Supabase for authentication, AI Edge Functions, and cloud repository access when configured.
 
 ## Tech Stack
 
@@ -29,6 +27,48 @@ flutter doctor
 flutter pub get
 flutter run
 ```
+
+## Supabase Setup
+
+CatDex starts in guest mode when Supabase values are missing. Guest mode keeps local capture, fake AI, in-memory saves, XP updates, Home refresh, and CatDex unlocks working without a backend.
+
+To connect a real Supabase project locally:
+
+```sh
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```text
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-public-anon-key
+```
+
+The `.env` file is gitignored. Do not commit real keys. The anon key is public by design, but it still belongs in local configuration, not source files.
+
+Run with either the built-in `.env` loader:
+
+```sh
+flutter run
+```
+
+or with Flutter defines:
+
+```sh
+flutter run --dart-define=SUPABASE_URL=https://your-project.supabase.co --dart-define=SUPABASE_ANON_KEY=your-public-anon-key
+```
+
+For CI or release builds, prefer environment-specific defines or a secure pipeline secret store. Server-only values such as `OPENAI_API_KEY` must only be configured in Supabase Edge Function secrets and must never be passed to Flutter.
+
+### Connection Checks
+
+The app exposes Supabase health checks behind providers:
+
+- `supabaseConnectionHealthProvider` verifies local-vs-cloud mode, auth client readiness, and master data reachability.
+- `cloudRepositoryVerificationProvider` verifies that logged-in cloud mode can read master data and read/write profile progress through repositories.
+
+These checks are repository/service level checks; widgets do not call Supabase directly.
 
 ## Quality Checks
 

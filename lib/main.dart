@@ -1,3 +1,4 @@
+import 'package:catdex/core/config/app_config.dart';
 import 'package:catdex/core/localization/catdex_localizations.dart';
 import 'package:catdex/core/supabase/supabase_initializer.dart';
 import 'package:catdex/routing/app_router.dart';
@@ -8,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.loadDotEnv();
   await SupabaseInitializer.initialize();
   runApp(const ProviderScope(child: CatDexApp()));
 }

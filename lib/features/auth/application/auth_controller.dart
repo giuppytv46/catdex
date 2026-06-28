@@ -1,18 +1,17 @@
 import 'dart:async';
 
-import 'package:catdex/core/config/app_config.dart';
 import 'package:catdex/features/auth/data/fake_auth_repository.dart';
 import 'package:catdex/features/auth/data/supabase_auth_repository.dart';
 import 'package:catdex/features/auth/domain/entities/auth_failure.dart';
 import 'package:catdex/features/auth/domain/entities/auth_session.dart';
 import 'package:catdex/features/auth/domain/entities/auth_user.dart';
 import 'package:catdex/features/auth/domain/repositories/auth_repository.dart';
+import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
-final authRepositoryProvider = Provider<AuthRepository>((_) {
-  if (AppConfig.hasSupabaseConfig) {
-    return SupabaseAuthRepository(supabase.Supabase.instance.client);
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  if (ref.watch(supabaseConfiguredProvider)) {
+    return SupabaseAuthRepository(ref.watch(supabaseClientProvider));
   }
 
   return FakeAuthRepository();

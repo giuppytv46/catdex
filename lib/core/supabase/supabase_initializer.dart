@@ -9,9 +9,13 @@ class SupabaseInitializer {
       return;
     }
 
-    await Supabase.initialize(
-      url: AppConfig.supabaseUrl,
-      publishableKey: AppConfig.supabaseAnonKey,
-    );
+    try {
+      await Supabase.initialize(
+        url: AppConfig.supabaseUrl,
+        publishableKey: AppConfig.supabaseAnonKey,
+      );
+    } on Object {
+      AppConfig.markSupabaseUnavailable();
+    }
   }
 }
