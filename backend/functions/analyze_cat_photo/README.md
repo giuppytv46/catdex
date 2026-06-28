@@ -27,11 +27,13 @@ Output is shaped to match Flutter `CatAnalysisResult` parsing:
 - `coatPattern`
 - `eyeColor`
 - `hairLength`
+- `estimatedAge`
 - `traits`
 - `rarity`
 - `variant`
 - `personality`
 - `story`
+- `funFact`
 - `analyzedAt`
 - `safetyStatus`
 
@@ -39,5 +41,19 @@ If `OPENAI_API_KEY` is missing, the function returns a safe mock result. If the
 OpenAI response is malformed, the function maps the result to a safe Domestic
 Cat fallback with low confidence.
 
+Realism rules:
+
+- Confidence below 80% is mapped to `domestic_shorthair_cat` or
+  `european_shorthair`.
+- Rare breed ids are accepted only with high confidence.
+- `legendary` rarity requires extremely high confidence.
+- `event_edition` is only allowed when an active event is explicitly passed.
+- Story, fun fact, trait names, and trait values are returned in Italian.
+
 `OPENAI_API_KEY` belongs only in the Supabase Edge Function environment. The
 Flutter app must never receive or store it.
+
+For private Supabase Storage photo references, configure server-side
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the Edge Function environment
+so the function can create a short-lived signed URL. These values must never be
+sent to Flutter.

@@ -8,7 +8,9 @@ type AnalyzeCatPhotoRequest = {
     source?: string;
     sizeBytes?: number;
     capturedAt?: string;
+    activeEventId?: string;
   };
+  activeEventId?: string;
 };
 
 type TraitJson = {
@@ -30,11 +32,13 @@ type AnalysisJson = {
   coatPattern: string;
   eyeColor: string;
   hairLength: string;
+  estimatedAge: string;
   traits: TraitJson[];
   personality: string;
   rarity: string;
   variant: string;
   story: string;
+  funFact: string;
   safetyStatus: "safe" | "no_cat" | "inappropriate" | "malformed";
   analyzedAt: string;
 };
@@ -78,6 +82,42 @@ const allowedPersonalities = [
   "relaxed",
   "playful",
 ];
+const allowedBreedIds = [
+  "domestic_shorthair_cat",
+  "domestic_tabby_cat",
+  "domestic_black_cat",
+  "domestic_white_cat",
+  "domestic_tuxedo_cat",
+  "domestic_calico_cat",
+  "domestic_orange_cat",
+  "domestic_gray_cat",
+  "domestic_longhair_cat",
+  "european_shorthair",
+  "maine_coon",
+  "persian",
+  "siamese",
+  "british_shorthair",
+  "ragdoll",
+  "bengal",
+  "sphynx",
+  "russian_blue",
+  "norwegian_forest_cat",
+  "abyssinian",
+  "scottish_fold",
+  "american_shorthair",
+];
+const rareBreedIds = [
+  "cymric",
+  "lykoi",
+  "khao_manee",
+  "peterbald",
+  "sokoke",
+  "toyger",
+  "chausie",
+  "savannah",
+  "serengeti",
+  "burmilla",
+];
 
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") {
@@ -107,10 +147,10 @@ Deno.serve(async (request: Request) => {
     return jsonResponse(mockAnalysisResult("missing_key"), 200);
   }
 
-  const imageInput = imageInputFor(body);
+  const imageInput = await imageInputFor(body);
   if (imageInput === null) {
     return invalidImageResponse(
-      "image_url or base64_image is required for real AI analysis.",
+      "image_url, base64_image, or resolvable photoReference is required for real AI analysis.",
     );
   }
 
@@ -120,7 +160,7 @@ Deno.serve(async (request: Request) => {
       locale: body.locale ?? "en",
       openAiKey,
     });
-    const analysis = validateAnalysisJson(aiJson);
+    const analysis = validateAnalysisJson(aiJson, hasActiveEvent(body));
 
     if (analysis.safetyStatus === "no_cat") {
       return jsonResponse(
@@ -177,7 +217,9 @@ function validateRequest(body: AnalyzeCatPhotoRequest): string | null {
   return null;
 }
 
-function imageInputFor(body: AnalyzeCatPhotoRequest): string | null {
+async function imageInputFor(
+  body: AnalyzeCatPhotoRequest,
+): Promise<string | null> {
   if (body.image_url) {
     return body.image_url;
   }
@@ -190,7 +232,56 @@ function imageInputFor(body: AnalyzeCatPhotoRequest): string | null {
     return `data:image/jpeg;base64,${body.base64_image}`;
   }
 
+  if (body.photoReference) {
+    return signedStorageUrlFor(body.photoReference);
+  }
+
   return null;
+}
+
+async function signedStorageUrlFor(
+  photoReference: string,
+): Promise<string | null> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) {
+    return null;
+  }
+
+  const normalizedPath = photoReference.replace(/^\/+/, "");
+  const bucketName = "cat-photos";
+  const storagePath = normalizedPath.startsWith(`${bucketName}/`)
+    ? normalizedPath.slice(bucketName.length + 1)
+    : normalizedPath;
+  const response = await fetch(
+    `${supabaseUrl}/storage/v1/object/sign/${bucketName}/${storagePath}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ expiresIn: 300 }),
+    },
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = await response.json() as {
+    signedURL?: string;
+    signedUrl?: string;
+  };
+  const signedPath = payload.signedURL ?? payload.signedUrl;
+  if (!signedPath) {
+    return null;
+  }
+
+  return signedPath.startsWith("http")
+    ? signedPath
+    : `${supabaseUrl}/storage/v1${signedPath}`;
 }
 
 async function analyzeWithOpenAi({
@@ -249,12 +340,17 @@ function analysisPrompt(locale: string): string {
     "Reject inappropriate images. If no cat is visible, set safetyStatus to no_cat.",
     "Return JSON only, with no markdown.",
     "Use CatDex ids for breed and variant.",
+    `Allowed breed ids: ${allowedBreedIds.join(", ")}.`,
     "Allowed rarity: common, uncommon, rare, epic, legendary, mythic.",
     `Allowed variants: ${allowedVariants.join(", ")}.`,
     `Allowed personalities: ${allowedPersonalities.join(", ")}.`,
-    "If breed is uncertain, use domestic_shorthair_cat with low confidence.",
-    "JSON keys: breed, confidence, candidates, coatColor, coatPattern, eyeColor, hairLength, traits, personality, rarity, variant, story, safetyStatus.",
-    `Use locale ${locale} for story only.`,
+    "If breed confidence is below 0.80, breed must be domestic_shorthair_cat or european_shorthair.",
+    "Rare breed ids are allowed only with confidence >= 0.90. Never invent exotic breeds.",
+    "Legendary rarity must be extremely rare and only for very strong visual evidence.",
+    "Never return event_edition unless an active event is explicitly provided.",
+    "Return story, funFact, trait names, and trait values in Italian.",
+    "JSON keys: breed, confidence, candidates, coatColor, coatPattern, eyeColor, hairLength, estimatedAge, traits, personality, rarity, variant, story, funFact, safetyStatus.",
+    `Requested locale is ${locale}, but CatDex alpha requires Italian user-facing text.`,
   ].join(" ");
 }
 
@@ -313,7 +409,10 @@ function parseJsonObject(text: string): unknown {
   }
 }
 
-function validateAnalysisJson(value: unknown): AnalysisJson {
+function validateAnalysisJson(
+  value: unknown,
+  activeEvent: boolean,
+): AnalysisJson {
   if (typeof value !== "object" || value === null) {
     throw new MalformedAiResponseError();
   }
@@ -339,6 +438,7 @@ function validateAnalysisJson(value: unknown): AnalysisJson {
     coatPattern: stringValue(item.coatPattern) || "Unknown",
     eyeColor: stringValue(item.eyeColor) || "Unknown",
     hairLength: stringValue(item.hairLength) || "Unknown",
+    estimatedAge: stringValue(item.estimatedAge) || "adulto",
     traits: traitList(item.traits),
     personality: allowedValue(
       stringValue(item.personality),
@@ -348,6 +448,7 @@ function validateAnalysisJson(value: unknown): AnalysisJson {
     rarity: allowedValue(stringValue(item.rarity), allowedRarities, "common"),
     variant: allowedValue(stringValue(item.variant), allowedVariants, "normal"),
     story: stringValue(item.story) || safeFallbackAnalysis().story,
+    funFact: stringValue(item.funFact) || safeFallbackAnalysis().funFact,
     safetyStatus: "safe",
     analyzedAt: new Date().toISOString(),
   };
@@ -356,7 +457,7 @@ function validateAnalysisJson(value: unknown): AnalysisJson {
     throw new MalformedAiResponseError();
   }
 
-  return analysis;
+  return applyRealismRules(analysis, activeEvent);
 }
 
 function candidateList(value: unknown): CandidateJson[] {
@@ -370,7 +471,10 @@ function candidateList(value: unknown): CandidateJson[] {
     }
 
     const row = item as Record<string, unknown>;
-    const breed = stringValue(row.breed) || "domestic_shorthair_cat";
+    const breed = realisticBreedId(
+      stringValue(row.breed) || "domestic_shorthair_cat",
+      numberValue(row.confidence),
+    );
     const confidence = numberValue(row.confidence);
 
     if (confidence < 0 || confidence > 1) {
@@ -387,7 +491,7 @@ function candidateList(value: unknown): CandidateJson[] {
 
 function traitList(value: unknown): TraitJson[] {
   if (!Array.isArray(value)) {
-    return [{ name: "Mood", value: "Curious", rarityWeight: 1 }];
+    return [{ name: "Umore", value: "Curioso", rarityWeight: 1 }];
   }
 
   const traits = value.flatMap((item) => {
@@ -410,7 +514,7 @@ function traitList(value: unknown): TraitJson[] {
   });
 
   return traits.length === 0
-    ? [{ name: "Mood", value: "Curious", rarityWeight: 1 }]
+    ? [{ name: "Umore", value: "Curioso", rarityWeight: 1 }]
     : traits.slice(0, 6);
 }
 
@@ -423,11 +527,13 @@ function toResultEnvelope(analysis: AnalysisJson): JsonResponseBody {
     coatPattern: analysis.coatPattern,
     eyeColor: analysis.eyeColor,
     hairLength: analysis.hairLength,
+    estimatedAge: analysis.estimatedAge,
     traits: analysis.traits,
     personality: analysis.personality,
     rarity: analysis.rarity,
     variant: analysis.variant,
     story: analysis.story,
+    funFact: analysis.funFact,
     safetyStatus: analysis.safetyStatus,
     analyzedAt: analysis.analyzedAt,
   };
@@ -442,12 +548,15 @@ function safeFallbackAnalysis(): AnalysisJson {
     coatPattern: "Unknown",
     eyeColor: "Unknown",
     hairLength: "Unknown",
-    traits: [{ name: "Mood", value: "Curious", rarityWeight: 1 }],
+    estimatedAge: "adulto",
+    traits: [{ name: "Umore", value: "Curioso", rarityWeight: 1 }],
     personality: "curious",
     rarity: "common",
     variant: "normal",
     story:
-      "This mysterious local cat keeps a few secrets, but still earns a cozy CatDex card.",
+      "Questo gatto di quartiere resta un piccolo mistero, ma merita comunque una carta CatDex tutta sua.",
+    funFact:
+      "Molti gatti domestici hanno origini miste: CatDex privilegia una classificazione prudente quando la razza non e chiara.",
     safetyStatus: "safe",
     analyzedAt: new Date().toISOString(),
   };
@@ -467,15 +576,18 @@ function mockAnalysisResult(mockReason: string): JsonResponseBody {
       coatPattern: "Tabby",
       eyeColor: "Green",
       hairLength: "Short",
+      estimatedAge: "adulto",
       traits: [
-        { name: "Pose", value: "Watching", rarityWeight: 1 },
-        { name: "Mood", value: "Curious", rarityWeight: 1 },
+        { name: "Posa", value: "In osservazione", rarityWeight: 1 },
+        { name: "Umore", value: "Curioso", rarityWeight: 1 },
       ],
       personality: "curious",
       rarity: "common",
       variant: "normal",
       story:
-        "This curious local cat looks ready to become the star of a cozy CatDex card.",
+        "Questo gatto curioso sembra pronto a diventare il protagonista di una nuova carta CatDex.",
+      funFact:
+        "I gatti tigrati domestici sono molto comuni e possono avere pattern molto diversi tra loro.",
       safetyStatus: "safe",
       analyzedAt: new Date().toISOString(),
     }),
@@ -484,6 +596,63 @@ function mockAnalysisResult(mockReason: string): JsonResponseBody {
       mockReason,
     },
   };
+}
+
+function applyRealismRules(
+  analysis: AnalysisJson,
+  activeEvent: boolean,
+): AnalysisJson {
+  const breed = realisticBreedId(analysis.breed, analysis.confidence);
+  const candidates = analysis.candidates
+    .map((candidate) => ({
+      breed: realisticBreedId(candidate.breed, candidate.confidence),
+      confidence: candidate.confidence,
+    }))
+    .filter((candidate, index, list) =>
+      list.findIndex((item) => item.breed === candidate.breed) === index
+    )
+    .slice(0, 3);
+
+  return {
+    ...analysis,
+    breed,
+    candidates: candidates.length === 0
+      ? [{ breed, confidence: analysis.confidence }]
+      : candidates,
+    rarity: realisticRarity(analysis.rarity, analysis.confidence),
+    variant: analysis.variant === "event_edition" && !activeEvent
+      ? "normal"
+      : analysis.variant,
+  };
+}
+
+function realisticBreedId(breed: string, confidence: number): string {
+  const normalized = breed.trim().toLowerCase();
+  if (confidence < 0.8) {
+    return normalized.includes("european")
+      ? "european_shorthair"
+      : "domestic_shorthair_cat";
+  }
+
+  if (rareBreedIds.includes(normalized) && confidence < 0.9) {
+    return "domestic_shorthair_cat";
+  }
+
+  return allowedBreedIds.includes(normalized)
+    ? normalized
+    : "domestic_shorthair_cat";
+}
+
+function realisticRarity(rarity: string, confidence: number): string {
+  if ((rarity === "legendary" && confidence < 0.98) || rarity === "mythic") {
+    return "rare";
+  }
+
+  return rarity;
+}
+
+function hasActiveEvent(body: AnalyzeCatPhotoRequest): boolean {
+  return Boolean(body.activeEventId || body.metadata?.activeEventId);
 }
 
 function invalidImageResponse(message: string): Response {

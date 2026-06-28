@@ -46,6 +46,41 @@ void main() {
     expect(result.variant.id, 'normal');
   });
 
+  test('falls back to domestic shorthair for low-confidence exotic breed', () {
+    const parser = CatAnalysisResultJsonParser();
+    final json = _realJson()
+      ..['breed'] = 'cymric'
+      ..['confidence'] = 0.61
+      ..['candidates'] = [
+        {'breed': 'cymric', 'confidence': 0.61},
+      ];
+
+    final result = parser.parse(json);
+
+    expect(result.primaryBreed.species.id, 'domestic_shorthair_cat');
+    expect(result.confidence.score, 0.61);
+  });
+
+  test('prevents Event Edition when no active event context exists', () {
+    const parser = CatAnalysisResultJsonParser();
+    final json = _realJson()..['variant'] = 'event_edition';
+
+    final result = parser.parse(json);
+
+    expect(result.variant.id, 'normal');
+  });
+
+  test('downgrades unrealistic legendary rarity', () {
+    const parser = CatAnalysisResultJsonParser();
+    final json = _realJson()
+      ..['rarity'] = 'legendary'
+      ..['confidence'] = 0.85;
+
+    final result = parser.parse(json);
+
+    expect(result.rarity, CatRarity.rare);
+  });
+
   test('falls back safely for malformed response', () {
     const parser = CatAnalysisResultJsonParser();
 

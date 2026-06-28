@@ -597,21 +597,21 @@ class CatDexLocalizations {
   );
 
   String get analysisPreparingMessage => _localizedValue(
-    en: 'CatDex is preparing a local fake analysis result.',
-    it: 'CatDex sta preparando una finta analisi locale.',
-    es: 'CatDex prepara un resultado falso local.',
-    fr: 'CatDex prepare une fausse analyse locale.',
-    de: 'CatDex erstellt eine lokale Fake-Analyse.',
-    ja: 'CatDex is preparing a local fake analysis result.',
+    en: 'CatDex is checking the photo and preparing your discovery.',
+    it: 'CatDex sta controllando la foto e preparando la scoperta.',
+    es: 'CatDex revisa la foto y prepara tu hallazgo.',
+    fr: 'CatDex analyse la photo et prepare ta decouverte.',
+    de: 'CatDex pruft das Foto und bereitet deine Entdeckung vor.',
+    ja: 'CatDex is checking the photo and preparing your discovery.',
   );
 
   String get analysisResultTitle => _localizedValue(
-    en: 'Fake Analysis Result',
-    it: 'Risultato Analisi Finta',
-    es: 'Resultado Falso',
-    fr: 'Resultat Fictif',
-    de: 'Fake-Analyse Ergebnis',
-    ja: 'Fake Analysis Result',
+    en: 'New discovery!',
+    it: 'Nuova scoperta!',
+    es: 'Nueva descoberta!',
+    fr: 'Nouvelle decouverte!',
+    de: 'Neue Entdeckung!',
+    ja: 'New discovery!',
   );
 
   String get breedLabel => _localizedValue(

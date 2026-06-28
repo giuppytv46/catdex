@@ -18,6 +18,7 @@ void main() {
 
     expect(result.primaryBreed.species.id, 'domestic_tabby_cat');
     expect(client.lastBody?['photoReference'], 'cat.jpg');
+    expect(client.lastBody?['locale'], 'it');
     expect(client.lastBody?['metadata'], isA<Map<String, Object?>>());
   });
 

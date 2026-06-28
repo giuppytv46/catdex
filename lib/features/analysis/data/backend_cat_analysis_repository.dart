@@ -52,6 +52,7 @@ class BackendCatAnalysisRepository implements CatAnalysisRepository {
         'sizeBytes': photo.sizeBytes,
         'capturedAt': photo.capturedAt.toIso8601String(),
       },
+      'locale': 'it',
     };
   }
 }
