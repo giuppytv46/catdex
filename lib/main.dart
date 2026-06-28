@@ -1,6 +1,8 @@
 import 'package:catdex/core/config/app_config.dart';
 import 'package:catdex/core/localization/catdex_localizations.dart';
 import 'package:catdex/core/supabase/supabase_initializer.dart';
+import 'package:catdex/features/onboarding/application/onboarding_controller.dart';
+import 'package:catdex/features/onboarding/data/shared_preferences_onboarding_repository.dart';
 import 'package:catdex/routing/app_router.dart';
 import 'package:catdex/theme/app_theme.dart';
 import 'package:catdex/theme/theme_controller.dart';
@@ -11,7 +13,16 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppConfig.loadDotEnv();
   await SupabaseInitializer.initialize();
-  runApp(const ProviderScope(child: CatDexApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        onboardingRepositoryProvider.overrideWithValue(
+          const SharedPreferencesOnboardingRepository(),
+        ),
+      ],
+      child: const CatDexApp(),
+    ),
+  );
 }
 
 class CatDexApp extends ConsumerWidget {

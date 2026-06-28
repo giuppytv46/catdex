@@ -47,6 +47,174 @@ class CatDexLocalizations {
     ja: 'Onboarding',
   );
 
+  String get onboardingDiscoverTitle => _localizedValue(
+    en: 'Discover real cats',
+    it: 'Scopri gatti reali',
+    es: 'Descubre gatos reales',
+    fr: 'Decouvre de vrais chats',
+    de: 'Entdecke echte Katzen',
+    ja: 'Discover real cats',
+  );
+
+  String get onboardingDiscoverMessage => _localizedValue(
+    en: 'Take or import a cat photo whenever you find a new friend.',
+    it: 'Scatta o importa una foto quando trovi un nuovo amico.',
+    es: 'Toma o importa una foto cuando encuentres un nuevo amigo.',
+    fr: 'Prends ou importe une photo quand tu trouves un nouvel ami.',
+    de: 'Mache oder importiere ein Foto, wenn du eine neue Katze findest.',
+    ja: 'Take or import a cat photo whenever you find a new friend.',
+  );
+
+  String get onboardingCardsTitle => _localizedValue(
+    en: 'AI creates collectible cards',
+    it: 'L AI crea carte collezionabili',
+    es: 'La IA crea cartas coleccionables',
+    fr: 'L IA cree des cartes a collectionner',
+    de: 'KI erstellt Sammelkarten',
+    ja: 'AI creates collectible cards',
+  );
+
+  String get onboardingCardsMessage => _localizedValue(
+    en: 'CatDex turns each discovery into species, traits, rarity, and story.',
+    it: 'CatDex trasforma ogni scoperta in specie, tratti, rarita e storia.',
+    es: 'CatDex convierte cada hallazgo en especie, rasgos, rareza e historia.',
+    fr:
+        'CatDex transforme chaque decouverte en espece, traits, rarete et '
+        'histoire.',
+    de:
+        'CatDex verwandelt jede Entdeckung in Art, Merkmale, Seltenheit und '
+        'Story.',
+    ja: 'CatDex turns each discovery into species, traits, rarity, and story.',
+  );
+
+  String get onboardingLevelTitle => _localizedValue(
+    en: 'Build your CatDex',
+    it: 'Costruisci il tuo CatDex',
+    es: 'Construye tu CatDex',
+    fr: 'Construis ton CatDex',
+    de: 'Baue dein CatDex auf',
+    ja: 'Build your CatDex',
+  );
+
+  String get onboardingLevelMessage => _localizedValue(
+    en: 'Save discoveries, grow your collection, earn XP, and level up.',
+    it: 'Salva scoperte, amplia la collezione, guadagna XP e sali di livello.',
+    es: 'Guarda hallazgos, amplia tu coleccion, gana XP y sube de nivel.',
+    fr: 'Sauvegarde tes decouvertes, agrandis ta collection, gagne de l XP.',
+    de:
+        'Speichere Entdeckungen, erweitere die Sammlung, verdiene XP und '
+        'Levels.',
+    ja: 'Save discoveries, grow your collection, earn XP, and level up.',
+  );
+
+  String get mascotPlaceholderTitle => _localizedValue(
+    en: 'Meet your CatDex guide',
+    it: 'Incontra la guida CatDex',
+    es: 'Conoce tu guia CatDex',
+    fr: 'Rencontre ton guide CatDex',
+    de: 'Triff deinen CatDex-Guide',
+    ja: 'Meet your CatDex guide',
+  );
+
+  String get mascotPlaceholderMessage => _localizedValue(
+    en: 'A polished mascot illustration will land here before beta.',
+    it: 'Qui arrivera una mascotte rifinita prima della beta.',
+    es: 'Aqui llegara una mascota final antes de la beta.',
+    fr: 'Une mascotte finalisee arrivera ici avant la beta.',
+    de: 'Hier erscheint vor der Beta eine fertige Maskottchen-Illustration.',
+    ja: 'A polished mascot illustration will land here before beta.',
+  );
+
+  String get permissionEducationTitle => _localizedValue(
+    en: 'Permissions when you need them',
+    it: 'Permessi solo quando servono',
+    es: 'Permisos cuando hagan falta',
+    fr: 'Permissions seulement au bon moment',
+    de: 'Berechtigungen erst wenn notig',
+    ja: 'Permissions when you need them',
+  );
+
+  String get cameraEducationTitle => _localizedValue(
+    en: 'Camera',
+    it: 'Fotocamera',
+    es: 'Camara',
+    fr: 'Camera',
+    de: 'Kamera',
+    ja: 'Camera',
+  );
+
+  String get cameraEducationMessage => _localizedValue(
+    en: 'Asked only when you choose Take Photo.',
+    it: 'Richiesta solo quando scegli Scatta Foto.',
+    es: 'Se pide solo cuando eliges Tomar Foto.',
+    fr: 'Demandee seulement quand tu choisis Prendre une Photo.',
+    de: 'Wird erst gefragt, wenn du Foto aufnehmen wahlst.',
+    ja: 'Asked only when you choose Take Photo.',
+  );
+
+  String get photosEducationTitle => _localizedValue(
+    en: 'Photos',
+    it: 'Foto',
+    es: 'Fotos',
+    fr: 'Photos',
+    de: 'Fotos',
+    ja: 'Photos',
+  );
+
+  String get photosEducationMessage => _localizedValue(
+    en: 'Asked only when you import from your gallery.',
+    it: 'Richiesto solo quando importi dalla galleria.',
+    es: 'Se pide solo cuando importas desde la galeria.',
+    fr: 'Demandee seulement quand tu importes depuis ta galerie.',
+    de: 'Wird erst gefragt, wenn du aus der Galerie importierst.',
+    ja: 'Asked only when you import from your gallery.',
+  );
+
+  String get locationEducationTitle => _localizedValue(
+    en: 'Location',
+    it: 'Posizione',
+    es: 'Ubicacion',
+    fr: 'Position',
+    de: 'Standort',
+    ja: 'Location',
+  );
+
+  String get locationEducationMessage => _localizedValue(
+    en: 'Asked only when you choose to add discovery location.',
+    it: 'Richiesta solo quando scegli di aggiungere il luogo della scoperta.',
+    es: 'Se pide solo cuando eliges agregar ubicacion al hallazgo.',
+    fr: 'Demandee seulement quand tu ajoutes le lieu de decouverte.',
+    de: 'Wird erst gefragt, wenn du den Fundort hinzufugst.',
+    ja: 'Asked only when you choose to add discovery location.',
+  );
+
+  String get continueAsGuestAction => _localizedValue(
+    en: 'Continue as Guest',
+    it: 'Continua come Ospite',
+    es: 'Continuar como Invitado',
+    fr: 'Continuer en Invite',
+    de: 'Als Gast fortfahren',
+    ja: 'Continue as Guest',
+  );
+
+  String get onboardingSignInAction => _localizedValue(
+    en: 'Sign in',
+    it: 'Accedi',
+    es: 'Iniciar sesion',
+    fr: 'Se connecter',
+    de: 'Einloggen',
+    ja: 'Sign in',
+  );
+
+  String get onboardingLoadingMessage => _localizedValue(
+    en: 'Preparing your CatDex...',
+    it: 'Prepariamo il tuo CatDex...',
+    es: 'Preparando tu CatDex...',
+    fr: 'Preparation de ton CatDex...',
+    de: 'Dein CatDex wird vorbereitet...',
+    ja: 'Preparing your CatDex...',
+  );
+
   String get loginTitle => _localizedValue(
     en: 'Login',
     it: 'Accesso',
