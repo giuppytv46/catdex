@@ -1,0 +1,35 @@
+insert into public.cat_species (
+  id,
+  display_name,
+  scientific_name,
+  origin_country,
+  base_rarity,
+  active
+) values
+  ('domestic_black_cat', 'Domestic Black Cat', 'Felis catus', 'Worldwide', 'common', true),
+  ('domestic_white_cat', 'Domestic White Cat', 'Felis catus', 'Worldwide', 'common', true),
+  ('domestic_tuxedo_cat', 'Domestic Tuxedo Cat', 'Felis catus', 'Worldwide', 'common', true),
+  ('domestic_calico_cat', 'Domestic Calico Cat', 'Felis catus', 'Worldwide', 'uncommon', true),
+  ('domestic_tabby_cat', 'Domestic Tabby Cat', 'Felis catus', 'Worldwide', 'common', true),
+  ('domestic_orange_cat', 'Domestic Orange Cat', 'Felis catus', 'Worldwide', 'common', true),
+  ('domestic_gray_cat', 'Domestic Gray Cat', 'Felis catus', 'Worldwide', 'common', true),
+  ('domestic_tortoiseshell_cat', 'Domestic Tortoiseshell Cat', 'Felis catus', 'Worldwide', 'uncommon', true),
+  ('domestic_colorpoint_cat', 'Domestic Colorpoint Cat', 'Felis catus', 'Worldwide', 'uncommon', true),
+  ('domestic_longhair_cat', 'Domestic Longhair Cat', 'Felis catus', 'Worldwide', 'common', true),
+  ('domestic_shorthair_cat', 'Domestic Shorthair Cat', 'Felis catus', 'Worldwide', 'common', true),
+  ('maine_coon', 'Maine Coon', 'Felis catus', 'United States', 'rare', true),
+  ('siamese', 'Siamese', 'Felis catus', 'Thailand', 'uncommon', true),
+  ('persian', 'Persian', 'Felis catus', 'Iran', 'rare', true),
+  ('ragdoll', 'Ragdoll', 'Felis catus', 'United States', 'rare', true),
+  ('bengal', 'Bengal', 'Felis catus', 'United States', 'epic', true),
+  ('sphynx', 'Sphynx', 'Felis catus', 'Canada', 'epic', true),
+  ('british_shorthair', 'British Shorthair', 'Felis catus', 'United Kingdom', 'uncommon', true),
+  ('scottish_fold', 'Scottish Fold', 'Felis catus', 'United Kingdom', 'rare', true),
+  ('european_shorthair', 'European Shorthair', 'Felis catus', 'Europe', 'common', true)
+on conflict (id) do update set
+  display_name = excluded.display_name,
+  scientific_name = excluded.scientific_name,
+  origin_country = excluded.origin_country,
+  base_rarity = excluded.base_rarity,
+  active = excluded.active,
+  updated_at = now();
