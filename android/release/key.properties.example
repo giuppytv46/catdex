@@ -1,0 +1,7 @@
+# Copy this file to android/key.properties for local Android release signing.
+# Do not commit android/key.properties or keystore files.
+
+storeFile=/absolute/path/to/catdex-release.keystore
+storePassword=replace-with-local-secret
+keyAlias=catdex
+keyPassword=replace-with-local-secret

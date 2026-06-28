@@ -11,6 +11,9 @@ coverage/
 
 # Android
 android/.gradle/
+android/key.properties
+android/**/*.jks
+android/**/*.keystore
 android/local.properties
 android/**/generated/
 
@@ -18,6 +21,7 @@ android/**/generated/
 ios/Flutter/ephemeral/
 ios/Pods/
 ios/.symlinks/
+ios/Runner/Config/ReleaseConfig.xcconfig
 ios/Runner.xcworkspace/xcshareddata/
 
 # Editors

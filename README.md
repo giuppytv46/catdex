@@ -82,6 +82,27 @@ flutter analyze
 flutter test
 ```
 
+## Release Preparation
+
+Sprint 20 adds store-readiness foundations only. CatDex is not published from this repository, and no store credentials are committed.
+
+Release references:
+
+- [Release preparation](docs/RELEASE_PREPARATION.md)
+- [Permissions](docs/PERMISSIONS.md)
+- [Privacy policy draft](docs/PRIVACY_POLICY_DRAFT.md)
+- [Store listing draft](docs/STORE_LISTING_DRAFT.md)
+- [Release checklist](docs/RELEASE_CHECKLIST.md)
+- [App icon placeholder](docs/APP_ICON_PLACEHOLDER.md)
+- [Splash screen placeholder](docs/SPLASH_SCREEN_PLACEHOLDER.md)
+
+Build helpers:
+
+```sh
+scripts/build_android.sh
+scripts/build_ios.sh
+```
+
 ## Project Structure
 
 ```text
