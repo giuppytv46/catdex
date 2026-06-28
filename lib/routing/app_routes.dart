@@ -10,6 +10,7 @@ enum AppRoute {
   friends('/friends'),
   profile('/profile'),
   settings('/settings'),
+  premium('/premium'),
   offline('/offline'),
   globalError('/error'),
   unknown('/unknown');

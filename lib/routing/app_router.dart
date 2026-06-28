@@ -11,6 +11,7 @@ import 'package:catdex/features/home/presentation/home_page.dart';
 import 'package:catdex/features/login/presentation/login_page.dart';
 import 'package:catdex/features/offline/presentation/offline_page.dart';
 import 'package:catdex/features/onboarding/presentation/onboarding_page.dart';
+import 'package:catdex/features/premium/presentation/premium_page.dart';
 import 'package:catdex/features/profile/presentation/profile_page.dart';
 import 'package:catdex/features/settings/presentation/settings_page.dart';
 import 'package:catdex/features/splash/presentation/splash_page.dart';
@@ -89,6 +90,7 @@ final appRouterProvider = Provider<GoRouter>((_) {
         ],
       ),
       _animatedRoute(route: AppRoute.settings, child: const SettingsPage()),
+      _animatedRoute(route: AppRoute.premium, child: const PremiumPage()),
       GoRoute(
         path: AppRoute.analysis.path,
         name: AppRoute.analysis.name,
