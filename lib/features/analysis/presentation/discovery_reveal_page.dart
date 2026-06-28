@@ -47,11 +47,7 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
       CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
     );
     unawaited(_controller.forward());
-    unawaited(
-      Future<void>.microtask(() {
-        ref.read(discoveryRevealSoundHooksProvider).playReveal();
-      }),
-    );
+    unawaited(Future<void>.microtask(_playRevealSound));
   }
 
   @override
@@ -105,19 +101,31 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
             const SizedBox(height: AppSpacing.lg),
             _ResultDetails(args: widget.args),
             const SizedBox(height: AppSpacing.lg),
-            FilledButton.icon(
-              onPressed: saving ? null : () => _saveDiscovery(context),
-              icon: saving
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: currentSaveState.status == LocalDiscoverySaveStatus.saved
+                  ? FilledButton.icon(
+                      key: const Key('discovery_reveal_continue_button'),
+                      onPressed: () => context.goNamed(AppRoute.home.name),
+                      icon: const Icon(Icons.arrow_forward_rounded),
+                      label: Text(l10n.continueAction),
                     )
-                  : const Icon(Icons.add_circle_rounded),
-              label: Text(
-                currentSaveState.status == LocalDiscoverySaveStatus.failure
-                    ? l10n.retrySaveAction
-                    : l10n.addToCatDexAction,
-              ),
+                  : FilledButton.icon(
+                      key: const Key('discovery_reveal_add_button'),
+                      onPressed: saving ? null : () => _saveDiscovery(context),
+                      icon: saving
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.add_circle_rounded),
+                      label: Text(
+                        currentSaveState.status ==
+                                LocalDiscoverySaveStatus.failure
+                            ? l10n.retrySaveAction
+                            : l10n.addToCatDexAction,
+                      ),
+                    ),
             ),
             if (currentSaveState.status ==
                 LocalDiscoverySaveStatus.failure) ...[
@@ -142,14 +150,30 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
     final notifier = ref.read(localDiscoverySaveControllerProvider.notifier);
 
     await notifier.save(widget.args.result);
-    ref.read(discoveryRevealSoundHooksProvider).playRewards();
 
     final state = ref.read(localDiscoverySaveControllerProvider).value;
     if (!context.mounted || state?.status != LocalDiscoverySaveStatus.saved) {
       return;
     }
 
-    context.goNamed(AppRoute.home.name);
+    ref.read(discoveryRevealSoundHooksProvider).playLevelUp();
+  }
+
+  void _playRevealSound() {
+    final hooks = ref.read(discoveryRevealSoundHooksProvider);
+    final result = widget.args.result;
+
+    if (_isShinyVariant(result.variant.id)) {
+      hooks.playShinyReveal();
+      return;
+    }
+
+    if (_isRareRarity(result.rarity)) {
+      hooks.playRareReveal();
+      return;
+    }
+
+    hooks.playCommonReveal();
   }
 }
 
@@ -163,74 +187,189 @@ class _RevealCard extends StatelessWidget {
     final l10n = CatDexLocalizations.of(context);
     final result = args.result;
     final rarityColor = _rarityColor(result.rarity);
+    final shimmer =
+        _isShinyVariant(result.variant.id) || _isRareRarity(result.rarity);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.white,
-            rarityColor.withValues(alpha: 0.22),
-            AppColors.primaryPurple.withValues(alpha: 0.2),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(40),
-        boxShadow: [
-          BoxShadow(
-            color: rarityColor.withValues(alpha: 0.42),
-            blurRadius: 34,
-            spreadRadius: 4,
-            offset: const Offset(0, 14),
-          ),
-        ],
-        border: Border.all(
-          color: rarityColor.withValues(alpha: 0.82),
-          width: 3,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          children: [
-            Text(
-              l10n.discoveryUnlockedLabel,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppColors.primaryPurple,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Hero(
-              tag: 'catdex-photo-${args.photo.path}',
-              child: _PhotoMedallion(path: args.photo.path),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              result.primaryBreed.species.displayName,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: AppColors.ink,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: [
-                _RevealBadge(label: l10n.rarityName(result.rarity.name)),
-                _RevealBadge(label: result.variant.name),
-                _RevealBadge(label: _personalityName(result.personality)),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned.fill(child: _ConfettiPlaceholder(color: rarityColor)),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.white,
+                rarityColor.withValues(alpha: 0.22),
+                AppColors.primaryPurple.withValues(alpha: 0.2),
               ],
             ),
-          ],
+            borderRadius: BorderRadius.circular(40),
+            boxShadow: [
+              BoxShadow(
+                color: rarityColor.withValues(alpha: 0.42),
+                blurRadius: 34,
+                spreadRadius: 4,
+                offset: const Offset(0, 14),
+              ),
+            ],
+            border: Border.all(
+              color: rarityColor.withValues(alpha: 0.82),
+              width: 3,
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(38),
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    children: [
+                      Text(
+                        l10n.discoveryUnlockedLabel,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: AppColors.primaryPurple,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        l10n.catNamePlaceholder,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: rarityColor,
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Hero(
+                        tag: 'catdex-photo-${args.photo.path}',
+                        child: _PhotoMedallion(path: args.photo.path),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        result.primaryBreed.species.displayName,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: AppColors.ink,
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: [
+                          _RevealBadge(
+                            label: l10n.rarityName(result.rarity.name),
+                          ),
+                          _RevealBadge(label: result.variant.name),
+                          _RevealBadge(
+                            label: _personalityName(result.personality),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (shimmer) _ShimmerOverlay(color: rarityColor),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ConfettiPlaceholder extends StatelessWidget {
+  const _ConfettiPlaceholder({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    const offsets = [
+      Alignment(-0.92, -1.05),
+      Alignment(-0.62, -0.9),
+      Alignment(0.68, -0.98),
+      Alignment(0.94, -0.62),
+      Alignment(-0.88, 0.74),
+      Alignment(0.82, 0.92),
+    ];
+
+    return IgnorePointer(
+      child: Stack(
+        children: offsets
+            .map((alignment) {
+              return Align(
+                alignment: alignment,
+                child: Container(
+                  width: 10,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              );
+            })
+            .toList(growable: false),
+      ),
+    );
+  }
+}
+
+class _ShimmerOverlay extends StatelessWidget {
+  const _ShimmerOverlay({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.transparent,
+                AppColors.white.withValues(alpha: 0.34),
+                color.withValues(alpha: 0.16),
+                Colors.transparent,
+              ],
+              stops: const [0, 0.42, 0.52, 1],
+            ),
+          ),
         ),
       ),
     );
   }
+}
+
+bool _isRareRarity(CatRarity rarity) {
+  return switch (rarity) {
+    CatRarity.common || CatRarity.uncommon => false,
+    CatRarity.rare ||
+    CatRarity.epic ||
+    CatRarity.legendary ||
+    CatRarity.mythic => true,
+  };
+}
+
+bool _isShinyVariant(String variantId) {
+  return switch (variantId) {
+    'shiny' || 'golden' || 'event_edition' => true,
+    _ => false,
+  };
 }
 
 class _PhotoMedallion extends StatelessWidget {

@@ -67,7 +67,7 @@ class CatDexPage extends ConsumerWidget {
             sliver: SliverGrid.builder(
               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                 maxCrossAxisExtent: 220,
-                mainAxisExtent: 264,
+                mainAxisExtent: 292,
                 mainAxisSpacing: AppSpacing.md,
                 crossAxisSpacing: AppSpacing.md,
               ),
@@ -344,6 +344,7 @@ class _CatCollectionCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final discovered = entry.discovered;
     final foreground = discovered ? AppColors.ink : AppColors.white;
+    final rarityColor = _rarityColor(entry.species.baseRarity);
 
     return Semantics(
       button: true,
@@ -361,9 +362,8 @@ class _CatCollectionCard extends StatelessWidget {
                       end: Alignment.bottomRight,
                       colors: [
                         AppColors.white,
-                        _rarityColor(entry.species.baseRarity).withValues(
-                          alpha: 0.2,
-                        ),
+                        rarityColor.withValues(alpha: 0.2),
+                        AppColors.primaryPurple.withValues(alpha: 0.1),
                       ],
                     )
                   : const LinearGradient(
@@ -378,12 +378,32 @@ class _CatCollectionCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Align(
-                    child: _CatVisual(
-                      discovered: discovered,
-                      rarity: entry.species.baseRarity,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 86,
+                          height: 86,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: rarityColor.withValues(
+                              alpha: discovered ? 0.18 : 0.08,
+                            ),
+                          ),
+                        ),
+                        _CatVisual(
+                          discovered: discovered,
+                          rarity: entry.species.baseRarity,
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
+                  _CollectionStatusBadge(
+                    discovered: discovered,
+                    color: rarityColor,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
                     discovered
                         ? entry.species.displayName
@@ -439,11 +459,59 @@ class _CatVisual extends StatelessWidget {
             ? _rarityColor(rarity).withValues(alpha: 0.9)
             : AppColors.white.withValues(alpha: 0.16),
         shape: BoxShape.circle,
+        boxShadow: discovered
+            ? [
+                BoxShadow(
+                  color: _rarityColor(rarity).withValues(alpha: 0.34),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ]
+            : null,
       ),
       child: Icon(
         discovered ? Icons.pets_rounded : Icons.lock_rounded,
         color: AppColors.white,
         size: 38,
+      ),
+    );
+  }
+}
+
+class _CollectionStatusBadge extends StatelessWidget {
+  const _CollectionStatusBadge({
+    required this.discovered,
+    required this.color,
+  });
+
+  final bool discovered;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = CatDexLocalizations.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: discovered
+            ? color.withValues(alpha: 0.16)
+            : AppColors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: 4,
+        ),
+        child: Text(
+          discovered ? l10n.discoveredLabel : l10n.undiscoveredLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: discovered ? color : AppColors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
       ),
     );
   }

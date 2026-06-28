@@ -7,17 +7,27 @@ final discoveryRevealSoundHooksProvider = Provider<DiscoveryRevealSoundHooks>((
 });
 
 abstract interface class DiscoveryRevealSoundHooks {
-  void playReveal();
+  void playCommonReveal();
 
-  void playRewards();
+  void playRareReveal();
+
+  void playShinyReveal();
+
+  void playLevelUp();
 }
 
 class NoOpDiscoveryRevealSoundHooks implements DiscoveryRevealSoundHooks {
   const NoOpDiscoveryRevealSoundHooks();
 
   @override
-  void playReveal() {}
+  void playCommonReveal() {}
 
   @override
-  void playRewards() {}
+  void playRareReveal() {}
+
+  @override
+  void playShinyReveal() {}
+
+  @override
+  void playLevelUp() {}
 }

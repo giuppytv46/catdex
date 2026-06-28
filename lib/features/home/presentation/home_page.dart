@@ -285,6 +285,7 @@ class _DiscoveryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final rarityColor = _rarityColor(discovery.rarityName);
 
     return Container(
       width: 196,
@@ -295,7 +296,7 @@ class _DiscoveryCard extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [
             AppColors.white,
-            AppColors.skyBlue.withValues(alpha: 0.22),
+            rarityColor.withValues(alpha: 0.22),
             AppColors.primaryPurple.withValues(alpha: 0.18),
           ],
         ),
@@ -304,18 +305,51 @@ class _DiscoveryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Align(
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: const BoxDecoration(
-                color: AppColors.primaryGreen,
-                shape: BoxShape.circle,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 74,
+                  height: 74,
+                  decoration: BoxDecoration(
+                    color: rarityColor.withValues(alpha: 0.22),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: rarityColor,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: rarityColor.withValues(alpha: 0.32),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.pets_rounded,
+                    color: AppColors.white,
+                    size: 30,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  rarityColor,
+                  AppColors.primaryPurple.withValues(alpha: 0.7),
+                ],
               ),
-              child: const Icon(
-                Icons.pets_rounded,
-                color: AppColors.white,
-                size: 30,
-              ),
+              borderRadius: BorderRadius.circular(999),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -373,6 +407,18 @@ class _DiscoveryCard extends StatelessWidget {
       ),
     );
   }
+}
+
+Color _rarityColor(String rarityName) {
+  return switch (rarityName.toLowerCase()) {
+    'common' => AppColors.primaryGreen,
+    'uncommon' => AppColors.skyBlue,
+    'rare' => AppColors.primaryPurple,
+    'epic' => const Color(0xFFEC4899),
+    'legendary' => AppColors.warning,
+    'mythic' => AppColors.danger,
+    _ => AppColors.primaryGreen,
+  };
 }
 
 class _CurrentEventCard extends StatelessWidget {
