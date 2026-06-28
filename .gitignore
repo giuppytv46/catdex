@@ -5,6 +5,9 @@
 .packages
 build/
 coverage/
+.env
+.env.*
+!.env.example
 
 # Android
 android/.gradle/

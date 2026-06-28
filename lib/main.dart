@@ -1,11 +1,14 @@
 import 'package:catdex/core/localization/catdex_localizations.dart';
+import 'package:catdex/core/supabase/supabase_initializer.dart';
 import 'package:catdex/routing/app_router.dart';
 import 'package:catdex/theme/app_theme.dart';
 import 'package:catdex/theme/theme_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseInitializer.initialize();
   runApp(const ProviderScope(child: CatDexApp()));
 }
 

@@ -56,6 +56,153 @@ class CatDexLocalizations {
     ja: 'Login',
   );
 
+  String get authWelcomeTitle => _localizedValue(
+    en: 'Welcome to CatDex',
+    it: 'Benvenuto in CatDex',
+    es: 'Bienvenido a CatDex',
+    fr: 'Bienvenue dans CatDex',
+    de: 'Willkommen bei CatDex',
+    ja: 'Welcome to CatDex',
+  );
+
+  String get authWelcomeMessage => _localizedValue(
+    en: 'Sign in or create an account to prepare for future cloud sync.',
+    it:
+        'Accedi o crea un account per preparare la futura '
+        'sincronizzazione cloud.',
+    es:
+        'Inicia sesion o crea una cuenta para preparar la futura '
+        'sincronizacion.',
+    fr:
+        'Connecte-toi ou cree un compte pour preparer la future '
+        'synchronisation.',
+    de:
+        'Melde dich an oder erstelle ein Konto fur die spatere '
+        'Cloud-Synchronisierung.',
+    ja: 'Sign in or create an account to prepare for future cloud sync.',
+  );
+
+  String get emailLabel => _localizedValue(
+    en: 'Email',
+    it: 'Email',
+    es: 'Email',
+    fr: 'Email',
+    de: 'Email',
+    ja: 'Email',
+  );
+
+  String get passwordLabel => _localizedValue(
+    en: 'Password',
+    it: 'Password',
+    es: 'Contrasena',
+    fr: 'Mot de passe',
+    de: 'Passwort',
+    ja: 'Password',
+  );
+
+  String get loginAction => _localizedValue(
+    en: 'Log In',
+    it: 'Accedi',
+    es: 'Iniciar Sesion',
+    fr: 'Se Connecter',
+    de: 'Einloggen',
+    ja: 'Log In',
+  );
+
+  String get signupAction => _localizedValue(
+    en: 'Sign Up',
+    it: 'Registrati',
+    es: 'Registrarse',
+    fr: 'Creer un Compte',
+    de: 'Registrieren',
+    ja: 'Sign Up',
+  );
+
+  String get logoutAction => _localizedValue(
+    en: 'Log Out',
+    it: 'Esci',
+    es: 'Cerrar Sesion',
+    fr: 'Se Deconnecter',
+    de: 'Ausloggen',
+    ja: 'Log Out',
+  );
+
+  String get signedInEmailLabel => _localizedValue(
+    en: 'Signed in email',
+    it: 'Email collegata',
+    es: 'Email conectada',
+    fr: 'Email connecte',
+    de: 'Angemeldete Email',
+    ja: 'Signed in email',
+  );
+
+  String get guestModeTitle => _localizedValue(
+    en: 'Guest / Local Mode',
+    it: 'Modalita Ospite Locale',
+    es: 'Modo Invitado Local',
+    fr: 'Mode Invite Local',
+    de: 'Gast- und Lokalmodus',
+    ja: 'Guest / Local Mode',
+  );
+
+  String get guestModeMessage => _localizedValue(
+    en:
+        'You can keep exploring locally. Cloud sync will be available '
+        'after login.',
+    it:
+        'Puoi continuare a esplorare in locale. La sincronizzazione cloud '
+        'arrivera dopo il login.',
+    es:
+        'Puedes seguir explorando localmente. La sincronizacion llegara '
+        'tras iniciar sesion.',
+    fr:
+        'Tu peux continuer en local. La synchronisation sera disponible '
+        'apres connexion.',
+    de:
+        'Du kannst lokal weiterspielen. Cloud-Synchronisierung folgt nach '
+        'dem Login.',
+    ja:
+        'You can keep exploring locally. Cloud sync will be available '
+        'after login.',
+  );
+
+  String authFailureMessage(String code) {
+    return switch (code) {
+      'missingEmail' => _localizedValue(
+        en: 'Enter your email address.',
+        it: 'Inserisci il tuo indirizzo email.',
+        es: 'Introduce tu email.',
+        fr: 'Entre ton adresse email.',
+        de: 'Gib deine Email-Adresse ein.',
+        ja: 'Enter your email address.',
+      ),
+      'missingPassword' => _localizedValue(
+        en: 'Enter your password.',
+        it: 'Inserisci la password.',
+        es: 'Introduce tu contrasena.',
+        fr: 'Entre ton mot de passe.',
+        de: 'Gib dein Passwort ein.',
+        ja: 'Enter your password.',
+      ),
+      'invalidCredentials' => _localizedValue(
+        en: 'Those login details did not work. Please try again.',
+        it: 'Questi dati non funzionano. Riprova.',
+        es: 'Estos datos no funcionaron. Intentalo otra vez.',
+        fr: 'Ces identifiants ne fonctionnent pas. Reessaie.',
+        de: 'Diese Anmeldedaten funktionieren nicht. Versuch es erneut.',
+        ja: 'Those login details did not work. Please try again.',
+      ),
+      _ => _localizedValue(
+        en: 'CatDex could not complete that auth request yet.',
+        it: 'CatDex non puo completare questa richiesta di accesso.',
+        es: 'CatDex no pudo completar esta solicitud.',
+        fr: 'CatDex ne peut pas terminer cette demande.',
+        de: 'CatDex konnte diese Anmeldung noch nicht abschliessen.',
+        ja: 'CatDex could not complete that auth request yet.',
+      ),
+    };
+  }
+
   String get homeTitle => _localizedValue(
     en: 'Home',
     it: 'Home',
