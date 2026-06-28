@@ -686,6 +686,24 @@ class CatDexLocalizations {
     ja: 'Hair length',
   );
 
+  String get estimatedAgeLabel => _localizedValue(
+    en: 'Estimated age',
+    it: 'Eta stimata',
+    es: 'Edad estimada',
+    fr: 'Age estime',
+    de: 'Geschatztes Alter',
+    ja: 'Estimated age',
+  );
+
+  String get funFactLabel => _localizedValue(
+    en: 'Fun fact',
+    it: 'Curiosita',
+    es: 'Dato curioso',
+    fr: 'Info amusante',
+    de: 'Fun Fact',
+    ja: 'Fun fact',
+  );
+
   String get variantLabel => _localizedValue(
     en: 'Variant',
     it: 'Variante',

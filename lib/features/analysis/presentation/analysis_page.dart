@@ -7,7 +7,6 @@ import 'package:catdex/features/analysis/application/cat_analysis_state.dart';
 import 'package:catdex/features/analysis/domain/entities/analysis_status.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_result.dart';
 import 'package:catdex/features/analysis/domain/entities/discovery_reveal_args.dart';
-import 'package:catdex/features/analysis/presentation/cat_analysis_display_text.dart';
 import 'package:catdex/features/capture/domain/entities/captured_photo.dart';
 import 'package:catdex/routing/app_routes.dart';
 import 'package:catdex/theme/app_colors.dart';
@@ -208,8 +207,9 @@ class _AnalysisResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
-    const displayText = CatAnalysisDisplayText();
-    final traits = displayText.traitSummary(result);
+    final traits = result.visualTraits.notableTraits
+        .map((trait) => '${trait.name}: ${trait.value}')
+        .join(', ');
 
     return DecoratedBox(
       decoration: _analysisDecoration(
@@ -243,19 +243,23 @@ class _AnalysisResultCard extends StatelessWidget {
             ),
             _ResultRow(
               label: l10n.coatColorLabel,
-              value: displayText.coatColor(result.visualTraits.coatColor),
+              value: result.visualTraits.coatColor,
             ),
             _ResultRow(
               label: l10n.coatPatternLabel,
-              value: displayText.coatPattern(result.visualTraits.coatPattern),
+              value: result.visualTraits.coatPattern,
             ),
             _ResultRow(
               label: l10n.eyeColorLabel,
-              value: displayText.eyeColor(result.visualTraits.eyeColor),
+              value: result.visualTraits.eyeColor,
             ),
             _ResultRow(
               label: l10n.hairLengthLabel,
-              value: displayText.hairLength(result.visualTraits.hairLength),
+              value: result.visualTraits.hairLength,
+            ),
+            _ResultRow(
+              label: l10n.estimatedAgeLabel,
+              value: result.estimatedAge ?? 'Unknown',
             ),
             _ResultRow(
               label: l10n.traitsLabel,
@@ -263,12 +267,12 @@ class _AnalysisResultCard extends StatelessWidget {
             ),
             _ResultRow(
               label: l10n.rarityFiltersTitle,
-              value: l10n.rarityName(result.rarity.name),
+              value: result.displayRarity,
             ),
-            _ResultRow(label: l10n.variantLabel, value: result.variant.name),
+            _ResultRow(label: l10n.variantLabel, value: result.displayVariant),
             _ResultRow(
               label: l10n.moodLabel,
-              value: displayText.personality(result.personality),
+              value: result.displayPersonality,
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
@@ -279,6 +283,17 @@ class _AnalysisResultCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(result.story),
+            if (result.funFact != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                l10n.funFactLabel,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(result.funFact!),
+            ],
             const SizedBox(height: AppSpacing.lg),
             FilledButton.icon(
               onPressed: () {

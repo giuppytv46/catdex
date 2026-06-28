@@ -61,28 +61,35 @@ void main() {
     await _expectVisibleText(tester, 'Pattern mantello');
     await _expectVisibleText(tester, 'Colore occhi');
     await _expectVisibleText(tester, 'Lunghezza pelo');
+    await _expectVisibleText(tester, 'Eta stimata');
     await _expectVisibleText(tester, 'Tratti');
     await _expectVisibleText(tester, 'Rarita');
     await _expectVisibleText(tester, 'Variante');
     await _expectVisibleText(tester, 'Umore');
     await _expectVisibleText(tester, 'Storia');
-    await _expectVisibleText(tester, 'Marrone');
-    await _expectVisibleText(tester, 'Tigrato');
-    await _expectVisibleText(tester, 'Occhi ambrati');
-    await _expectVisibleText(tester, 'Pelo corto');
+    await _expectVisibleText(tester, 'Curiosita');
+    await _expectVisibleText(tester, 'Brown');
+    await _expectVisibleText(tester, 'Tabby');
+    await _expectVisibleText(tester, 'Amber eyes');
+    await _expectVisibleText(tester, 'Short hair');
+    await _expectVisibleText(tester, 'adult');
     await _expectVisibleText(
       tester,
-      'Marrone, Tigrato, Occhi ambrati, Pelo corto, '
-      'Posa: in osservazione',
+      'Posture: watching, Mood: alert',
     );
-    await _expectVisibleText(tester, 'Rilassato');
+    await _expectVisibleText(tester, 'calm_observer');
+    await _expectVisibleText(tester, 'ordinary');
+    await _expectVisibleText(tester, 'standard');
     await _expectVisibleText(
       tester,
       'Un gatto arancione osserva il mondo con calma.',
     );
+    await _expectVisibleText(
+      tester,
+      'I mantelli arancioni sono spesso tabby.',
+    );
     expect(find.textContaining('European Shorthair'), findsNothing);
     expect(find.textContaining('Tortoiseshell'), findsNothing);
-    expect(find.textContaining('Blue eyes'), findsNothing);
     expect(find.textContaining('Soft hair'), findsNothing);
     expect(find.textContaining('curved whiskers'), findsNothing);
   });
@@ -118,13 +125,14 @@ Map<String, Object?> _backendJson() {
     'coatPattern': 'Tabby',
     'eyeColor': 'Amber eyes',
     'hairLength': 'Short hair',
+    'estimatedAge': 'adult',
     'traits': [
-      {'name': 'Posa', 'value': 'watching', 'rarityWeight': 1},
-      {'name': 'Whiskers', 'value': 'curved whiskers', 'rarityWeight': 1},
+      {'name': 'Posture', 'value': 'watching', 'rarityWeight': 1},
+      {'name': 'Mood', 'value': 'alert', 'rarityWeight': 1},
     ],
-    'personality': 'relaxed',
-    'rarity': 'common',
-    'variant': 'normal',
+    'personality': 'calm_observer',
+    'rarity': 'ordinary',
+    'variant': 'standard',
     'story': 'Un gatto arancione osserva il mondo con calma.',
     'funFact': 'I mantelli arancioni sono spesso tabby.',
     'safetyStatus': 'safe',

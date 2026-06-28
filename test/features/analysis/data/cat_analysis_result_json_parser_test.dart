@@ -45,6 +45,9 @@ void main() {
     expect(result.breedCandidates, hasLength(2));
     expect(result.visualTraits.coatPattern, 'Tabby');
     expect(result.variant.id, 'normal');
+    expect(result.displayRarity, 'common');
+    expect(result.displayVariant, 'normal');
+    expect(result.displayPersonality, 'curious');
   });
 
   test('preserves backend breed instead of applying local conversion', () {
@@ -91,6 +94,11 @@ void main() {
       ..['coatPattern'] = 'tabby'
       ..['eyeColor'] = 'ambra'
       ..['hairLength'] = 'corto'
+      ..['estimatedAge'] = 'adulto'
+      ..['personality'] = 'osservatore_calmo'
+      ..['rarity'] = 'ordinario'
+      ..['variant'] = 'standard'
+      ..['funFact'] = 'Curiosita ricevuta dal backend.'
       ..['traits'] = <Map<String, Object?>>[];
 
     final result = parser.parse(json);
@@ -102,6 +110,14 @@ void main() {
     expect(result.visualTraits.eyeColor, 'ambra');
     expect(result.visualTraits.hairLength, 'corto');
     expect(result.visualTraits.notableTraits, isEmpty);
+    expect(result.estimatedAge, 'adulto');
+    expect(result.displayPersonality, 'osservatore_calmo');
+    expect(result.displayRarity, 'ordinario');
+    expect(result.displayVariant, 'standard');
+    expect(result.funFact, 'Curiosita ricevuta dal backend.');
+    expect(result.rarity, CatRarity.common);
+    expect(result.variant.id, 'normal');
+    expect(result.personality, CatPersonality.curious);
   });
 
   test('falls back safely for malformed response', () {

@@ -22,27 +22,34 @@ class CatAnalysisResultJsonParser {
       final primaryBreed = _primaryBreed(map);
       final candidates = _candidates(map, primaryBreed);
       final confidence = _confidence(map['confidence']);
+      final backendRarity = _optionalString(map['rarity']) ?? 'common';
+      final variantId =
+          _optionalString(map['variantId']) ??
+          _optionalString(map['variant']) ??
+          'normal';
+      final backendVariant = _optionalString(map['variant']) ?? variantId;
+      final backendPersonality =
+          _optionalString(map['personality']) ?? 'curious';
 
       return CatAnalysisResult(
         primaryBreed: primaryBreed,
         breedCandidates: candidates,
         visualTraits: _visualTraits(map),
         confidence: confidence,
-        rarity: _rarity(_optionalString(map['rarity']) ?? 'common'),
-        variant: _variant(
-          _optionalString(map['variantId']) ??
-              _optionalString(map['variant']) ??
-              'normal',
-        ),
-        personality: _personality(
-          _optionalString(map['personality']) ?? 'curious',
-        ),
+        rarity: _safeRarity(backendRarity),
+        variant: _safeVariant(variantId),
+        personality: _safePersonality(backendPersonality),
         story: _optionalString(map['story']) ?? _fallbackStory,
         analyzedAt: DateTime.parse(
           _optionalString(map['analyzedAt']) ??
               DateTime.utc(2026, 6, 28).toIso8601String(),
         ),
         backendBreed: _optionalString(map['breed']),
+        backendRarity: backendRarity,
+        backendVariant: backendVariant,
+        backendPersonality: backendPersonality,
+        estimatedAge: _optionalString(map['estimatedAge']),
+        funFact: _optionalString(map['funFact']),
       );
     } on FormatException {
       return _safeFallback();
@@ -148,6 +155,14 @@ class CatAnalysisResultJsonParser {
     throw FormatException('Unknown variant id: $rawValue');
   }
 
+  CatVariant _safeVariant(String rawValue) {
+    try {
+      return _variant(rawValue);
+    } on FormatException {
+      return _variant('normal');
+    }
+  }
+
   CatRarity _rarity(String name) {
     for (final rarity in CatRarity.values) {
       if (rarity.name == name) {
@@ -158,6 +173,14 @@ class CatAnalysisResultJsonParser {
     throw FormatException('Unknown rarity: $name');
   }
 
+  CatRarity _safeRarity(String name) {
+    try {
+      return _rarity(name);
+    } on FormatException {
+      return CatRarity.common;
+    }
+  }
+
   CatPersonality _personality(String name) {
     for (final personality in CatPersonality.values) {
       if (personality.name == name) {
@@ -166,6 +189,14 @@ class CatAnalysisResultJsonParser {
     }
 
     throw FormatException('Unknown personality: $name');
+  }
+
+  CatPersonality _safePersonality(String name) {
+    try {
+      return _personality(name);
+    } on FormatException {
+      return CatPersonality.curious;
+    }
   }
 
   Map<String, Object?> _map(Object? value) {

@@ -17,6 +17,11 @@ class CatAnalysisResult {
     required this.story,
     required this.analyzedAt,
     this.backendBreed,
+    this.backendRarity,
+    this.backendVariant,
+    this.backendPersonality,
+    this.estimatedAge,
+    this.funFact,
   });
 
   final CatBreedCandidate primaryBreed;
@@ -29,6 +34,14 @@ class CatAnalysisResult {
   final String story;
   final DateTime analyzedAt;
   final String? backendBreed;
+  final String? backendRarity;
+  final String? backendVariant;
+  final String? backendPersonality;
+  final String? estimatedAge;
+  final String? funFact;
 
   String get displayBreed => backendBreed ?? primaryBreed.species.displayName;
+  String get displayRarity => backendRarity ?? rarity.name;
+  String get displayVariant => backendVariant ?? variant.name;
+  String get displayPersonality => backendPersonality ?? personality.name;
 }

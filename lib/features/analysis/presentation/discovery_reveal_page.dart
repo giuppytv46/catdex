@@ -6,7 +6,6 @@ import 'package:catdex/features/analysis/application/discovery_reveal_sound_hook
 import 'package:catdex/features/analysis/application/local_discovery_save_controller.dart';
 import 'package:catdex/features/analysis/application/local_discovery_save_state.dart';
 import 'package:catdex/features/analysis/domain/entities/discovery_reveal_args.dart';
-import 'package:catdex/features/analysis/presentation/cat_analysis_display_text.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/routing/app_routes.dart';
 import 'package:catdex/theme/app_colors.dart';
@@ -273,13 +272,11 @@ class _RevealCard extends StatelessWidget {
                         runSpacing: AppSpacing.sm,
                         children: [
                           _RevealBadge(
-                            label: l10n.rarityName(result.rarity.name),
+                            label: result.displayRarity,
                           ),
-                          _RevealBadge(label: result.variant.name),
+                          _RevealBadge(label: result.displayVariant),
                           _RevealBadge(
-                            label: const CatAnalysisDisplayText().personality(
-                              result.personality,
-                            ),
+                            label: result.displayPersonality,
                           ),
                         ],
                       ),
@@ -503,8 +500,9 @@ class _ResultDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
     final result = args.result;
-    const displayText = CatAnalysisDisplayText();
-    final traits = displayText.traitSummary(result);
+    final traits = result.visualTraits.notableTraits
+        .map((trait) => '${trait.name}: ${trait.value}')
+        .join(', ');
 
     return DecoratedBox(
       decoration: BoxDecoration(
