@@ -525,12 +525,22 @@ function analysisPrompt(locale: string): string {
     `Allowed breed ids: ${allowedBreedIds.join(", ")}.`,
     "Allowed rarity: common, uncommon, rare, epic, legendary, mythic.",
     `Allowed variants: ${allowedVariants.join(", ")}.`,
-    `Allowed personalities: ${allowedPersonalities.join(", ")}.`,
-    "If breed confidence is below 0.80, breed must be domestic_shorthair_cat or european_shorthair.",
-    "Rare breed ids are allowed only with confidence >= 0.90. Never invent exotic breeds.",
-    "Legendary rarity must be extremely rare and only for very strong visual evidence.",
-    "Never return event_edition unless an active event is explicitly provided.",
-    "Return story, funFact, trait names, and trait values in Italian.",
+    `Personality must be one allowed id: ${allowedPersonalities.join(", ")}.`,
+    "Accuracy is more important than rarity. Do not make the result feel special unless the image clearly supports it.",
+    "Most street, house, shelter, and mixed cats must be domestic_shorthair_cat, domestic_tabby_cat, domestic_longhair_cat, domestic_tuxedo_cat, domestic_calico_cat, domestic_black_cat, domestic_white_cat, domestic_orange_cat, or domestic_gray_cat.",
+    "Use domestic_tabby_cat for common tabby cats unless a pure breed standard is strongly visible.",
+    "Use european_shorthair only when the image strongly justifies that breed; do not use it as a generic fallback for a normal house cat.",
+    "If breed confidence is below 0.80, breed must be domestic_shorthair_cat or domestic_tabby_cat.",
+    "Rare breed ids are allowed only with confidence >= 0.90 and clear breed-specific visual evidence. Never invent exotic breeds.",
+    "Recognize only visible visual facts: coatColor, coatPattern, eyeColor, hairLength, estimatedAge, posture, expression, and environment.",
+    "Allowed coatPattern values are tabby, tuxedo, calico, solid, bicolor, tortoiseshell, pointed, spotted, smoke, unknown.",
+    "Do not output tortoiseshell unless mixed black/brown and orange/cream mottling is clearly visible.",
+    "Do not call a brown tabby gray, tortoiseshell, medium hair, or a pure breed unless those details are visible.",
+    "Traits must describe visible evidence only, such as Posa, Espressione, Ambiente, Mantello, Occhi, Eta stimata. Do not invent hidden temperament or history.",
+    "Rarity must be common for normal domestic/common cats. Use uncommon only for visually distinctive but still common cats. Use rare, epic, or legendary only for clearly rare breeds or exceptional visible traits.",
+    "Legendary should almost never happen and requires extraordinary visual evidence plus confidence >= 0.98.",
+    "Never return event_edition unless an active_event or activeEventId is explicitly provided.",
+    "Return story, funFact, trait names, trait values, and any user-facing wording in Italian.",
     "JSON keys: breed, confidence, candidates, coatColor, coatPattern, eyeColor, hairLength, estimatedAge, traits, personality, rarity, variant, story, funFact, safetyStatus.",
     `Requested locale is ${locale}, but CatDex alpha requires Italian user-facing text.`,
   ].join(" ");
@@ -867,10 +877,18 @@ function applyRealismRules(
   analysis: AnalysisJson,
   activeEvent: boolean,
 ): AnalysisJson {
-  const breed = realisticBreedId(analysis.breed, analysis.confidence);
+  const breed = realisticBreedId(
+    analysis.breed,
+    analysis.confidence,
+    analysis.coatPattern,
+  );
   const candidates = analysis.candidates
     .map((candidate) => ({
-      breed: realisticBreedId(candidate.breed, candidate.confidence),
+      breed: realisticBreedId(
+        candidate.breed,
+        candidate.confidence,
+        analysis.coatPattern,
+      ),
       confidence: candidate.confidence,
     }))
     .filter((candidate, index, list) =>
@@ -884,18 +902,34 @@ function applyRealismRules(
     candidates: candidates.length === 0
       ? [{ breed, confidence: analysis.confidence }]
       : candidates,
-    rarity: realisticRarity(analysis.rarity, analysis.confidence),
+    coatPattern: realisticCoatPattern(analysis.coatPattern),
+    rarity: realisticRarity(
+      analysis.rarity,
+      analysis.confidence,
+      breed,
+      analysis.coatPattern,
+    ),
     variant: analysis.variant === "event_edition" && !activeEvent
       ? "normal"
       : analysis.variant,
   };
 }
 
-function realisticBreedId(breed: string, confidence: number): string {
+function realisticBreedId(
+  breed: string,
+  confidence: number,
+  coatPattern = "",
+): string {
   const normalized = breed.trim().toLowerCase();
   if (confidence < 0.8) {
-    return normalized.includes("european")
-      ? "european_shorthair"
+    return isTabbyPattern(coatPattern)
+      ? "domestic_tabby_cat"
+      : "domestic_shorthair_cat";
+  }
+
+  if (normalized === "european_shorthair" && confidence < 0.9) {
+    return isTabbyPattern(coatPattern)
+      ? "domestic_tabby_cat"
       : "domestic_shorthair_cat";
   }
 
@@ -908,12 +942,54 @@ function realisticBreedId(breed: string, confidence: number): string {
     : "domestic_shorthair_cat";
 }
 
-function realisticRarity(rarity: string, confidence: number): string {
+function realisticCoatPattern(coatPattern: string): string {
+  const normalized = coatPattern.trim().toLowerCase();
+  if (
+    normalized.includes("tortoiseshell") ||
+    normalized.includes("tortie")
+  ) {
+    return "tortoiseshell";
+  }
+
+  if (normalized.includes("tabby")) {
+    return "tabby";
+  }
+
+  return coatPattern;
+}
+
+function realisticRarity(
+  rarity: string,
+  confidence: number,
+  breed: string,
+  coatPattern: string,
+): string {
+  const commonDomesticBreed = breed.startsWith("domestic_") ||
+    breed === "european_shorthair" ||
+    breed === "american_shorthair";
+  if (commonDomesticBreed && confidence < 0.95) {
+    return isDistinctiveCommonPattern(coatPattern) && rarity === "uncommon"
+      ? "uncommon"
+      : "common";
+  }
+
   if ((rarity === "legendary" && confidence < 0.98) || rarity === "mythic") {
     return "rare";
   }
 
   return rarity;
+}
+
+function isTabbyPattern(coatPattern: string): boolean {
+  return coatPattern.trim().toLowerCase().includes("tabby");
+}
+
+function isDistinctiveCommonPattern(coatPattern: string): boolean {
+  const normalized = coatPattern.trim().toLowerCase();
+  return normalized.includes("calico") ||
+    normalized.includes("tuxedo") ||
+    normalized.includes("tortoiseshell") ||
+    normalized.includes("bicolor");
 }
 
 function hasActiveEvent(body: AnalyzeCatPhotoRequest): boolean {

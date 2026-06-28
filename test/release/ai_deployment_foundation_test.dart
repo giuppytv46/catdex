@@ -41,5 +41,20 @@ void main() {
       expect(functionText, isNot(contains('ai_failed')));
       expect(functionText, isNot(contains('502')));
     });
+
+    test('Edge Function prompt favors realistic domestic cat analysis', () {
+      final functionText = File(
+        'supabase/functions/analyze_cat_photo/index.ts',
+      ).readAsStringSync();
+
+      expect(functionText, contains('Use domestic_tabby_cat for common tabby'));
+      expect(functionText, contains('Use european_shorthair only when'));
+      expect(functionText, contains('Do not output tortoiseshell unless'));
+      expect(functionText, contains('Rarity must be common'));
+      expect(functionText, contains('Return story, funFact'));
+      expect(functionText, contains('in Italian'));
+      expect(functionText, contains('realisticBreedId('));
+      expect(functionText, contains('realisticRarity('));
+    });
   });
 }
