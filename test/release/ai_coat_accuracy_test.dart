@@ -30,9 +30,9 @@ void main() {
       expect(functionText, contains('marrone/grigio tigrato'));
     });
 
-    test('solid black can normalize to Nero', () {
+    test('solid black can normalize to nero solido', () {
       expect(functionText, contains('if (solid && isBlackColor(color))'));
-      expect(functionText, contains('return "Nero";'));
+      expect(functionText, contains('return "nero solido";'));
     });
   });
 }

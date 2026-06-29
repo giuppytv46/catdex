@@ -48,13 +48,40 @@ void main() {
         'supabase/functions/analyze_cat_photo/index.ts',
       ).readAsStringSync();
 
-      expect(functionText, contains('CatDex Vision Step 1'));
+      final observationIndex = functionText.indexOf(
+        'const observation = parseVisionEngineObservation(value);',
+      );
+      final classificationIndex = functionText.indexOf(
+        'const classification = classifyWithRuleEngine(observation, context);',
+      );
+      final loreIndex = functionText.indexOf(
+        'const lore = generateLoreWithLoreEngine(observation, classification);',
+      );
+      final successResponseIndex = functionText.indexOf(
+        'return jsonResponse(toResultEnvelope(analysis), 200);',
+      );
+      final mockFallbackIndex = functionText.indexOf(
+        'mockAnalysisResult(openAiFallbackReason(error))',
+      );
+
+      expect(observationIndex, isNonNegative);
+      expect(classificationIndex, isNonNegative);
+      expect(loreIndex, isNonNegative);
+      expect(observationIndex, lessThan(classificationIndex));
+      expect(classificationIndex, lessThan(loreIndex));
       expect(functionText, contains('Do not return breed'));
       expect(functionText, contains('If a visual fact is uncertain'));
-      expect(functionText, contains('analysisFromObservation('));
+      expect(functionText, contains('function parseVisionEngineObservation('));
+      expect(functionText, contains('function classifyWithRuleEngine('));
       expect(functionText, contains('breedFromObservationRules('));
       expect(functionText, contains('rarityFromObservationRules('));
+      expect(functionText, contains('function generateLoreWithLoreEngine('));
       expect(functionText, contains('storyFromObservation('));
+      expect(successResponseIndex, isNonNegative);
+      expect(mockFallbackIndex, isNonNegative);
+      expect(successResponseIndex, lessThan(mockFallbackIndex));
+      expect(functionText, contains('backend: {'));
+      expect(functionText, contains('mock: true'));
     });
   });
 }
