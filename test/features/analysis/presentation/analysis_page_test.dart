@@ -35,7 +35,7 @@ void main() {
     expect(find.byType(AnalysisPage), findsOneWidget);
   });
 
-  testWidgets('Analysis page renders backend analysis fields', (tester) async {
+  testWidgets('Analysis page renders premium discovery result', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -55,32 +55,21 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    await _expectVisibleText(tester, 'Razza');
-    await _expectVisibleText(tester, 'Confidenza');
-    await _expectVisibleText(tester, 'Colore mantello');
-    await _expectVisibleText(tester, 'Pattern mantello');
-    await _expectVisibleText(tester, 'Colore occhi');
-    await _expectVisibleText(tester, 'Lunghezza pelo');
-    await _expectVisibleText(tester, 'Eta stimata');
-    await _expectVisibleText(tester, 'Tratti');
-    await _expectVisibleText(tester, 'Rarita');
-    await _expectVisibleText(tester, 'Variante');
-    await _expectVisibleText(tester, 'Umore');
-    await _expectVisibleText(tester, 'Storia');
-    await _expectVisibleText(tester, 'Curiosita');
+    await _expectVisibleText(tester, '✨ New Discovery!');
     await _expectVisibleText(tester, 'Gatto domestico tigrato');
-    await _expectVisibleText(tester, 'Marrone/grigio tigrato');
-    await _expectVisibleText(tester, 'Tigrato mackerel');
-    await _expectVisibleText(tester, 'occhi gialli');
-    await _expectVisibleText(tester, 'pelo corto');
-    await _expectVisibleText(tester, 'adult');
-    await _expectVisibleText(
-      tester,
-      'Mantello: Marrone/grigio tigrato, Pattern: Tigrato mackerel',
-    );
-    await _expectVisibleText(tester, 'Curioso');
     await _expectVisibleText(tester, 'Comune');
-    await _expectVisibleText(tester, 'Normale');
+    await _expectVisibleText(tester, '+80');
+    await _expectVisibleText(tester, 'XP');
+    await _expectVisibleText(tester, '+15');
+    await _expectVisibleText(tester, 'Coins');
+    await _expectVisibleText(tester, 'Curioso');
+    await _expectVisibleText(tester, 'Species');
+    await _expectVisibleText(tester, 'Coat');
+    await _expectVisibleText(tester, 'Marrone/grigio tigrato');
+    await _expectVisibleText(tester, 'Eyes');
+    await _expectVisibleText(tester, 'occhi gialli');
+    await _expectVisibleText(tester, 'Personality');
+    await _expectVisibleText(tester, '📖 Story');
     await _expectVisibleText(
       tester,
       'Un gatto tigrato osserva il mondo con calma.',
@@ -88,6 +77,15 @@ void main() {
     await _expectVisibleText(
       tester,
       'I mantelli tigrati sono molto comuni nei gatti domestici.',
+    );
+    await _expectVisibleText(tester, 'More details');
+    expect(find.text('Tigrato mackerel'), findsNothing);
+    expect(find.text('pelo corto'), findsNothing);
+    expect(find.text('adult'), findsNothing);
+    expect(find.text('Normale'), findsNothing);
+    expect(
+      find.text('Mantello: Marrone/grigio tigrato, Pattern: Tigrato mackerel'),
+      findsNothing,
     );
     expect(find.textContaining('domestic_tabby_cat'), findsNothing);
     expect(find.textContaining('common'), findsNothing);
