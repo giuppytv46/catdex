@@ -43,6 +43,18 @@ type AnalysisJson = {
   analyzedAt: string;
 };
 
+type CatVisionObservation = {
+  coatBaseColor: string | null;
+  coatPattern: string | null;
+  eyeColor: string | null;
+  hairLength: string | null;
+  posture: string | null;
+  environment: string | null;
+  estimatedAge: string | null;
+  visibleConfidence: number;
+  safetyStatus: "safe" | "no_cat" | "inappropriate" | "malformed";
+};
+
 type JsonResponseBody = Record<string, unknown>;
 
 const defaultOpenAiModel = "gpt-4o-mini";
@@ -50,76 +62,6 @@ const openAiModel = openAiModelFromEnv();
 const jsonHeaders = {
   "Content-Type": "application/json",
 };
-const allowedRarities = [
-  "common",
-  "uncommon",
-  "rare",
-  "epic",
-  "legendary",
-  "mythic",
-];
-const allowedVariants = [
-  "normal",
-  "shiny",
-  "golden",
-  "albino",
-  "melanistic",
-  "heterochromia",
-  "midnight",
-  "lucky",
-  "event_edition",
-];
-const allowedPersonalities = [
-  "sleepy",
-  "curious",
-  "boss",
-  "friendly",
-  "royal",
-  "mischievous",
-  "silly",
-  "mysterious",
-  "brave",
-  "lazy",
-  "relaxed",
-  "playful",
-];
-const allowedBreedIds = [
-  "domestic_shorthair_cat",
-  "domestic_tabby_cat",
-  "domestic_black_cat",
-  "domestic_white_cat",
-  "domestic_tuxedo_cat",
-  "domestic_calico_cat",
-  "domestic_orange_cat",
-  "domestic_gray_cat",
-  "domestic_longhair_cat",
-  "european_shorthair",
-  "maine_coon",
-  "persian",
-  "siamese",
-  "british_shorthair",
-  "ragdoll",
-  "bengal",
-  "sphynx",
-  "russian_blue",
-  "norwegian_forest_cat",
-  "abyssinian",
-  "scottish_fold",
-  "american_shorthair",
-];
-const rareBreedIds = [
-  "cymric",
-  "lykoi",
-  "khao_manee",
-  "peterbald",
-  "sokoke",
-  "toyger",
-  "chausie",
-  "savannah",
-  "serengeti",
-  "burmilla",
-];
-
 Deno.serve(async (request: Request) => {
   const requestId = crypto.randomUUID();
   console.log(`[analyze_cat_photo] request received`, {
@@ -190,7 +132,7 @@ Deno.serve(async (request: Request) => {
       openAiKey,
       requestId,
     });
-    const analysis = validateAnalysisJson(aiJson, hasActiveEvent(body));
+    const analysis = validateAnalysisJson(aiJson);
     console.log(`[analyze_cat_photo] JSON validation complete`, {
       requestId,
       safetyStatus: analysis.safetyStatus,
@@ -377,9 +319,9 @@ async function analyzeWithOpenAi({
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: "catdex_cat_analysis",
+          name: "catdex_cat_observation",
           strict: true,
-          schema: analysisJsonSchema(),
+          schema: observationJsonSchema(),
         },
       },
       messages: [
@@ -388,7 +330,7 @@ async function analyzeWithOpenAi({
           content: [
             {
               type: "text",
-              text: analysisPrompt(locale),
+              text: observationPrompt(locale),
             },
             {
               type: "image_url",
@@ -439,68 +381,37 @@ async function analyzeWithOpenAi({
   return parsed;
 }
 
-function analysisJsonSchema(): Record<string, unknown> {
+function observationJsonSchema(): Record<string, unknown> {
   return {
     type: "object",
     additionalProperties: false,
     required: [
-      "breed",
-      "confidence",
-      "candidates",
-      "coatColor",
+      "coatBaseColor",
       "coatPattern",
       "eyeColor",
       "hairLength",
+      "posture",
+      "environment",
       "estimatedAge",
-      "traits",
-      "personality",
-      "rarity",
-      "variant",
-      "story",
-      "funFact",
+      "visibleConfidence",
       "safetyStatus",
     ],
     properties: {
-      breed: { type: "string" },
-      confidence: { type: "number" },
-      candidates: {
-        type: "array",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: ["breed", "confidence"],
-          properties: {
-            breed: { type: "string" },
-            confidence: { type: "number" },
-          },
-        },
-      },
-      coatColor: { type: "string" },
-      coatPattern: { type: "string" },
-      eyeColor: { type: "string" },
-      hairLength: { type: "string" },
-      estimatedAge: { type: "string" },
-      traits: {
-        type: "array",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: ["name", "value", "rarityWeight"],
-          properties: {
-            name: { type: "string" },
-            value: { type: "string" },
-            rarityWeight: { type: "number" },
-          },
-        },
-      },
-      personality: { type: "string" },
-      rarity: { type: "string" },
-      variant: { type: "string" },
-      story: { type: "string" },
-      funFact: { type: "string" },
+      coatBaseColor: nullableStringSchema(),
+      coatPattern: nullableStringSchema(),
+      eyeColor: nullableStringSchema(),
+      hairLength: nullableStringSchema(),
+      posture: nullableStringSchema(),
+      environment: nullableStringSchema(),
+      estimatedAge: nullableStringSchema(),
+      visibleConfidence: { type: "number" },
       safetyStatus: { type: "string" },
     },
   };
+}
+
+function nullableStringSchema(): Record<string, unknown> {
+  return { type: ["string", "null"] };
 }
 
 function safeForLog(value: string, maxLength: number): string {
@@ -515,37 +426,30 @@ function safeForLog(value: string, maxLength: number): string {
     : `${redacted.slice(0, maxLength)}...`;
 }
 
-function analysisPrompt(locale: string): string {
+function observationPrompt(locale: string): string {
   return [
-    "You are CatDex Vision, a safety-first cat collection game analyzer.",
+    "You are CatDex Vision Step 1, a safety-first visual observation tool.",
     "Analyze only the cat. Ignore humans and never identify people.",
     "Reject inappropriate images. If no cat is visible, set safetyStatus to no_cat.",
     "Return JSON only, with no markdown.",
-    "Use CatDex ids for breed and variant.",
-    `Allowed breed ids: ${allowedBreedIds.join(", ")}.`,
-    "Allowed rarity: common, uncommon, rare, epic, legendary, mythic.",
-    `Allowed variants: ${allowedVariants.join(", ")}.`,
-    `Personality must be one allowed id: ${allowedPersonalities.join(", ")}.`,
-    "Accuracy is more important than rarity. Do not make the result feel special unless the image clearly supports it.",
-    "Most street, house, shelter, and mixed cats must be domestic_shorthair_cat, domestic_tabby_cat, domestic_longhair_cat, domestic_tuxedo_cat, domestic_calico_cat, domestic_black_cat, domestic_white_cat, domestic_orange_cat, or domestic_gray_cat.",
-    "Use domestic_tabby_cat for common tabby cats unless a pure breed standard is strongly visible.",
-    "Use european_shorthair only when the image strongly justifies that breed; do not use it as a generic fallback for a normal house cat.",
-    "If breed confidence is below 0.80, breed must be domestic_shorthair_cat or domestic_tabby_cat.",
-    "Rare breed ids are allowed only with confidence >= 0.90 and clear breed-specific visual evidence. Never invent exotic breeds.",
-    "Recognize only visible visual facts: coatColor, coatPattern, eyeColor, hairLength, estimatedAge, posture, expression, and environment.",
-    "Allowed coatPattern values are tabby, tuxedo, calico, solid, bicolor, tortoiseshell, pointed, spotted, smoke, unknown.",
-    "Do not output tortoiseshell unless mixed black/brown and orange/cream mottling is clearly visible.",
-    "Do not call a brown tabby gray, tortoiseshell, medium hair, or a pure breed unless those details are visible.",
-    "Traits must describe visible evidence only, such as Posa, Espressione, Ambiente, Mantello, Occhi, Eta stimata. Do not invent hidden temperament or history.",
-    "Do not include whisker traits unless whiskers are the main visible feature. Never invent curved whiskers.",
-    "For a common brown short-haired tabby with amber or yellow eyes, return coatColor marrone, coatPattern tigrato, eyeColor occhi ambrati or occhi gialli, hairLength pelo corto.",
-    "Use Italian canonical user-facing values: Brown=marrone, Tabby=tigrato, Amber eyes=occhi ambrati, Yellow eyes=occhi gialli, Short hair=pelo corto, Long hair=pelo lungo, Relaxed=rilassato, Curious=curioso.",
-    "Rarity must be common for normal domestic/common cats. Use uncommon only for visually distinctive but still common cats. Use rare, epic, or legendary only for clearly rare breeds or exceptional visible traits.",
-    "Legendary should almost never happen and requires extraordinary visual evidence plus confidence >= 0.98.",
-    "Never return event_edition unless an active_event or activeEventId is explicitly provided.",
-    "Return story, funFact, trait names, trait values, and any user-facing wording in Italian.",
-    "JSON keys: breed, confidence, candidates, coatColor, coatPattern, eyeColor, hairLength, estimatedAge, traits, personality, rarity, variant, story, funFact, safetyStatus.",
-    `Requested locale is ${locale}, but CatDex alpha requires Italian user-facing text.`,
+    "Return only visible facts: coatBaseColor, coatPattern, eyeColor, hairLength, posture, environment, estimatedAge, visibleConfidence, safetyStatus.",
+    "Do not return breed, rarity, variant, personality, story, funFact, or candidates.",
+    "If a visual fact is uncertain, return null for that field. Do not guess.",
+    "Never guess calico, tortoiseshell, colorpoint, blue eyes, or long hair unless clearly visible.",
+    "For tabby cats, distinguish brown tabby, gray tabby, and orange tabby from solid black.",
+    "Use coatPattern tabby only when stripes, rings, or spotted tabby markings are visible.",
+    "Use coatPattern calico only when clear white, orange, and black patches are visible.",
+    "Use coatPattern tortoiseshell only when mixed black or brown and orange mottling is visible.",
+    "Use coatPattern colorpoint only when Siamese-like darker ears, face, tail, or paws are visible.",
+    "Use coatBaseColor black only if the cat is mostly solid black.",
+    "Use coatBaseColor white only if the cat is mostly white.",
+    "Use eyeColor blue only if the eyes are clearly blue.",
+    "Use hairLength long only if the fur is clearly long; otherwise prefer short or null.",
+    "Allowed coatBaseColor examples: brown, gray, orange, black, white, cream, mixed, null.",
+    "Allowed coatPattern examples: tabby, solid, bicolor, tuxedo, calico, tortoiseshell, colorpoint, spotted, smoke, null.",
+    "visibleConfidence must be 0.0 to 1.0 and reflect only visual fact confidence.",
+    "JSON keys: coatBaseColor, coatPattern, eyeColor, hairLength, posture, environment, estimatedAge, visibleConfidence, safetyStatus.",
+    `Requested locale is ${locale}; observation values may be simple English visual labels because the backend rule engine localizes final output.`,
   ].join(" ");
 }
 
@@ -636,10 +540,12 @@ function parseJsonObject(text: string): unknown {
   }
 }
 
-function validateAnalysisJson(
-  value: unknown,
-  activeEvent: boolean,
-): AnalysisJson {
+function validateAnalysisJson(value: unknown): AnalysisJson {
+  const observation = validateVisionObservation(value);
+  return analysisFromObservation(observation);
+}
+
+function validateVisionObservation(value: unknown): CatVisionObservation {
   if (typeof value !== "object" || value === null) {
     throw new MalformedAiResponseError();
   }
@@ -651,98 +557,31 @@ function validateAnalysisJson(
     safetyStatus === "inappropriate"
   ) {
     return {
-      ...safeFallbackAnalysis(),
+      ...safeFallbackObservation(),
       safetyStatus,
-      story: stringValue(item.story) || safeFallbackAnalysis().story,
     };
   }
 
-  const analysis: AnalysisJson = {
-    breed: stringValue(item.breed) || "domestic_shorthair_cat",
-    confidence: numberValue(item.confidence),
-    candidates: candidateList(item.candidates),
-    coatColor: stringValue(item.coatColor) || "Unknown",
-    coatPattern: stringValue(item.coatPattern) || "Unknown",
-    eyeColor: stringValue(item.eyeColor) || "Unknown",
-    hairLength: stringValue(item.hairLength) || "Unknown",
-    estimatedAge: stringValue(item.estimatedAge) || "adulto",
-    traits: traitList(item.traits),
-    personality: allowedValue(
-      stringValue(item.personality),
-      allowedPersonalities,
-      "curious",
-    ),
-    rarity: allowedValue(stringValue(item.rarity), allowedRarities, "common"),
-    variant: allowedValue(stringValue(item.variant), allowedVariants, "normal"),
-    story: stringValue(item.story) || safeFallbackAnalysis().story,
-    funFact: stringValue(item.funFact) || safeFallbackAnalysis().funFact,
+  const observation: CatVisionObservation = {
+    coatBaseColor: nullableStringValue(item.coatBaseColor),
+    coatPattern: nullableStringValue(item.coatPattern),
+    eyeColor: nullableStringValue(item.eyeColor),
+    hairLength: nullableStringValue(item.hairLength),
+    posture: nullableStringValue(item.posture),
+    environment: nullableStringValue(item.environment),
+    estimatedAge: nullableStringValue(item.estimatedAge),
+    visibleConfidence: numberValue(item.visibleConfidence),
     safetyStatus: "safe",
-    analyzedAt: new Date().toISOString(),
   };
 
-  if (analysis.confidence < 0 || analysis.confidence > 1) {
+  if (
+    observation.visibleConfidence < 0 ||
+    observation.visibleConfidence > 1
+  ) {
     throw new MalformedAiResponseError();
   }
 
-  return applyRealismRules(analysis, activeEvent);
-}
-
-function candidateList(value: unknown): CandidateJson[] {
-  if (!Array.isArray(value)) {
-    return [{ breed: "domestic_shorthair_cat", confidence: 0.35 }];
-  }
-
-  const candidates = value.flatMap((item) => {
-    if (typeof item !== "object" || item === null) {
-      return [];
-    }
-
-    const row = item as Record<string, unknown>;
-    const breed = realisticBreedId(
-      stringValue(row.breed) || "domestic_shorthair_cat",
-      numberValue(row.confidence),
-    );
-    const confidence = numberValue(row.confidence);
-
-    if (confidence < 0 || confidence > 1) {
-      return [];
-    }
-
-    return [{ breed, confidence }];
-  });
-
-  return candidates.length === 0
-    ? [{ breed: "domestic_shorthair_cat", confidence: 0.35 }]
-    : candidates.slice(0, 3);
-}
-
-function traitList(value: unknown): TraitJson[] {
-  if (!Array.isArray(value)) {
-    return [{ name: "Umore", value: "Curioso", rarityWeight: 1 }];
-  }
-
-  const traits = value.flatMap((item) => {
-    if (typeof item !== "object" || item === null) {
-      return [];
-    }
-
-    const row = item as Record<string, unknown>;
-    const name = stringValue(row.name);
-    const value = stringValue(row.value);
-    if (!name || !value) {
-      return [];
-    }
-
-    return [{
-      name,
-      value,
-      rarityWeight: Math.max(1, numberValue(row.rarityWeight) || 1),
-    }];
-  });
-
-  return traits.length === 0
-    ? [{ name: "Umore", value: "Curioso", rarityWeight: 1 }]
-    : traits.slice(0, 6);
+  return observation;
 }
 
 function toResultEnvelope(analysis: AnalysisJson): JsonResponseBody {
@@ -764,6 +603,316 @@ function toResultEnvelope(analysis: AnalysisJson): JsonResponseBody {
     safetyStatus: analysis.safetyStatus,
     analyzedAt: analysis.analyzedAt,
   };
+}
+
+function safeFallbackObservation(): CatVisionObservation {
+  return {
+    coatBaseColor: null,
+    coatPattern: null,
+    eyeColor: null,
+    hairLength: null,
+    posture: null,
+    environment: null,
+    estimatedAge: null,
+    visibleConfidence: 0.35,
+    safetyStatus: "safe",
+  };
+}
+
+function analysisFromObservation(observation: CatVisionObservation): AnalysisJson {
+  if (
+    observation.safetyStatus === "no_cat" ||
+    observation.safetyStatus === "inappropriate"
+  ) {
+    return {
+      ...safeFallbackAnalysis(),
+      safetyStatus: observation.safetyStatus,
+    };
+  }
+
+  const coatPattern = realisticCoatPattern(
+    observation.coatPattern ?? "unknown",
+  );
+  const coatColor = coatColorFromObservation(
+    observation.coatBaseColor,
+    coatPattern,
+  );
+  const hairLength = realisticHairLength(observation.hairLength);
+  const eyeColor = realisticEyeColor(observation.eyeColor);
+  const estimatedAge = italianOrFallback(observation.estimatedAge, "adulto");
+  const confidence = Math.max(0.35, observation.visibleConfidence);
+  const breed = breedFromObservationRules({
+    coatColor,
+    coatPattern,
+    hairLength,
+    confidence,
+  });
+  const candidates = candidatesForBreed(breed, confidence, coatPattern);
+  const personality = personalityFromObservation(observation);
+  const rarity = rarityFromObservationRules(breed);
+  const variant = "normal";
+
+  return {
+    breed,
+    confidence,
+    candidates,
+    coatColor,
+    coatPattern,
+    eyeColor,
+    hairLength,
+    estimatedAge,
+    traits: traitsFromObservation({
+      coatColor,
+      coatPattern,
+      eyeColor,
+      hairLength,
+      estimatedAge,
+      posture: observation.posture,
+      environment: observation.environment,
+    }),
+    personality,
+    rarity,
+    variant,
+    story: storyFromObservation({
+      breed,
+      coatColor,
+      coatPattern,
+      posture: observation.posture,
+      environment: observation.environment,
+    }),
+    funFact: funFactForBreed(breed, coatPattern),
+    safetyStatus: "safe",
+    analyzedAt: new Date().toISOString(),
+  };
+}
+
+function coatColorFromObservation(
+  coatBaseColor: string | null,
+  coatPattern: string,
+): string {
+  return realisticCoatColor(coatBaseColor ?? "unknown", coatPattern);
+}
+
+function realisticHairLength(hairLength: string | null): string {
+  const normalized = normalizeVisualValue(hairLength ?? "");
+  if (normalized.includes("long") || normalized.includes("lung")) {
+    return "pelo lungo";
+  }
+
+  if (normalized.includes("medium") || normalized.includes("medio")) {
+    return "pelo medio";
+  }
+
+  if (normalized.includes("short") || normalized.includes("cort")) {
+    return "pelo corto";
+  }
+
+  return "pelo corto";
+}
+
+function realisticEyeColor(eyeColor: string | null): string {
+  const normalized = normalizeVisualValue(eyeColor ?? "");
+  if (normalized.includes("blue") || normalized.includes("azzurr")) {
+    return "occhi azzurri";
+  }
+
+  if (normalized.includes("green") || normalized.includes("verd")) {
+    return "occhi verdi";
+  }
+
+  if (normalized.includes("amber") || normalized.includes("ambr")) {
+    return "occhi ambrati";
+  }
+
+  if (
+    normalized.includes("yellow") ||
+    normalized.includes("gold") ||
+    normalized.includes("giall") ||
+    normalized.includes("dorat")
+  ) {
+    return "occhi gialli";
+  }
+
+  return "Non rilevato";
+}
+
+function italianOrFallback(value: string | null, fallback: string): string {
+  return stringValue(value) || fallback;
+}
+
+function breedFromObservationRules({
+  coatColor,
+  coatPattern,
+  hairLength,
+  confidence,
+}: {
+  coatColor: string;
+  coatPattern: string;
+  hairLength: string;
+  confidence: number;
+}): string {
+  if (isTabbyPattern(coatPattern) && hairLength !== "pelo lungo") {
+    return "domestic_tabby_cat";
+  }
+
+  if (isTabbyPattern(coatPattern)) {
+    return "domestic_tabby_cat";
+  }
+
+  if (normalizeVisualValue(coatPattern).includes("calico")) {
+    return "domestic_calico_cat";
+  }
+
+  if (isSolidPattern(coatPattern) && isBlackColor(coatColor)) {
+    return "domestic_black_cat";
+  }
+
+  if (isWhiteColor(coatColor)) {
+    return "domestic_white_cat";
+  }
+
+  if (isOrangeColor(coatColor)) {
+    return "domestic_orange_cat";
+  }
+
+  if (isGrayColor(coatColor)) {
+    return "domestic_gray_cat";
+  }
+
+  if (normalizeVisualValue(coatPattern).includes("colorpoint")) {
+    return confidence >= 0.9 ? "siamese" : "domestic_shorthair_cat";
+  }
+
+  if (hairLength === "pelo lungo") {
+    return "domestic_longhair_cat";
+  }
+
+  return "domestic_shorthair_cat";
+}
+
+function candidatesForBreed(
+  breed: string,
+  confidence: number,
+  coatPattern: string,
+): CandidateJson[] {
+  const candidates: CandidateJson[] = [
+    { breed, confidence },
+  ];
+
+  if (breed !== "domestic_shorthair_cat") {
+    candidates.push({
+      breed: "domestic_shorthair_cat",
+      confidence: Math.max(0.35, confidence - 0.18),
+    });
+  }
+
+  if (breed !== "domestic_tabby_cat" && isTabbyPattern(coatPattern)) {
+    candidates.push({
+      breed: "domestic_tabby_cat",
+      confidence: Math.max(0.35, confidence - 0.12),
+    });
+  }
+
+  return candidates.slice(0, 3);
+}
+
+function rarityFromObservationRules(breed: string): string {
+  return breed.startsWith("domestic_") ? "common" : "uncommon";
+}
+
+function personalityFromObservation(
+  observation: CatVisionObservation,
+): string {
+  const posture = normalizeVisualValue(observation.posture ?? "");
+  if (posture.includes("sleep") || posture.includes("rest")) {
+    return "relaxed";
+  }
+
+  if (posture.includes("play")) {
+    return "playful";
+  }
+
+  return "curious";
+}
+
+function traitsFromObservation({
+  coatColor,
+  coatPattern,
+  eyeColor,
+  hairLength,
+  estimatedAge,
+  posture,
+  environment,
+}: {
+  coatColor: string;
+  coatPattern: string;
+  eyeColor: string;
+  hairLength: string;
+  estimatedAge: string;
+  posture: string | null;
+  environment: string | null;
+}): TraitJson[] {
+  const traits: TraitJson[] = [
+    { name: "Mantello", value: `${coatColor}, ${coatPattern}`, rarityWeight: 1 },
+    { name: "Occhi", value: eyeColor, rarityWeight: 1 },
+    { name: "Pelo", value: hairLength, rarityWeight: 1 },
+    { name: "Eta stimata", value: estimatedAge, rarityWeight: 1 },
+  ];
+
+  if (posture) {
+    traits.push({ name: "Posa", value: posture, rarityWeight: 1 });
+  }
+
+  if (environment) {
+    traits.push({ name: "Ambiente", value: environment, rarityWeight: 1 });
+  }
+
+  return traits.slice(0, 6);
+}
+
+function storyFromObservation({
+  breed,
+  coatColor,
+  coatPattern,
+  posture,
+  environment,
+}: {
+  breed: string;
+  coatColor: string;
+  coatPattern: string;
+  posture: string | null;
+  environment: string | null;
+}): string {
+  const breedName = italianBreedName(breed);
+  const poseText = posture ? ` in posa ${posture}` : "";
+  const environmentText = environment ? `, avvistato in ${environment}` : "";
+  return `Un ${breedName} dal mantello ${coatColor} ${coatPattern}${poseText}${environmentText} entra nel tuo CatDex con un'aria curiosa e attenta.`;
+}
+
+function funFactForBreed(breed: string, coatPattern: string): string {
+  if (breed === "domestic_tabby_cat" || isTabbyPattern(coatPattern)) {
+    return "Il disegno tigrato e uno dei mantelli piu comuni nei gatti domestici e puo apparire in tonalita marroni, grigie o arancioni.";
+  }
+
+  if (breed === "domestic_black_cat") {
+    return "I gatti neri solidi possono mostrare riflessi marroni alla luce del sole, ma CatDex li considera neri solo quando il mantello e quasi interamente scuro.";
+  }
+
+  return "Molti gatti domestici hanno origini miste: CatDex privilegia una classificazione prudente quando la razza non e chiara.";
+}
+
+function italianBreedName(breed: string): string {
+  return {
+    domestic_tabby_cat: "gatto domestico tigrato",
+    domestic_shorthair_cat: "gatto domestico a pelo corto",
+    domestic_black_cat: "gatto domestico nero",
+    domestic_white_cat: "gatto domestico bianco",
+    domestic_calico_cat: "gatto calico domestico",
+    domestic_orange_cat: "gatto domestico arancione",
+    domestic_gray_cat: "gatto domestico grigio",
+    domestic_longhair_cat: "gatto domestico a pelo lungo",
+    siamese: "gatto siamese",
+  }[breed] ?? "gatto domestico";
 }
 
 function safeFallbackAnalysis(): AnalysisJson {
@@ -876,123 +1025,151 @@ function openAiErrorSummary(body: string): {
   }
 }
 
-function applyRealismRules(
-  analysis: AnalysisJson,
-  activeEvent: boolean,
-): AnalysisJson {
-  const breed = realisticBreedId(
-    analysis.breed,
-    analysis.confidence,
-    analysis.coatPattern,
-  );
-  const candidates = analysis.candidates
-    .map((candidate) => ({
-      breed: realisticBreedId(
-        candidate.breed,
-        candidate.confidence,
-        analysis.coatPattern,
-      ),
-      confidence: candidate.confidence,
-    }))
-    .filter((candidate, index, list) =>
-      list.findIndex((item) => item.breed === candidate.breed) === index
-    )
-    .slice(0, 3);
+function realisticCoatColor(coatColor: string, coatPattern: string): string {
+  const color = normalizeVisualValue(coatColor);
+  const pattern = normalizeVisualValue(coatPattern);
+  const tabby = isTabbyPattern(pattern);
+  const solid = isSolidPattern(pattern);
 
-  return {
-    ...analysis,
-    breed,
-    candidates: candidates.length === 0
-      ? [{ breed, confidence: analysis.confidence }]
-      : candidates,
-    coatPattern: realisticCoatPattern(analysis.coatPattern),
-    rarity: realisticRarity(
-      analysis.rarity,
-      analysis.confidence,
-      breed,
-      analysis.coatPattern,
-    ),
-    variant: analysis.variant === "event_edition" && !activeEvent
-      ? "normal"
-      : analysis.variant,
-  };
-}
+  if (tabby) {
+    if (isOrangeColor(color)) {
+      return "arancione tigrato";
+    }
 
-function realisticBreedId(
-  breed: string,
-  confidence: number,
-  coatPattern = "",
-): string {
-  const normalized = breed.trim().toLowerCase();
-  if (confidence < 0.8) {
-    return isTabbyPattern(coatPattern)
-      ? "domestic_tabby_cat"
-      : "domestic_shorthair_cat";
+    if (isGrayColor(color)) {
+      return "grigio tigrato";
+    }
+
+    if (
+      isWhiteColor(color) ||
+      isCalicoColor(color) ||
+      isColorpointColor(color)
+    ) {
+      return "marrone/grigio tigrato";
+    }
+
+    if (isBlackColor(color) && !solid) {
+      return "marrone/grigio tigrato";
+    }
+
+    if (color.includes("tigrat")) {
+      return coatColor;
+    }
+
+    if (isBrownColor(color) || color.length === 0 || color === "unknown") {
+      return "marrone tigrato";
+    }
   }
 
-  if (normalized === "european_shorthair" && confidence < 0.9) {
-    return isTabbyPattern(coatPattern)
-      ? "domestic_tabby_cat"
-      : "domestic_shorthair_cat";
+  if (solid && isBlackColor(color)) {
+    return "Nero";
   }
 
-  if (rareBreedIds.includes(normalized) && confidence < 0.9) {
-    return "domestic_shorthair_cat";
+  if (isWhiteColor(color)) {
+    return "Bianco";
   }
 
-  return allowedBreedIds.includes(normalized)
-    ? normalized
-    : "domestic_shorthair_cat";
+  return coatColor;
 }
 
 function realisticCoatPattern(coatPattern: string): string {
-  const normalized = coatPattern.trim().toLowerCase();
+  const normalized = normalizeVisualValue(coatPattern);
   if (
     normalized.includes("tortoiseshell") ||
-    normalized.includes("tortie")
+    normalized.includes("tortie") ||
+    normalized.includes("tartarugat")
   ) {
-    return "tortoiseshell";
+    return "tartarugato";
   }
 
   if (normalized.includes("tabby")) {
-    return "tabby";
+    return "tigrato";
+  }
+
+  if (normalized.includes("tigrat")) {
+    return "tigrato";
+  }
+
+  if (normalized.includes("calico")) {
+    return "calico";
+  }
+
+  if (normalized.includes("colorpoint") || normalized.includes("pointed")) {
+    return "colorpoint";
+  }
+
+  if (normalized.includes("solid") || normalized.includes("solido")) {
+    return "solido";
+  }
+
+  if (normalized.includes("bicolor") || normalized.includes("bicolore")) {
+    return "bicolore";
   }
 
   return coatPattern;
 }
 
-function realisticRarity(
-  rarity: string,
-  confidence: number,
-  breed: string,
-  coatPattern: string,
-): string {
-  const commonDomesticBreed = breed.startsWith("domestic_") ||
-    breed === "european_shorthair" ||
-    breed === "american_shorthair";
-  if (commonDomesticBreed && confidence < 0.95) {
-    return isDistinctiveCommonPattern(coatPattern) && rarity === "uncommon"
-      ? "uncommon"
-      : "common";
-  }
-
-  if ((rarity === "legendary" && confidence < 0.98) || rarity === "mythic") {
-    return "rare";
-  }
-
-  return rarity;
-}
-
 function isTabbyPattern(coatPattern: string): boolean {
-  return coatPattern.trim().toLowerCase().includes("tabby");
+  const normalized = normalizeVisualValue(coatPattern);
+  return normalized.includes("tabby") ||
+    normalized.includes("tigrat") ||
+    normalized.includes("striped");
 }
 
-function isDistinctiveCommonPattern(coatPattern: string): boolean {
-  const normalized = coatPattern.trim().toLowerCase();
-  return normalized.includes("calico") ||
-    normalized.includes("tuxedo") ||
-    normalized.includes("tortoiseshell") ||
-    normalized.includes("bicolor");
+function isSolidPattern(coatPattern: string): boolean {
+  const normalized = normalizeVisualValue(coatPattern);
+  return normalized.includes("solid") || normalized.includes("solido");
+}
+
+function isBlackColor(coatColor: string): boolean {
+  const normalized = normalizeVisualValue(coatColor);
+  return normalized.includes("nero") ||
+    normalized.includes("black") ||
+    normalized.includes("nero solido");
+}
+
+function isWhiteColor(coatColor: string): boolean {
+  const normalized = normalizeVisualValue(coatColor);
+  return normalized.includes("bianco") || normalized.includes("white");
+}
+
+function isBrownColor(coatColor: string): boolean {
+  const normalized = normalizeVisualValue(coatColor);
+  return normalized.includes("marrone") ||
+    normalized.includes("brown") ||
+    normalized.includes("bruno");
+}
+
+function isGrayColor(coatColor: string): boolean {
+  const normalized = normalizeVisualValue(coatColor);
+  return normalized.includes("grigio") ||
+    normalized.includes("gray") ||
+    normalized.includes("grey");
+}
+
+function isOrangeColor(coatColor: string): boolean {
+  const normalized = normalizeVisualValue(coatColor);
+  return normalized.includes("arancione") ||
+    normalized.includes("orange") ||
+    normalized.includes("rosso") ||
+    normalized.includes("ginger");
+}
+
+function isCalicoColor(coatColor: string): boolean {
+  return normalizeVisualValue(coatColor).includes("calico");
+}
+
+function isColorpointColor(coatColor: string): boolean {
+  const normalized = normalizeVisualValue(coatColor);
+  return normalized.includes("colorpoint") || normalized.includes("pointed");
+}
+
+function normalizeVisualValue(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function hasActiveEvent(body: AnalyzeCatPhotoRequest): boolean {
@@ -1020,16 +1197,13 @@ function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function numberValue(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+function nullableStringValue(value: unknown): string | null {
+  const text = stringValue(value);
+  return text.length === 0 ? null : text;
 }
 
-function allowedValue(
-  value: string,
-  allowedValues: string[],
-  fallback: string,
-): string {
-  return allowedValues.includes(value) ? value : fallback;
+function numberValue(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 class OpenAiRequestError extends Error {

@@ -68,10 +68,10 @@ void main() {
     await _expectVisibleText(tester, 'Umore');
     await _expectVisibleText(tester, 'Storia');
     await _expectVisibleText(tester, 'Curiosita');
-    await _expectVisibleText(tester, 'Brown');
-    await _expectVisibleText(tester, 'Tabby');
-    await _expectVisibleText(tester, 'Amber eyes');
-    await _expectVisibleText(tester, 'Short hair');
+    await _expectVisibleText(tester, 'arancione tigrato');
+    await _expectVisibleText(tester, 'tigrato');
+    await _expectVisibleText(tester, 'occhi gialli');
+    await _expectVisibleText(tester, 'pelo corto');
     await _expectVisibleText(tester, 'adult');
     await _expectVisibleText(
       tester,
@@ -90,8 +90,17 @@ void main() {
     );
     expect(find.textContaining('European Shorthair'), findsNothing);
     expect(find.textContaining('Tortoiseshell'), findsNothing);
+    expect(find.textContaining('Squama di tartaruga'), findsNothing);
+    expect(find.textContaining('Bianco'), findsNothing);
+    expect(find.textContaining('Calico'), findsNothing);
+    expect(find.textContaining('Colorpoint'), findsNothing);
+    expect(find.textContaining('Blue eyes'), findsNothing);
+    expect(find.textContaining('Blu'), findsNothing);
+    expect(find.textContaining('Lungo'), findsNothing);
+    expect(find.textContaining('Soffice'), findsNothing);
     expect(find.textContaining('Soft hair'), findsNothing);
     expect(find.textContaining('curved whiskers'), findsNothing);
+    expect(find.text('null'), findsNothing);
   });
 }
 
@@ -121,10 +130,10 @@ Map<String, Object?> _backendJson() {
     'candidates': [
       {'breed': 'domestic_orange_cat', 'confidence': 0.91},
     ],
-    'coatColor': 'Brown',
-    'coatPattern': 'Tabby',
-    'eyeColor': 'Amber eyes',
-    'hairLength': 'Short hair',
+    'coatColor': 'arancione tigrato',
+    'coatPattern': 'tigrato',
+    'eyeColor': 'occhi gialli',
+    'hairLength': 'pelo corto',
     'estimatedAge': 'adult',
     'traits': [
       {'name': 'Posture', 'value': 'watching', 'rarityWeight': 1},

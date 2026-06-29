@@ -20,7 +20,7 @@ void main() {
     expect(result.story, isNotEmpty);
   });
 
-  test('falls back safely for unknown seed ids', () {
+  test('keeps backend response when seed ids are unknown', () {
     const parser = CatAnalysisResultJsonParser();
     final json = _json();
     final primaryBreed = Map<String, Object?>.from(
@@ -32,7 +32,8 @@ void main() {
     final result = parser.parse(json);
 
     expect(result.primaryBreed.species.id, 'domestic_shorthair_cat');
-    expect(result.confidence.score, 0.35);
+    expect(result.confidence.score, 0.82);
+    expect(result.visualTraits.coatColor, 'Brown');
   });
 
   test('parses real Edge Function response shape', () {
@@ -43,7 +44,7 @@ void main() {
     expect(result.primaryBreed.species.id, 'domestic_tabby_cat');
     expect(result.displayBreed, 'domestic_tabby_cat');
     expect(result.breedCandidates, hasLength(2));
-    expect(result.visualTraits.coatPattern, 'Tabby');
+    expect(result.visualTraits.coatPattern, 'tigrato');
     expect(result.variant.id, 'normal');
     expect(result.displayRarity, 'common');
     expect(result.displayVariant, 'normal');
@@ -120,6 +121,37 @@ void main() {
     expect(result.personality, CatPersonality.curious);
   });
 
+  test('treats literal null strings as absent values', () {
+    const parser = CatAnalysisResultJsonParser();
+    final json = _realJson()
+      ..['estimatedAge'] = 'null'
+      ..['story'] = 'null'
+      ..['funFact'] = 'null'
+      ..['traits'] = [
+        {'name': 'null', 'value': 'ignored', 'rarityWeight': 1},
+        {'name': 'Posa', 'value': 'null', 'rarityWeight': 1},
+      ];
+
+    final result = parser.parse(json);
+
+    expect(result.estimatedAge, isNull);
+    expect(result.story, isNot('null'));
+    expect(result.funFact, isNull);
+    expect(result.visualTraits.notableTraits, isEmpty);
+  });
+
+  test('does not replace backend visual fields with fake defaults', () {
+    const parser = CatAnalysisResultJsonParser();
+    final result = parser.parse(_realJson());
+
+    expect(result.visualTraits.coatColor, 'arancione tigrato');
+    expect(result.visualTraits.coatColor, isNot('Bianco'));
+    expect(result.visualTraits.coatPattern, 'tigrato');
+    expect(result.visualTraits.coatPattern, isNot('Calico'));
+    expect(result.visualTraits.hairLength, 'pelo corto');
+    expect(result.visualTraits.hairLength, isNot('Lungo'));
+  });
+
   test('falls back safely for malformed response', () {
     const parser = CatAnalysisResultJsonParser();
 
@@ -182,10 +214,10 @@ Map<String, Object?> _realJson() {
         'confidence': 0.64,
       },
     ],
-    'coatColor': 'Brown',
-    'coatPattern': 'Tabby',
-    'eyeColor': 'Green',
-    'hairLength': 'Short',
+    'coatColor': 'arancione tigrato',
+    'coatPattern': 'tigrato',
+    'eyeColor': 'occhi gialli',
+    'hairLength': 'pelo corto',
     'traits': [
       {
         'name': 'Mood',

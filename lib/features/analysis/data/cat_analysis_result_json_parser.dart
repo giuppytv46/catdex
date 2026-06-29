@@ -60,7 +60,7 @@ class CatAnalysisResultJsonParser {
     final map = _map(json);
 
     return CatBreedCandidate(
-      species: _species(
+      species: _safeSpecies(
         _optionalString(map['speciesId']) ??
             _optionalString(map['breed']) ??
             'domestic_shorthair_cat',
@@ -75,7 +75,7 @@ class CatAnalysisResultJsonParser {
     }
 
     return CatBreedCandidate(
-      species: _species(
+      species: _safeSpecies(
         _optionalString(map['breed']) ?? 'domestic_shorthair_cat',
       ),
       confidence: _confidence(map['confidence']),
@@ -104,13 +104,19 @@ class CatAnalysisResultJsonParser {
                 const [])
             .map((item) {
               final trait = _map(item);
+              final name = _optionalString(trait['name']);
+              final value = _optionalString(trait['value']);
+              if (name == null || value == null) {
+                return null;
+              }
 
               return CatTrait(
-                name: _optionalString(trait['name']) ?? 'Trait',
-                value: _optionalString(trait['value']) ?? 'Unknown',
+                name: name,
+                value: value,
                 rarityWeight: _optionalDouble(trait['rarityWeight']) ?? 1,
               );
             })
+            .nonNulls
             .toList(growable: false);
 
     return CatVisualTraits(
@@ -141,6 +147,14 @@ class CatAnalysisResultJsonParser {
     }
 
     throw FormatException('Unknown species id: $rawValue');
+  }
+
+  CatSpecies _safeSpecies(String rawValue) {
+    try {
+      return _species(rawValue);
+    } on FormatException {
+      return _species('domestic_shorthair_cat');
+    }
   }
 
   CatVariant _variant(String rawValue) {
@@ -233,8 +247,13 @@ class CatAnalysisResultJsonParser {
   }
 
   String? _optionalString(Object? value) {
-    if (value is String && value.isNotEmpty) {
-      return value;
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty || trimmed.toLowerCase() == 'null') {
+        return null;
+      }
+
+      return trimmed;
     }
 
     return null;

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:catdex/core/localization/catdex_localizations.dart';
@@ -210,6 +211,12 @@ class _AnalysisResultCard extends StatelessWidget {
     final traits = result.visualTraits.notableTraits
         .map((trait) => '${trait.name}: ${trait.value}')
         .join(', ');
+    final traitDisplay = traits.isEmpty ? 'Unknown' : traits;
+
+    debugPrint(
+      'CATDEX_AI_UI_FIELDS '
+      '${_safeJson(_analysisUiDebugJson(result, traitDisplay))}',
+    );
 
     return DecoratedBox(
       decoration: _analysisDecoration(
@@ -263,7 +270,7 @@ class _AnalysisResultCard extends StatelessWidget {
             ),
             _ResultRow(
               label: l10n.traitsLabel,
-              value: traits.isEmpty ? 'Unknown' : traits,
+              value: traitDisplay,
             ),
             _ResultRow(
               label: l10n.rarityFiltersTitle,
@@ -311,6 +318,43 @@ class _AnalysisResultCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Map<String, Object?> _analysisUiDebugJson(
+    CatAnalysisResult result,
+    String traitDisplay,
+  ) {
+    return {
+      'breed': result.displayBreed,
+      'coatColor': result.visualTraits.coatColor,
+      'coatPattern': result.visualTraits.coatPattern,
+      'eyeColor': result.visualTraits.eyeColor,
+      'hairLength': result.visualTraits.hairLength,
+      'estimatedAge': result.estimatedAge,
+      'traits': result.visualTraits.notableTraits
+          .map(
+            (trait) => {
+              'name': trait.name,
+              'value': trait.value,
+              'rarityWeight': trait.rarityWeight,
+            },
+          )
+          .toList(growable: false),
+      'personality': result.displayPersonality,
+      'rarity': result.displayRarity,
+      'variant': result.displayVariant,
+      'story': result.story,
+      'funFact': result.funFact,
+      'traitDisplay': traitDisplay,
+    };
+  }
+
+  String _safeJson(Object? value) {
+    try {
+      return jsonEncode(value);
+    } on Object {
+      return value.toString();
+    }
   }
 }
 

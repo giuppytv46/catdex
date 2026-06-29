@@ -994,7 +994,7 @@ class CatDexLocalizations {
 
   String get placeholderTraitsLabel => _localizedValue(
     en: 'Curious, Friendly, Fluffy',
-    it: 'Curioso, Amichevole, Soffice',
+    it: 'Curioso, Amichevole, Vivace',
     es: 'Curioso, Amigable, Suave',
     fr: 'Curieux, Amical, Doux',
     de: 'Neugierig, Freundlich, Flauschig',

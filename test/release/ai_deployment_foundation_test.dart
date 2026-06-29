@@ -34,6 +34,7 @@ void main() {
 
       expect(functionText, contains('/v1/chat/completions'));
       expect(functionText, contains('response_format'));
+      expect(functionText, contains('catdex_cat_observation'));
       expect(functionText, contains('type: "image_url"'));
       expect(functionText, contains(r'Authorization: `Bearer ${openAiKey}`'));
       expect(functionText, contains('openAiFallbackReason'));
@@ -42,19 +43,18 @@ void main() {
       expect(functionText, isNot(contains('502')));
     });
 
-    test('Edge Function prompt favors realistic domestic cat analysis', () {
+    test('Edge Function uses observation first and local CatDex rules', () {
       final functionText = File(
         'supabase/functions/analyze_cat_photo/index.ts',
       ).readAsStringSync();
 
-      expect(functionText, contains('Use domestic_tabby_cat for common tabby'));
-      expect(functionText, contains('Use european_shorthair only when'));
-      expect(functionText, contains('Do not output tortoiseshell unless'));
-      expect(functionText, contains('Rarity must be common'));
-      expect(functionText, contains('Return story, funFact'));
-      expect(functionText, contains('in Italian'));
-      expect(functionText, contains('realisticBreedId('));
-      expect(functionText, contains('realisticRarity('));
+      expect(functionText, contains('CatDex Vision Step 1'));
+      expect(functionText, contains('Do not return breed'));
+      expect(functionText, contains('If a visual fact is uncertain'));
+      expect(functionText, contains('analysisFromObservation('));
+      expect(functionText, contains('breedFromObservationRules('));
+      expect(functionText, contains('rarityFromObservationRules('));
+      expect(functionText, contains('storyFromObservation('));
     });
   });
 }

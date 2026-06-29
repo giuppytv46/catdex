@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'dart:developer';
 
 import 'package:catdex/features/analysis/data/backend_cat_analysis_client.dart';
 import 'package:catdex/features/analysis/data/cat_analysis_error_mapper.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_exception.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseCatAnalysisBackendClient implements CatAnalysisBackendClient {
@@ -22,10 +22,7 @@ class SupabaseCatAnalysisBackendClient implements CatAnalysisBackendClient {
         'analyze_cat_photo',
         body: body,
       );
-      log(
-        _safeJson(response.data),
-        name: 'CatDexAI.rawSupabaseResponse',
-      );
+      debugPrint('CATDEX_AI_RAW ${_safeJson(response.data)}');
 
       return response.data;
     } on FunctionException catch (error) {

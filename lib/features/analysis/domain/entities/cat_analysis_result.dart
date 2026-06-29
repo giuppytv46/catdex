@@ -40,8 +40,8 @@ class CatAnalysisResult {
   final String? estimatedAge;
   final String? funFact;
 
-  String get displayBreed => backendBreed ?? primaryBreed.species.displayName;
-  String get displayRarity => backendRarity ?? rarity.name;
-  String get displayVariant => backendVariant ?? variant.name;
-  String get displayPersonality => backendPersonality ?? personality.name;
+  String get displayBreed => backendBreed ?? 'Unknown';
+  String get displayRarity => backendRarity ?? 'Unknown';
+  String get displayVariant => backendVariant ?? 'Unknown';
+  String get displayPersonality => backendPersonality ?? 'Unknown';
 }
