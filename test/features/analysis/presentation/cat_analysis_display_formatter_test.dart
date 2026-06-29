@@ -7,6 +7,9 @@ void main() {
 
   test('formats backend technical labels as readable Italian labels', () {
     expect(formatter.value('domestic_tabby_cat'), 'Gatto domestico tigrato');
+    expect(formatter.value('domestic_gray_cat'), 'Gatto domestico bicolore');
+    expect(formatter.value('domestic_black_cat'), 'Gatto nero domestico');
+    expect(formatter.value('domestic_orange_cat'), 'Gatto rosso domestico');
     expect(
       formatter.value('domestic_shorthair_cat'),
       'Gatto domestico a pelo corto',
@@ -21,11 +24,15 @@ void main() {
     expect(formatter.value('epic'), 'Epico');
     expect(formatter.value('legendary'), 'Leggendario');
     expect(formatter.value('normal'), 'Normale');
+    expect(formatter.value('relaxed'), 'Rilassato');
+    expect(formatter.value('curious'), 'Curioso');
+    expect(formatter.value('playful'), 'Giocherellone');
     expect(
       formatter.value('marrone/grigio tigrato'),
       'Marrone/grigio tigrato',
     );
     expect(formatter.value('tigrato mackerel'), 'Tigrato mackerel');
+    expect(formatter.value('unknown_species_id'), 'Unknown Species Id');
   });
 
   test('formats trait values without changing the source traits', () {

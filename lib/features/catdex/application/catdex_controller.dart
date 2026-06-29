@@ -11,27 +11,6 @@ final catDexControllerProvider =
     );
 
 class CatDexController extends Notifier<CatDexCollectionState> {
-  static const _discoveredSpeciesIds = {
-    'domestic_black_cat',
-    'domestic_white_cat',
-    'domestic_tuxedo_cat',
-    'domestic_calico_cat',
-    'domestic_tabby_cat',
-    'domestic_orange_cat',
-    'domestic_gray_cat',
-    'domestic_tortoiseshell_cat',
-    'domestic_colorpoint_cat',
-    'domestic_longhair_cat',
-    'domestic_shorthair_cat',
-    'maine_coon',
-    'siamese',
-    'persian',
-    'ragdoll',
-    'bengal',
-    'sphynx',
-    'british_shorthair',
-  };
-
   @override
   CatDexCollectionState build() {
     final sessionDiscoveries = ref.watch(localDiscoverySessionProvider);
@@ -108,9 +87,17 @@ class CatDexController extends Notifier<CatDexCollectionState> {
     final normalizedQuery = nextSearchQuery.trim().toLowerCase();
     final visibleEntries = state.entries
         .where((entry) {
+          final formattedSpeciesName = _speciesSearchLabel(
+            entry.discovery?.speciesId ?? entry.species.id,
+          );
           final matchesSearch =
               normalizedQuery.isEmpty ||
-              entry.species.displayName.toLowerCase().contains(normalizedQuery);
+              entry.species.displayName.toLowerCase().contains(
+                normalizedQuery,
+              ) ||
+              formattedSpeciesName.contains(normalizedQuery) ||
+              (entry.displayName?.toLowerCase().contains(normalizedQuery) ??
+                  false);
           final matchesRarity =
               nextSelectedRarity == null ||
               entry.species.baseRarity == nextSelectedRarity;
@@ -121,6 +108,7 @@ class CatDexController extends Notifier<CatDexCollectionState> {
             CatDexDiscoveryFilter.all => true,
             CatDexDiscoveryFilter.discovered => entry.discovered,
             CatDexDiscoveryFilter.undiscovered => !entry.discovered,
+            CatDexDiscoveryFilter.favorites => entry.favorite,
           };
 
           return matchesSearch &&
@@ -171,9 +159,10 @@ class CatDexController extends Notifier<CatDexCollectionState> {
           ? _variantNameForIndex(index)
           : _variantNameById(localDiscovery.variantId),
       variantId: localDiscovery?.variantId ?? _variantIdForIndex(index),
-      discovered:
-          _discoveredSpeciesIds.contains(species.id) || localDiscovery != null,
+      discovered: localDiscovery != null,
       collectionNumber: index + 1,
+      discovery: localDiscovery,
+      displayName: localDiscovery?.customName,
       discoveredPhotoPath: localDiscovery?.photoPath,
     );
   }
@@ -203,5 +192,9 @@ class CatDexController extends Notifier<CatDexCollectionState> {
 
   String _variantIdForIndex(int index) {
     return CatDexSeedData.variants[index % CatDexSeedData.variants.length].id;
+  }
+
+  String _speciesSearchLabel(String speciesId) {
+    return speciesId.replaceAll('_', ' ').toLowerCase();
   }
 }

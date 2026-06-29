@@ -35,7 +35,11 @@ void main() {
     await container.read(localDiscoverySaveControllerProvider.future);
     await container
         .read(localDiscoverySaveControllerProvider.notifier)
-        .save(_analysisResult());
+        .save(
+          _analysisResult(),
+          photoPath: '/tmp/cat.jpg',
+          customName: 'Nebbia',
+        );
 
     final saveState = container.read(localDiscoverySaveControllerProvider);
     final discoveries = await discoveryRepository.getDiscoveriesForPlayer(
@@ -50,6 +54,27 @@ void main() {
       discoveries.single.speciesId,
       _analysisResult().primaryBreed.species.id,
     );
+    expect(discoveries.single.nickname, 'Nebbia');
+    expect(discoveries.single.suggestedName, 'Mochi');
+    expect(discoveries.single.originalPhotoPath, '/tmp/cat.jpg');
+    expect(discoveries.single.displayPhotoPath, '/tmp/cat.jpg');
+    expect(discoveries.single.photoPath, '/tmp/cat.jpg');
+    expect(discoveries.single.story, _analysisResult().story);
+    expect(discoveries.single.funFact, _analysisResult().funFact);
+    expect(discoveries.single.coatColor, 'Black');
+    expect(discoveries.single.coatPattern, 'Solid');
+    expect(discoveries.single.eyeColor, 'Green');
+    expect(discoveries.single.hairLength, 'Short');
+    expect(discoveries.single.estimatedAge, 'adult');
+    expect(discoveries.single.xpEarned, saveState.value?.reward?.xp);
+    expect(discoveries.single.coinsEarned, saveState.value?.reward?.coins);
+    expect(
+      discoveries.single.confidenceScore,
+      _analysisResult().confidence.score,
+    );
+    expect(discoveries.single.card?.discoveryId, discoveries.single.id);
+    expect(discoveries.single.card?.cardFrameStyle, 'green_simple_frame');
+    expect(discoveries.single.card?.isEventCard, isFalse);
   });
 
   test('updates local player progress with discovery reward', () async {
@@ -242,5 +267,7 @@ CatAnalysisResult _analysisResult() {
     personality: CatPersonality.curious,
     story: 'A calm local discovery.',
     analyzedAt: DateTime.utc(2026),
+    estimatedAge: 'adult',
+    funFact: 'Domestic cats can recognize familiar voices.',
   );
 }

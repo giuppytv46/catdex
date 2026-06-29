@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:catdex/core/localization/catdex_localizations.dart';
+import 'package:catdex/features/analysis/presentation/cat_analysis_display_formatter.dart';
 import 'package:catdex/features/catdex/application/catdex_controller.dart';
+import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
+import 'package:catdex/features/catdex/application/local_player_progress_session_controller.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/catdex_collection.dart';
 import 'package:catdex/theme/app_colors.dart';
@@ -15,44 +17,70 @@ class CatDexPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = CatDexLocalizations.of(context);
     final state = ref.watch(catDexControllerProvider);
     final controller = ref.read(catDexControllerProvider.notifier);
+    final progress = ref.watch(localPlayerProgressSessionProvider);
+    final levelCalculator = ref.watch(levelCalculatorProvider);
+    final levelStartXp = levelCalculator.xpRequiredForLevel(progress.level);
+    final nextLevelXp = levelCalculator.xpRequiredForLevel(progress.level + 1);
+    final levelSpan = nextLevelXp - levelStartXp;
+    final levelXp = progress.totalXp - levelStartXp;
+    final xpProgress = levelSpan <= 0 ? 1.0 : levelXp / levelSpan;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.catDexTitle)),
+      backgroundColor: AppColors.backgroundGray,
       body: CustomScrollView(
         key: const Key('catdex_collection_scroll'),
         slivers: [
+          SliverAppBar(
+            pinned: true,
+            backgroundColor: AppColors.backgroundGray,
+            surfaceTintColor: Colors.transparent,
+            title: const Text('CatDex'),
+            actions: [
+              IconButton(
+                tooltip: 'Profilo',
+                onPressed: () {},
+                icon: const Icon(Icons.person_rounded),
+              ),
+            ],
+          ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
               AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
+              AppSpacing.lg,
               0,
             ),
             sliver: SliverList.list(
               children: [
-                _CollectionProgressHeader(state: state),
+                _PlayerCollectionHeader(
+                  level: progress.level,
+                  totalXp: progress.totalXp,
+                  levelXp: levelXp.clamp(0, levelSpan),
+                  nextLevelXp: levelSpan,
+                  xpProgress: xpProgress.clamp(0, 1),
+                  coins: progress.coins,
+                  found: state.discoveredCount,
+                  total: state.totalCount,
+                  completion: state.completionPercentage,
+                ),
                 const SizedBox(height: AppSpacing.lg),
                 _SearchBar(onChanged: controller.updateSearchQuery),
-                const SizedBox(height: AppSpacing.lg),
-                _DiscoveryFilterChips(
-                  selectedFilter: state.discoveryFilter,
-                  onSelected: controller.setDiscoveryFilter,
-                ),
                 const SizedBox(height: AppSpacing.md),
-                _RarityFilterChips(
-                  selectedRarity: state.selectedRarity,
-                  onClear: controller.clearRarityFilter,
-                  onSelected: controller.toggleRarity,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _VariantFilterChips(
-                  variants: state.availableVariants,
-                  selectedVariantId: state.selectedVariantId,
-                  onClear: controller.clearVariantFilter,
-                  onSelected: controller.toggleVariant,
+                _CollectionFilters(
+                  state: state,
+                  onAll: () {
+                    controller
+                      ..setDiscoveryFilter(CatDexDiscoveryFilter.all)
+                      ..clearRarityFilter();
+                  },
+                  onRarity: controller.toggleRarity,
+                  onFavorites: () {
+                    controller
+                      ..clearRarityFilter()
+                      ..setDiscoveryFilter(CatDexDiscoveryFilter.favorites);
+                  },
                 ),
                 const SizedBox(height: AppSpacing.lg),
               ],
@@ -60,33 +88,39 @@ class CatDexPage extends ConsumerWidget {
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
+              AppSpacing.lg,
               0,
-              AppSpacing.md,
-              120,
+              AppSpacing.lg,
+              128,
             ),
             sliver: SliverGrid.builder(
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 220,
-                mainAxisExtent: 292,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisExtent: 268,
                 mainAxisSpacing: AppSpacing.md,
                 crossAxisSpacing: AppSpacing.md,
               ),
               itemCount: state.visibleEntries.length,
               itemBuilder: (context, index) {
                 final entry = state.visibleEntries[index];
-                return _CatCollectionCard(
-                  key: ValueKey('catdex_card_${entry.species.id}'),
-                  entry: entry,
-                  onTap: () {
-                    unawaited(
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => CatDexDetailPage(entry: entry),
-                        ),
+                return TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: 1),
+                  duration: Duration(milliseconds: 260 + (index % 8) * 45),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 18 * (1 - value)),
+                        child: child,
                       ),
                     );
                   },
+                  child: _CatCollectionCard(
+                    key: ValueKey('catdex_card_${entry.species.id}'),
+                    entry: entry,
+                    onTap: () => _openEntry(context, entry),
+                  ),
                 );
               },
             ),
@@ -95,20 +129,62 @@ class CatDexPage extends ConsumerWidget {
       ),
     );
   }
+
+  void _openEntry(BuildContext context, CatDexCollectionEntry entry) {
+    if (!entry.discovered || entry.discovery == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: const Text(
+            'Continua a esplorare per scoprire questo gatto.',
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+        ),
+      );
+      return;
+    }
+
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => CollectibleCatCardPage(entry: entry),
+        ),
+      ),
+    );
+  }
 }
 
-class _CollectionProgressHeader extends StatelessWidget {
-  const _CollectionProgressHeader({required this.state});
+class _PlayerCollectionHeader extends StatelessWidget {
+  const _PlayerCollectionHeader({
+    required this.level,
+    required this.totalXp,
+    required this.levelXp,
+    required this.nextLevelXp,
+    required this.xpProgress,
+    required this.coins,
+    required this.found,
+    required this.total,
+    required this.completion,
+  });
 
-  final CatDexCollectionState state;
+  final int level;
+  final int totalXp;
+  final int levelXp;
+  final int nextLevelXp;
+  final double xpProgress;
+  final int coins;
+  final int found;
+  final int total;
+  final double completion;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = CatDexLocalizations.of(context);
-    final percent = (state.completionPercentage * 100).round();
+    final completionPercent = (completion * 100).round();
 
     return DecoratedBox(
-      decoration: _collectionDecoration(
+      decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -118,46 +194,186 @@ class _CollectionProgressHeader extends StatelessWidget {
             AppColors.primaryPurple,
           ],
         ),
+        borderRadius: BorderRadius.circular(34),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryPurple.withValues(alpha: 0.24),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              l10n.collectionProgressTitle,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppColors.white,
-                fontWeight: FontWeight.w900,
-              ),
+            Row(
+              children: [
+                const CircleAvatar(
+                  radius: 28,
+                  backgroundColor: AppColors.white,
+                  child: Icon(
+                    Icons.pets_rounded,
+                    color: AppColors.primaryPurple,
+                    size: 30,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Level $level',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: AppColors.white,
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                      Text(
+                        '$totalXp XP totali',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.white.withValues(alpha: 0.86),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _HeaderCoinPill(coins: coins),
+              ],
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.lg),
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
               child: LinearProgressIndicator(
                 minHeight: 14,
-                value: state.completionPercentage,
-                backgroundColor: AppColors.white.withValues(alpha: 0.28),
+                value: xpProgress,
+                backgroundColor: AppColors.white.withValues(alpha: 0.26),
                 valueColor: const AlwaysStoppedAnimation<Color>(
                   AppColors.warning,
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              '$levelXp / $nextLevelXp XP',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: AppColors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Row(
               children: [
-                _ProgressPill(
-                  label: l10n.totalEntriesLabel,
-                  value: '${state.totalCount}',
+                Expanded(
+                  child: _HeaderStat(
+                    label: 'Trovati',
+                    value: '$found / $total Gatti',
+                    icon: Icons.style_rounded,
+                  ),
                 ),
-                _ProgressPill(
-                  label: l10n.discoveredLabel,
-                  value: '${state.discoveredCount}',
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _HeaderStat(
+                    label: 'Completato',
+                    value: '$completionPercent%',
+                    icon: Icons.emoji_events_rounded,
+                  ),
                 ),
-                _ProgressPill(label: l10n.completionLabel, value: '$percent%'),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderCoinPill extends StatelessWidget {
+  const _HeaderCoinPill({required this.coins});
+
+  final int coins;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.white.withValues(alpha: 0.44)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.paid_rounded, color: AppColors.warning, size: 20),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              '$coins',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: AppColors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderStat extends StatelessWidget {
+  const _HeaderStat({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.white, size: 22),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.white.withValues(alpha: 0.78),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: AppColors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -173,18 +389,17 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = CatDexLocalizations.of(context);
-
     return TextField(
       key: const Key('catdex_search_field'),
       onChanged: onChanged,
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
         prefixIcon: const Icon(Icons.search_rounded),
-        hintText: l10n.searchCatDexLabel,
+        hintText: 'Cerca per nome',
         filled: true,
+        fillColor: AppColors.white,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(26),
           borderSide: BorderSide.none,
         ),
       ),
@@ -192,139 +407,89 @@ class _SearchBar extends StatelessWidget {
   }
 }
 
-class _DiscoveryFilterChips extends StatelessWidget {
-  const _DiscoveryFilterChips({
-    required this.selectedFilter,
-    required this.onSelected,
+class _CollectionFilters extends StatelessWidget {
+  const _CollectionFilters({
+    required this.state,
+    required this.onAll,
+    required this.onRarity,
+    required this.onFavorites,
   });
 
-  final CatDexDiscoveryFilter selectedFilter;
-  final ValueChanged<CatDexDiscoveryFilter> onSelected;
+  final CatDexCollectionState state;
+  final VoidCallback onAll;
+  final ValueChanged<CatRarity> onRarity;
+  final VoidCallback onFavorites;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = CatDexLocalizations.of(context);
-
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: [
-        ChoiceChip(
-          key: const Key('catdex_discovery_filter_all'),
-          label: Text(l10n.allFilterLabel),
-          selected: selectedFilter == CatDexDiscoveryFilter.all,
-          onSelected: (_) => onSelected(CatDexDiscoveryFilter.all),
-        ),
-        ChoiceChip(
-          key: const Key('catdex_discovery_filter_discovered'),
-          label: Text(l10n.discoveredLabel),
-          selected: selectedFilter == CatDexDiscoveryFilter.discovered,
-          onSelected: (_) => onSelected(CatDexDiscoveryFilter.discovered),
-        ),
-        ChoiceChip(
-          key: const Key('catdex_discovery_filter_undiscovered'),
-          label: Text(l10n.undiscoveredLabel),
-          selected: selectedFilter == CatDexDiscoveryFilter.undiscovered,
-          onSelected: (_) => onSelected(CatDexDiscoveryFilter.undiscovered),
-        ),
-      ],
-    );
-  }
-}
-
-class _RarityFilterChips extends StatelessWidget {
-  const _RarityFilterChips({
-    required this.selectedRarity,
-    required this.onClear,
-    required this.onSelected,
-  });
-
-  final CatRarity? selectedRarity;
-  final VoidCallback onClear;
-  final ValueChanged<CatRarity> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = CatDexLocalizations.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _FilterTitle(title: l10n.rarityFiltersTitle),
-        const SizedBox(height: AppSpacing.sm),
-        Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          children: [
-            ChoiceChip(
-              key: const Key('catdex_rarity_all'),
-              label: Text(l10n.allFilterLabel),
-              selected: selectedRarity == null,
-              onSelected: (_) => onClear(),
-            ),
-            for (final rarity in CatRarity.values)
-              ChoiceChip(
-                key: ValueKey('catdex_rarity_${rarity.name}'),
-                label: Text(l10n.rarityName(rarity.name)),
-                selected: selectedRarity == rarity,
-                onSelected: (_) => onSelected(rarity),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _VariantFilterChips extends StatelessWidget {
-  const _VariantFilterChips({
-    required this.variants,
-    required this.selectedVariantId,
-    required this.onClear,
-    required this.onSelected,
-  });
-
-  final List<CatDexVariantFilter> variants;
-  final String? selectedVariantId;
-  final VoidCallback onClear;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = CatDexLocalizations.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _FilterTitle(title: l10n.variantFiltersTitle),
-        const SizedBox(height: AppSpacing.sm),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: AppSpacing.sm),
-                child: ChoiceChip(
-                  key: const Key('catdex_variant_all'),
-                  label: Text(l10n.allFilterLabel),
-                  selected: selectedVariantId == null,
-                  onSelected: (_) => onClear(),
-                ),
-              ),
-              for (final variant in variants)
-                Padding(
-                  padding: const EdgeInsets.only(right: AppSpacing.sm),
-                  child: ChoiceChip(
-                    key: ValueKey('catdex_variant_${variant.id}'),
-                    label: Text(variant.name),
-                    selected: selectedVariantId == variant.id,
-                    onSelected: (_) => onSelected(variant.id),
-                  ),
-                ),
-            ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _FilterChipButton(
+            label: 'Tutti',
+            selected:
+                state.selectedRarity == null &&
+                state.discoveryFilter == CatDexDiscoveryFilter.all,
+            onTap: onAll,
           ),
+          _FilterChipButton(
+            label: 'Comune',
+            selected: state.selectedRarity == CatRarity.common,
+            onTap: () => onRarity(CatRarity.common),
+          ),
+          _FilterChipButton(
+            label: 'Raro',
+            selected: state.selectedRarity == CatRarity.rare,
+            onTap: () => onRarity(CatRarity.rare),
+          ),
+          _FilterChipButton(
+            label: 'Epico',
+            selected: state.selectedRarity == CatRarity.epic,
+            onTap: () => onRarity(CatRarity.epic),
+          ),
+          _FilterChipButton(
+            label: 'Leggendario',
+            selected: state.selectedRarity == CatRarity.legendary,
+            onTap: () => onRarity(CatRarity.legendary),
+          ),
+          _FilterChipButton(
+            label: 'Preferiti',
+            selected: state.discoveryFilter == CatDexDiscoveryFilter.favorites,
+            onTap: onFavorites,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChipButton extends StatelessWidget {
+  const _FilterChipButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: AppSpacing.sm),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onTap(),
+        selectedColor: AppColors.primaryPurple.withValues(alpha: 0.18),
+        labelStyle: TextStyle(
+          color: selected ? AppColors.primaryPurple : AppColors.ink,
+          fontWeight: FontWeight.w900,
         ),
-      ],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      ),
     );
   }
 }
@@ -341,22 +506,23 @@ class _CatCollectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = CatDexLocalizations.of(context);
-    final textTheme = Theme.of(context).textTheme;
     final discovered = entry.discovered;
-    final foreground = discovered ? AppColors.ink : AppColors.white;
-    final rarityColor = _rarityColor(entry.species.baseRarity);
+    final rarity = _entryRarity(entry);
+    final rarityColor = _rarityColor(rarity);
+    final speciesLabel = _speciesLabel(entry);
+    final name = entry.displayName ?? speciesLabel;
 
     return Semantics(
       button: true,
-      label: entry.species.displayName,
+      label: discovered ? name : 'Locked cat',
       child: Material(
         color: Colors.transparent,
+        borderRadius: BorderRadius.circular(30),
         child: InkWell(
-          borderRadius: BorderRadius.circular(40),
+          borderRadius: BorderRadius.circular(30),
           onTap: onTap,
           child: Ink(
-            decoration: _collectionDecoration(
+            decoration: BoxDecoration(
               gradient: discovered
                   ? LinearGradient(
                       begin: Alignment.topLeft,
@@ -364,78 +530,33 @@ class _CatCollectionCard extends StatelessWidget {
                       colors: [
                         AppColors.white,
                         rarityColor.withValues(alpha: 0.2),
-                        AppColors.primaryPurple.withValues(alpha: 0.1),
                       ],
                     )
                   : const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFF4B5563), AppColors.darkBackground],
+                      colors: [Color(0xFF111827), Color(0xFF374151)],
                     ),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: discovered
+                      ? rarityColor.withValues(alpha: 0.18)
+                      : Colors.black.withValues(alpha: 0.16),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Align(
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          width: 86,
-                          height: 86,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: rarityColor.withValues(
-                              alpha: discovered ? 0.18 : 0.08,
-                            ),
-                          ),
-                        ),
-                        _CatVisual(
-                          discovered: discovered,
-                          rarity: entry.species.baseRarity,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _CollectionStatusBadge(
-                    discovered: discovered,
-                    color: rarityColor,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    discovered
-                        ? entry.species.displayName
-                        : l10n.notDiscoveredYetLabel,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: foreground,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    l10n.rarityName(entry.species.baseRarity.name),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelMedium?.copyWith(
-                      color: discovered ? AppColors.primaryPurple : foreground,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Text(
-                    '${l10n.originLabel}: ${entry.species.originCountry}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodySmall?.copyWith(color: foreground),
-                  ),
-                  const Spacer(),
-                  _CardFooter(entry: entry, foreground: foreground),
-                ],
-              ),
+              child: discovered
+                  ? _DiscoveredCardContent(
+                      entry: entry,
+                      name: name,
+                      rarityColor: rarityColor,
+                    )
+                  : const _LockedCardContent(),
             ),
           ),
         ),
@@ -444,60 +565,265 @@ class _CatCollectionCard extends StatelessWidget {
   }
 }
 
-class _CatVisual extends StatelessWidget {
-  const _CatVisual({required this.discovered, required this.rarity});
+class _DiscoveredCardContent extends StatelessWidget {
+  const _DiscoveredCardContent({
+    required this.entry,
+    required this.name,
+    required this.rarityColor,
+  });
 
-  final bool discovered;
-  final CatRarity rarity;
+  final CatDexCollectionEntry entry;
+  final String name;
+  final Color rarityColor;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        color: discovered
-            ? _rarityColor(rarity).withValues(alpha: 0.9)
-            : AppColors.white.withValues(alpha: 0.16),
-        shape: BoxShape.circle,
-        boxShadow: discovered
-            ? [
-                BoxShadow(
-                  color: _rarityColor(rarity).withValues(alpha: 0.34),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
+    final rarity = _entryRarity(entry);
+    final speciesLabel = _speciesLabel(entry);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: _CatPhotoFrame(
+                  photoPath: entry.discoveredPhotoPath,
+                  rarity: rarity,
+                  frameStyle: entry.cardFrameStyle,
                 ),
-              ]
-            : null,
+              ),
+              Positioned(
+                top: AppSpacing.sm,
+                right: AppSpacing.sm,
+                child: Icon(
+                  entry.favorite
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: entry.favorite ? AppColors.danger : AppColors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: AppColors.ink,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        Text(
+          speciesLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: AppColors.ink.withValues(alpha: 0.72),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: _RarityBadge(
+                rarity: rarity,
+                color: rarityColor,
+              ),
+            ),
+            if (entry.cardFrameStyle != null) ...[
+              const SizedBox(width: AppSpacing.xs),
+              _CardFrameChip(style: entry.cardFrameStyle!),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _LockedCardContent extends StatelessWidget {
+  const _LockedCardContent();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.28),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.pets_rounded,
+                color: Colors.black,
+                size: 72,
+                shadows: [
+                  Shadow(color: AppColors.white, blurRadius: 22),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          '????',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: AppColors.white,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        const Icon(Icons.lock_rounded, color: AppColors.white),
+      ],
+    );
+  }
+}
+
+class _CatPhotoFrame extends StatelessWidget {
+  const _CatPhotoFrame({
+    required this.photoPath,
+    required this.rarity,
+    this.frameStyle,
+  });
+
+  final String? photoPath;
+  final CatRarity rarity;
+  final String? frameStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = _imageForPath(photoPath);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: _frameColor(frameStyle, rarity),
+          width: frameStyle == null ? 0 : 4,
+        ),
       ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                _rarityColor(rarity).withValues(alpha: 0.9),
+                AppColors.primaryPurple.withValues(alpha: 0.76),
+              ],
+            ),
+          ),
+          child: image == null
+              ? const _PhotoPlaceholder()
+              : Image(
+                  image: image,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const _PhotoPlaceholder(),
+                ),
+        ),
+      ),
+    );
+  }
+
+  ImageProvider<Object>? _imageForPath(String? path) {
+    final trimmed = path?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return null;
+    }
+
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return NetworkImage(trimmed);
+    }
+
+    final file = File(trimmed);
+    return file.existsSync() ? FileImage(file) : null;
+  }
+
+  Color _frameColor(String? style, CatRarity rarity) {
+    return switch (style) {
+      'green_simple_frame' => AppColors.primaryGreen,
+      'blue_frame' => AppColors.skyBlue,
+      'purple_frame' => AppColors.primaryPurple,
+      'gold_purple_frame' => AppColors.warning,
+      'gold_animated_style_frame' => AppColors.warning,
+      _ => _rarityColor(rarity),
+    };
+  }
+}
+
+class _PhotoPlaceholder extends StatelessWidget {
+  const _PhotoPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
       child: Icon(
-        discovered ? Icons.pets_rounded : Icons.lock_rounded,
+        Icons.pets_rounded,
         color: AppColors.white,
-        size: 38,
+        size: 62,
       ),
     );
   }
 }
 
-class _CollectionStatusBadge extends StatelessWidget {
-  const _CollectionStatusBadge({
-    required this.discovered,
-    required this.color,
-  });
+class _CardFrameChip extends StatelessWidget {
+  const _CardFrameChip({required this.style});
 
-  final bool discovered;
+  final String style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: _frameLabel(style),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.ink.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.all(6),
+          child: Icon(
+            Icons.auto_awesome_rounded,
+            size: 16,
+            color: AppColors.primaryPurple,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _frameLabel(String style) {
+    return switch (style) {
+      'green_simple_frame' => 'Cornice verde',
+      'blue_frame' => 'Cornice blu',
+      'purple_frame' => 'Cornice viola',
+      'gold_purple_frame' => 'Cornice oro e viola',
+      'gold_animated_style_frame' => 'Cornice oro leggendaria',
+      _ => 'Cornice collezionabile',
+    };
+  }
+}
+
+class _RarityBadge extends StatelessWidget {
+  const _RarityBadge({required this.rarity, required this.color});
+
+  final CatRarity rarity;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = CatDexLocalizations.of(context);
-
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: discovered
-            ? color.withValues(alpha: 0.16)
-            : AppColors.white.withValues(alpha: 0.12),
+        color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.32)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -505,11 +831,11 @@ class _CollectionStatusBadge extends StatelessWidget {
           vertical: 4,
         ),
         child: Text(
-          discovered ? l10n.discoveredLabel : l10n.undiscoveredLabel,
+          _rarityLabel(rarity),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: discovered ? color : AppColors.white,
+            color: color,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -518,273 +844,279 @@ class _CollectionStatusBadge extends StatelessWidget {
   }
 }
 
-class _CardFooter extends StatelessWidget {
-  const _CardFooter({required this.entry, required this.foreground});
-
-  final CatDexCollectionEntry entry;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            entry.variantName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        Text(
-          '#${entry.collectionNumber.toString().padLeft(3, '0')}',
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: foreground,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class CatDexDetailPage extends StatelessWidget {
-  const CatDexDetailPage({required this.entry, super.key});
+class CollectibleCatCardPage extends StatelessWidget {
+  const CollectibleCatCardPage({required this.entry, super.key});
 
   final CatDexCollectionEntry entry;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = CatDexLocalizations.of(context);
-    final discovered = entry.discovered;
+    // TODO(CatDex): remove background from cat image
+    // TODO(CatDex): generate cat cutout
+    // TODO(CatDex): create night card background
+    // TODO(CatDex): create seasonal event card background
+    // TODO(CatDex): create seasonal event cards
+    // TODO(CatDex): create animated legendary card frame
+    // TODO(CatDex): create animated legendary frames
+    final discovery = entry.discovery;
+    final rarity = _entryRarity(entry);
+    final name = entry.displayName ?? _speciesLabel(entry);
+    final species = _speciesLabel(entry);
+    final backgroundStyle = discovery?.card?.cardBackgroundStyle ?? 'default';
+    final story = discovery?.story?.trim().isNotEmpty ?? false
+        ? discovery!.story!
+        : 'Una nuova storia CatDex sta prendendo forma.';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(discovered ? entry.species.displayName : l10n.catDexTitle),
-      ),
+      backgroundColor: AppColors.backgroundGray,
+      appBar: AppBar(title: const Text('Carta CatDex')),
       body: ListView(
-        key: const Key('catdex_detail_page'),
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.xxl + AppSpacing.xl + MediaQuery.paddingOf(context).bottom,
+        ),
         children: [
-          DecoratedBox(
-            decoration: _collectionDecoration(
-              gradient: discovered
-                  ? const LinearGradient(
-                      colors: [AppColors.skyBlue, AppColors.primaryPurple],
-                    )
-                  : const LinearGradient(
-                      colors: [Color(0xFF4B5563), AppColors.darkBackground],
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: _CollectibleCardFrame(
+                rarity: rarity,
+                backgroundStyle: backgroundStyle,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 1.02,
+                      child: _CatPhotoFrame(
+                        photoPath: entry.discoveredPhotoPath,
+                        rarity: rarity,
+                        frameStyle: entry.cardFrameStyle,
+                      ),
                     ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                children: [
-                  _CatDetailVisual(
-                    discovered: discovered,
-                    photoPath: entry.discoveredPhotoPath,
-                    rarity: entry.species.baseRarity,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    discovered
-                        ? entry.species.displayName
-                        : l10n.notDiscoveredYetLabel,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.w900,
+                    const SizedBox(height: AppSpacing.lg),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  color: AppColors.white,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                        ),
+                        _RarityBadge(rarity: rarity, color: AppColors.white),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      species,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppColors.white.withValues(alpha: 0.86),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _CardRewardPill(
+                            icon: Icons.bolt_rounded,
+                            label: '${discovery?.xpEarned ?? 0} XP',
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: _CardRewardPill(
+                            icon: Icons.paid_rounded,
+                            label: '${discovery?.coinsEarned ?? 0} Monete',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: _PersonalityChip(
+                        label: _format(discovery?.personality.name ?? ''),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    _LoreBox(story: story),
+                    const SizedBox(height: AppSpacing.lg),
+                    _CardMetaRow(
+                      label: 'ID carta',
+                      value:
+                          discovery?.card?.cardId ?? 'card-${entry.species.id}',
+                    ),
+                    _CardMetaRow(
+                      label: 'Scoperto il',
+                      value: _formatDate(discovery?.discoveredAt),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          if (discovered)
-            _DiscoveredDetail(entry: entry)
-          else
-            _LockedDetail(entry: entry),
         ],
       ),
     );
   }
 }
 
-class _CatDetailVisual extends StatelessWidget {
-  const _CatDetailVisual({
-    required this.discovered,
+class _CollectibleCardFrame extends StatelessWidget {
+  const _CollectibleCardFrame({
     required this.rarity,
-    required this.photoPath,
+    required this.backgroundStyle,
+    required this.child,
   });
 
-  final bool discovered;
   final CatRarity rarity;
-  final String? photoPath;
+  final String backgroundStyle;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final path = photoPath?.trim();
-    if (discovered && path != null && path.isNotEmpty) {
-      if (path.startsWith('http://') || path.startsWith('https://')) {
-        return _PhotoVisual(
-          image: Image.network(path, fit: BoxFit.cover),
-          fallback: _CatVisual(discovered: discovered, rarity: rarity),
-        );
-      }
+    final frameColor = _rarityColor(rarity);
 
-      final file = File(path);
-      if (file.existsSync()) {
-        return _PhotoVisual(
-          image: Image.file(file, fit: BoxFit.cover),
-          fallback: _CatVisual(discovered: discovered, rarity: rarity),
-        );
-      }
-    }
-
-    return _CatVisual(discovered: discovered, rarity: rarity);
-  }
-}
-
-class _PhotoVisual extends StatelessWidget {
-  const _PhotoVisual({required this.image, required this.fallback});
-
-  final Image image;
-  final Widget fallback;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(32),
-      child: SizedBox(
-        width: 180,
-        height: 180,
-        child: Image(
-          image: image.image,
-          fit: image.fit,
-          errorBuilder: (_, _, _) => fallback,
-        ),
-      ),
-    );
-  }
-}
-
-class _DiscoveredDetail extends StatelessWidget {
-  const _DiscoveredDetail({required this.entry});
-
-  final CatDexCollectionEntry entry;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = CatDexLocalizations.of(context);
-    final textTheme = Theme.of(context).textTheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _DetailRow(
-          label: l10n.rarityFiltersTitle,
-          value: l10n.rarityName(entry.species.baseRarity.name),
-        ),
-        _DetailRow(label: l10n.originLabel, value: entry.species.originCountry),
-        _DetailRow(label: l10n.variantFiltersTitle, value: entry.variantName),
-        const SizedBox(height: AppSpacing.md),
-        Text(
-          l10n.catDexDetailDescription(
-            speciesName: entry.species.displayName,
-            origin: entry.species.originCountry,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: _frameGradient(rarity),
+        borderRadius: BorderRadius.circular(38),
+        boxShadow: [
+          BoxShadow(
+            color: frameColor.withValues(alpha: 0.34),
+            blurRadius: 34,
+            offset: const Offset(0, 18),
           ),
-          style: textTheme.bodyLarge,
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        _DetailRow(label: l10n.traitsLabel, value: l10n.placeholderTraitsLabel),
-      ],
-    );
-  }
-}
-
-class _LockedDetail extends StatelessWidget {
-  const _LockedDetail({required this.entry});
-
-  final CatDexCollectionEntry entry;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = CatDexLocalizations.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.notDiscoveredYetLabel,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _DetailRow(
-          label: l10n.rarityFiltersTitle,
-          value: l10n.rarityName(entry.species.baseRarity.name),
-        ),
-        _DetailRow(label: l10n.originLabel, value: entry.species.originCountry),
-      ],
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 96,
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          Expanded(child: Text(value)),
         ],
       ),
+      child: Padding(
+        padding: const EdgeInsets.all(5),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: _cardBackground(backgroundStyle, rarity),
+            borderRadius: BorderRadius.circular(33),
+            border: Border.all(color: AppColors.white.withValues(alpha: 0.4)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
+  LinearGradient _frameGradient(CatRarity rarity) {
+    return switch (rarity) {
+      CatRarity.common => const LinearGradient(
+        colors: [AppColors.primaryGreen, Color(0xFF86EFAC)],
+      ),
+      CatRarity.uncommon => const LinearGradient(
+        colors: [AppColors.skyBlue, Color(0xFF1D4ED8)],
+      ),
+      CatRarity.rare => const LinearGradient(
+        colors: [AppColors.primaryPurple, Color(0xFFC084FC)],
+      ),
+      CatRarity.epic => const LinearGradient(
+        colors: [AppColors.warning, AppColors.primaryPurple],
+      ),
+      CatRarity.legendary => const LinearGradient(
+        colors: [Color(0xFFFFFBEB), AppColors.warning, Color(0xFFB45309)],
+      ),
+      CatRarity.mythic => const LinearGradient(
+        colors: [Color(0xFFEF4444), AppColors.warning, AppColors.primaryPurple],
+      ),
+    };
+  }
+
+  LinearGradient _cardBackground(String style, CatRarity rarity) {
+    if (style == 'night') {
+      return const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF111827), Color(0xFF312E81), Color(0xFF581C87)],
+      );
+    }
+
+    if (style == 'event') {
+      return LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          AppColors.primaryGreen,
+          _rarityColor(rarity),
+          AppColors.primaryPurple,
+        ],
+      );
+    }
+
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        _rarityColor(rarity).withValues(alpha: 0.92),
+        AppColors.skyBlue,
+        AppColors.primaryPurple,
+      ],
     );
   }
 }
 
-class _FilterTitle extends StatelessWidget {
-  const _FilterTitle({required this.title});
+class _CardRewardPill extends StatelessWidget {
+  const _CardRewardPill({required this.icon, required this.label});
 
-  final String title;
+  final IconData icon;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: Theme.of(
-        context,
-      ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.white.withValues(alpha: 0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: AppColors.warning, size: 20),
+            const SizedBox(width: AppSpacing.xs),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppColors.white,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _ProgressPill extends StatelessWidget {
-  const _ProgressPill({required this.label, required this.value});
+class _PersonalityChip extends StatelessWidget {
+  const _PersonalityChip({required this.label});
 
   final String label;
-  final String value;
 
   @override
   Widget build(BuildContext context) {
@@ -792,37 +1124,107 @@ class _ProgressPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.white.withValues(alpha: 0.5)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.sm,
         ),
-        child: Text(
-          '$label $value',
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: AppColors.white,
-            fontWeight: FontWeight.w900,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.psychology_rounded, color: AppColors.white),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: AppColors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-BoxDecoration _collectionDecoration({required Gradient gradient}) {
-  return BoxDecoration(
-    gradient: gradient,
-    borderRadius: BorderRadius.circular(40),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withValues(alpha: 0.15),
-        blurRadius: 20,
-        offset: const Offset(0, 10),
+class _LoreBox extends StatelessWidget {
+  const _LoreBox({required this.story});
+
+  final String story;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(24),
       ),
-    ],
-  );
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Storia',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: AppColors.primaryPurple,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              story,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CardMetaRow extends StatelessWidget {
+  const _CardMetaRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: AppColors.white.withValues(alpha: 0.72),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: AppColors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 Color _rarityColor(CatRarity rarity) {
@@ -830,8 +1232,43 @@ Color _rarityColor(CatRarity rarity) {
     CatRarity.common => AppColors.primaryGreen,
     CatRarity.uncommon => AppColors.skyBlue,
     CatRarity.rare => AppColors.primaryPurple,
-    CatRarity.epic => const Color(0xFFEC4899),
+    CatRarity.epic => AppColors.warning,
     CatRarity.legendary => AppColors.warning,
     CatRarity.mythic => const Color(0xFFEF4444),
   };
+}
+
+String _rarityLabel(CatRarity rarity) {
+  return switch (rarity) {
+    CatRarity.common => '🟢 Comune',
+    CatRarity.uncommon => '🔵 Non comune',
+    CatRarity.rare => '🟣 Raro',
+    CatRarity.epic => '🟡 Epico',
+    CatRarity.legendary => '🟡 Leggendario',
+    CatRarity.mythic => '🟡 Leggendario',
+  };
+}
+
+CatRarity _entryRarity(CatDexCollectionEntry entry) {
+  return entry.discovery?.rarity ?? entry.species.baseRarity;
+}
+
+String _speciesLabel(CatDexCollectionEntry entry) {
+  return _format(entry.discovery?.speciesId ?? entry.species.id);
+}
+
+String _format(String value) {
+  return const CatAnalysisDisplayFormatter().value(value);
+}
+
+String _formatDate(DateTime? date) {
+  if (date == null) {
+    return '-';
+  }
+
+  final localDate = date.toLocal();
+  final day = localDate.day.toString().padLeft(2, '0');
+  final month = localDate.month.toString().padLeft(2, '0');
+
+  return '$day/$month/${localDate.year}';
 }

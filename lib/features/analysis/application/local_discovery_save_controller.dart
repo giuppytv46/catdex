@@ -29,7 +29,13 @@ class LocalDiscoverySaveController
     return const LocalDiscoverySaveState.idle();
   }
 
-  Future<void> save(CatAnalysisResult result, {String? photoPath}) async {
+  Future<void> save(
+    CatAnalysisResult result, {
+    String? photoPath,
+    String customName = 'Mochi',
+    String suggestedName = 'Mochi',
+    String? nickname,
+  }) async {
     state = const AsyncData(
       LocalDiscoverySaveState(status: LocalDiscoverySaveStatus.saving),
     );
@@ -42,6 +48,7 @@ class LocalDiscoverySaveController
       final discoveryRepository = ref.read(discoveryRepositoryProvider);
       final rewardCalculator = ref.read(discoveryRewardCalculatorProvider);
       final factory = ref.read(catDiscoveryFactoryProvider);
+      final chosenName = nickname ?? customName;
       final discoveries = await discoveryRepository.getDiscoveriesForPlayer(
         activeSession.playerId,
       );
@@ -62,7 +69,12 @@ class LocalDiscoverySaveController
         playerId: activeSession.playerId,
         discoveredAt: DateTime.now().toUtc(),
         friendshipPoints: reward.friendshipPoints,
-        photoPath: photoPath,
+        xpEarned: reward.xp,
+        coinsEarned: reward.coins,
+        customName: chosenName.trim().isEmpty ? suggestedName : chosenName,
+        suggestedName: suggestedName,
+        originalPhotoPath: photoPath,
+        displayPhotoPath: photoPath,
       );
 
       await discoveryRepository.saveDiscovery(discovery);

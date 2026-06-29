@@ -1,7 +1,7 @@
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:catdex/features/catdex/data/repositories/in_memory_catdex_repository.dart';
-import 'package:catdex/features/catdex/data/repositories/in_memory_discovery_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/in_memory_player_progress_repository.dart';
+import 'package:catdex/features/catdex/data/repositories/shared_preferences_discovery_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/supabase_catdex_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/supabase_discovery_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/supabase_player_progress_repository.dart';
@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 void main() {
-  test('uses in-memory repositories when Supabase is not configured', () {
+  test('uses local repositories when Supabase is not configured', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
@@ -20,7 +20,7 @@ void main() {
     );
     expect(
       container.read(discoveryRepositoryProvider),
-      isA<InMemoryDiscoveryRepository>(),
+      isA<SharedPreferencesDiscoveryRepository>(),
     );
     expect(
       container.read(playerProgressRepositoryProvider),

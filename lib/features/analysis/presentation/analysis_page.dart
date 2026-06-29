@@ -308,7 +308,7 @@ class _AnalysisResultCard extends StatelessWidget {
                   SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: _RewardCard(
-                      label: 'Coins',
+                      label: 'Monete',
                       amount: 15,
                       icon: Icons.paid_rounded,
                       color: AppColors.warning,

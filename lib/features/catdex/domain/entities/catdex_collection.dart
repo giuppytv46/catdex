@@ -1,3 +1,4 @@
+import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_species.dart';
 
@@ -70,6 +71,8 @@ class CatDexCollectionEntry {
     required this.variantId,
     required this.discovered,
     required this.collectionNumber,
+    this.discovery,
+    this.displayName,
     this.discoveredPhotoPath,
   });
 
@@ -78,7 +81,12 @@ class CatDexCollectionEntry {
   final String variantId;
   final bool discovered;
   final int collectionNumber;
+  final CatDiscovery? discovery;
+  final String? displayName;
   final String? discoveredPhotoPath;
+
+  bool get favorite => discovery?.favorite ?? false;
+  String? get cardFrameStyle => discovery?.card?.cardFrameStyle;
 }
 
 class CatDexVariantFilter {
@@ -92,4 +100,5 @@ enum CatDexDiscoveryFilter {
   all,
   discovered,
   undiscovered,
+  favorites,
 }

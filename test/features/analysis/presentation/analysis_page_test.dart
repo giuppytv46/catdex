@@ -68,7 +68,7 @@ void main() {
     expect(find.text('+80'), findsOneWidget);
     expect(find.text('XP'), findsOneWidget);
     expect(find.text('+15'), findsOneWidget);
-    expect(find.text('Coins'), findsOneWidget);
+    expect(find.text('Monete'), findsOneWidget);
     expect(find.text('📖 Story'), findsOneWidget);
     expect(
       find.text('Un gatto tigrato osserva il mondo con calma.'),

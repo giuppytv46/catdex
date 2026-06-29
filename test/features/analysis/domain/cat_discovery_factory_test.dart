@@ -20,6 +20,11 @@ void main() {
       playerId: 'player-1',
       discoveredAt: DateTime.utc(2026, 6, 28),
       friendshipPoints: 30,
+      xpEarned: 100,
+      coinsEarned: 15,
+      customName: 'Nebbia',
+      originalPhotoPath: '/tmp/original-cat.jpg',
+      displayPhotoPath: '/tmp/display-cat.jpg',
     );
 
     expect(discovery.id, 'discovery-1');
@@ -30,7 +35,26 @@ void main() {
     expect(discovery.personality, result.personality);
     expect(discovery.traits, result.visualTraits.notableTraits);
     expect(discovery.friendshipPoints, 30);
-    expect(discovery.nickname, 'Mochi');
+    expect(discovery.xpEarned, 100);
+    expect(discovery.coinsEarned, 15);
+    expect(discovery.confidenceScore, result.confidence.score);
+    expect(discovery.story, result.story);
+    expect(discovery.funFact, result.funFact);
+    expect(discovery.coatColor, result.visualTraits.coatColor);
+    expect(discovery.coatPattern, result.visualTraits.coatPattern);
+    expect(discovery.eyeColor, result.visualTraits.eyeColor);
+    expect(discovery.hairLength, result.visualTraits.hairLength);
+    expect(discovery.estimatedAge, result.estimatedAge);
+    expect(discovery.suggestedName, 'Mochi');
+    expect(discovery.nickname, 'Nebbia');
+    expect(discovery.originalPhotoPath, '/tmp/original-cat.jpg');
+    expect(discovery.displayPhotoPath, '/tmp/display-cat.jpg');
+    expect(discovery.card?.discoveryId, 'discovery-1');
+    expect(discovery.card?.cardFrameStyle, 'green_simple_frame');
+    expect(discovery.card?.cardBackgroundStyle, 'default');
+    expect(discovery.card?.cardRarityStyle, 'common');
+    expect(discovery.card?.isEventCard, isFalse);
+    expect(discovery.card?.cutoutImagePath, isNull);
   });
 }
 
@@ -62,5 +86,7 @@ CatAnalysisResult _analysisResult() {
     personality: CatPersonality.curious,
     story: 'A calm local discovery.',
     analyzedAt: DateTime.utc(2026),
+    estimatedAge: 'adult',
+    funFact: 'Tabby cats often have an M-shaped forehead marking.',
   );
 }

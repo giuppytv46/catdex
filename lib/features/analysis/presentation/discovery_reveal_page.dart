@@ -153,9 +153,27 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
   }
 
   Future<void> _saveDiscovery(BuildContext context) async {
+    final suggestedName = CatDexLocalizations.of(context).catNamePlaceholder;
+    final catName = await showDialog<String>(
+      context: context,
+      builder: (_) {
+        return _NameCatDialog(
+          initialName: suggestedName,
+        );
+      },
+    );
+    if (catName == null || !context.mounted) {
+      return;
+    }
+
     final notifier = ref.read(localDiscoverySaveControllerProvider.notifier);
 
-    await notifier.save(widget.args.result, photoPath: widget.args.photo.path);
+    await notifier.save(
+      widget.args.result,
+      photoPath: widget.args.photo.path,
+      customName: catName,
+      suggestedName: suggestedName,
+    );
 
     final state = ref.read(localDiscoverySaveControllerProvider).value;
     if (!context.mounted || state?.status != LocalDiscoverySaveStatus.saved) {
@@ -163,6 +181,7 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
     }
 
     ref.read(discoveryRevealSoundHooksProvider).playLevelUp();
+    context.goNamed(AppRoute.catDex.name);
   }
 
   void _playRevealSound() {
@@ -294,6 +313,124 @@ class _RevealCard extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _NameCatDialog extends StatefulWidget {
+  const _NameCatDialog({required this.initialName});
+
+  final String initialName;
+
+  @override
+  State<_NameCatDialog> createState() => _NameCatDialogState();
+}
+
+class _NameCatDialogState extends State<_NameCatDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.all(AppSpacing.lg),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.white,
+              AppColors.primaryGreen.withValues(alpha: 0.18),
+              AppColors.primaryPurple.withValues(alpha: 0.14),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(32),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '🐈 Name your discovery',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Choose a name for this cat or keep the suggested one.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.ink.withValues(alpha: 0.72),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: AppColors.white.withValues(alpha: 0.82),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: const BorderSide(
+                      color: AppColors.primaryPurple,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                onSubmitted: (_) => _save(context),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _save(context),
+                      icon: const Icon(Icons.pets_rounded),
+                      label: const Text('Save to CatDex'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _save(BuildContext context) {
+    final trimmed = _controller.text.trim();
+    Navigator.of(context).pop(trimmed.isEmpty ? widget.initialName : trimmed);
   }
 }
 
