@@ -83,11 +83,11 @@ void main() {
     await _expectVisibleText(tester, 'Normale');
     await _expectVisibleText(
       tester,
-      'Un gatto arancione osserva il mondo con calma.',
+      'Un gatto tigrato osserva il mondo con calma.',
     );
     await _expectVisibleText(
       tester,
-      'I mantelli arancioni sono spesso tabby.',
+      'I mantelli tigrati sono molto comuni nei gatti domestici.',
     );
     expect(find.textContaining('domestic_tabby_cat'), findsNothing);
     expect(find.textContaining('common'), findsNothing);
