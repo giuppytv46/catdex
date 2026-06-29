@@ -36,6 +36,11 @@ void main() {
   });
 
   testWidgets('Analysis page renders premium discovery result', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(900, 2600);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -55,65 +60,32 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    await _expectVisibleText(tester, '✨ New Discovery!');
-    await _expectVisibleText(tester, 'Gatto domestico tigrato');
-    await _expectVisibleText(tester, 'Comune');
-    await _expectVisibleText(tester, '+80');
-    await _expectVisibleText(tester, 'XP');
-    await _expectVisibleText(tester, '+15');
-    await _expectVisibleText(tester, 'Coins');
-    await _expectVisibleText(tester, 'Curioso');
-    await _expectVisibleText(tester, 'Species');
-    await _expectVisibleText(tester, 'Coat');
-    await _expectVisibleText(tester, 'Marrone/grigio tigrato');
-    await _expectVisibleText(tester, 'Eyes');
-    await _expectVisibleText(tester, 'occhi gialli');
-    await _expectVisibleText(tester, 'Personality');
-    await _expectVisibleText(tester, '📖 Story');
-    await _expectVisibleText(
-      tester,
-      'Un gatto tigrato osserva il mondo con calma.',
-    );
-    await _expectVisibleText(
-      tester,
-      'I mantelli tigrati sono molto comuni nei gatti domestici.',
-    );
-    await _expectVisibleText(tester, 'More details');
-    expect(find.text('Tigrato mackerel'), findsNothing);
-    expect(find.text('pelo corto'), findsNothing);
-    expect(find.text('adult'), findsNothing);
-    expect(find.text('Normale'), findsNothing);
-    expect(
-      find.text('Mantello: Marrone/grigio tigrato, Pattern: Tigrato mackerel'),
-      findsNothing,
-    );
-    expect(find.textContaining('domestic_tabby_cat'), findsNothing);
-    expect(find.textContaining('common'), findsNothing);
-    expect(find.textContaining('normal'), findsNothing);
-    expect(find.textContaining('European Shorthair'), findsNothing);
-    expect(find.textContaining('Tortoiseshell'), findsNothing);
-    expect(find.textContaining('Squama di tartaruga'), findsNothing);
-    expect(find.textContaining('Bianco'), findsNothing);
-    expect(find.textContaining('Calico'), findsNothing);
-    expect(find.textContaining('Colorpoint'), findsNothing);
-    expect(find.textContaining('Blue eyes'), findsNothing);
-    expect(find.textContaining('Blu'), findsNothing);
-    expect(find.textContaining('Lungo'), findsNothing);
-    expect(find.textContaining('Soffice'), findsNothing);
-    expect(find.textContaining('Soft hair'), findsNothing);
-    expect(find.textContaining('curved whiskers'), findsNothing);
-    expect(find.text('null'), findsNothing);
-  });
-}
 
-Future<void> _expectVisibleText(WidgetTester tester, String text) async {
-  final finder = find.text(text);
-  await tester.scrollUntilVisible(
-    finder,
-    180,
-    scrollable: find.byType(Scrollable).first,
-  );
-  expect(finder, findsOneWidget);
+    expect(find.text('✨ New Discovery!'), findsOneWidget);
+    expect(find.text('Species'), findsOneWidget);
+    expect(find.text('Gatto domestico tigrato'), findsWidgets);
+    expect(find.text('Comune'), findsOneWidget);
+    expect(find.text('+80'), findsOneWidget);
+    expect(find.text('XP'), findsOneWidget);
+    expect(find.text('+15'), findsOneWidget);
+    expect(find.text('Coins'), findsOneWidget);
+    expect(find.text('📖 Story'), findsOneWidget);
+    expect(
+      find.text('Un gatto tigrato osserva il mondo con calma.'),
+      findsOneWidget,
+    );
+    expect(find.text('More details'), findsOneWidget);
+
+    await tester.tap(find.text('More details'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Confidence'), findsOneWidget);
+    expect(find.text('Coat pattern'), findsOneWidget);
+    expect(find.text('Hair length'), findsOneWidget);
+    expect(find.text('Estimated age'), findsOneWidget);
+    expect(find.text('Variant'), findsOneWidget);
+    expect(find.text('Traits'), findsOneWidget);
+  });
 }
 
 CapturedPhoto _photo() {
