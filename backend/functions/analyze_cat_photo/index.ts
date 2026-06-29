@@ -546,6 +546,10 @@ function observationPrompt(locale: string): string {
     "Never invent. Never infer. Never guess.",
     "Never guess calico, tortoiseshell, colorpoint, blue eyes, or long hair unless clearly visible.",
     "For common striped cats, prefer baseColor brown or gray and coatPattern tabby or mackerel_tabby when those stripes are objectively visible.",
+    "Orange tabby is allowed only when the coat is clearly orange or ginger across most of the body.",
+    "Brown or gray tabby must not become orange just because of warm lighting, beige areas, or sun highlights.",
+    "If dark stripes sit on a gray or brown base with a beige muzzle or chest, return brown or gray rather than orange.",
+    "If uncertain between brown or gray and orange for a common tabby cat, prefer brown or gray.",
     "Use coatPattern mackerel_tabby for narrow vertical stripes; classic_tabby for swirled bullseye markings; spotted_tabby for spots; ticked_tabby for agouti ticking; tabby for visible stripes when subtype is uncertain.",
     "Use coatPattern calico only when clear white, orange, and black patches are visible.",
     "Use coatPattern tortoiseshell only when mixed black or brown and orange mottling is visible without large white patches.",
@@ -805,12 +809,17 @@ function classifyWithRuleEngine(
   const coatPattern = realisticCoatPattern(
     observation.coatPattern ?? "unknown",
   );
-  const coatColor = coatColorFromObservation(
+  const rawCoatColor = coatColorFromObservation(
     observation.baseColor,
     observation.secondaryColor,
     observation.whitePresent,
     observation.orangePresent,
     observation.blackPresent,
+    coatPattern,
+  );
+  const coatColor = normalizeCoatColorFromObservation(
+    observation,
+    rawCoatColor,
     coatPattern,
   );
   const hairLength = realisticHairLength(observation.hairLength);
@@ -862,6 +871,55 @@ function coatColorFromObservation(
       blackPresent,
     },
   );
+}
+
+function normalizeCoatColorFromObservation(
+  observation: CatVisionObservation,
+  currentColor: string,
+  coatPattern: string,
+): string {
+  const pattern = normalizeVisualValue(coatPattern);
+  const current = normalizeVisualValue(currentColor);
+  const baseColor = normalizeVisualValue(observation.baseColor ?? "");
+  const secondaryColor = normalizeVisualValue(observation.secondaryColor ?? "");
+  const tabby = isTabbyPattern(pattern);
+  const secondaryUnknown = secondaryColor.length === 0 ||
+    secondaryColor === "unknown" ||
+    secondaryColor === "null";
+
+  if (!tabby) {
+    return currentColor;
+  }
+
+  const orangeAllowed = observation.orangePresent &&
+    baseColor === "orange" &&
+    observation.visibleConfidence >= 0.9 &&
+    !isBrownColor(secondaryColor) &&
+    !isGrayColor(secondaryColor) &&
+    !isCreamColor(secondaryColor) &&
+    secondaryColor !== "mixed" &&
+    !secondaryUnknown &&
+    !observation.blackPresent;
+
+  if (current.includes("arancione") && !orangeAllowed) {
+    return "marrone/grigio tigrato";
+  }
+
+  if (
+    !orangeAllowed &&
+    (isBrownColor(baseColor) ||
+      isGrayColor(baseColor) ||
+      isBrownColor(secondaryColor) ||
+      isGrayColor(secondaryColor) ||
+      isCreamColor(secondaryColor) ||
+      secondaryColor === "mixed" ||
+      secondaryUnknown ||
+      observation.blackPresent)
+  ) {
+    return "marrone/grigio tigrato";
+  }
+
+  return currentColor;
 }
 
 function realisticHairLength(hairLength: string | null): string {
@@ -1380,7 +1438,11 @@ function realisticCoatColor(
   }
 
   if (tabby) {
-    if (isOrangeColor(color)) {
+    if (isCat03LikeTabby(color, secondary, presence)) {
+      return "marrone/grigio tigrato";
+    }
+
+    if (isClearlyOrangeTabby(color, secondary, presence)) {
       return "arancione tigrato";
     }
 
@@ -1410,6 +1472,10 @@ function realisticCoatColor(
 
     if (secondary.includes("gray") || secondary.includes("blue_gray")) {
       return "grigio tigrato";
+    }
+
+    if (secondary.includes("brown")) {
+      return "marrone tigrato";
     }
   }
 
@@ -1536,6 +1602,13 @@ function isOrangeColor(coatColor: string): boolean {
     normalized.includes("ginger");
 }
 
+function isCreamColor(coatColor: string): boolean {
+  const normalized = normalizeVisualValue(coatColor);
+  return normalized.includes("cream") ||
+    normalized.includes("crema") ||
+    normalized.includes("beige");
+}
+
 function isCalicoColor(coatColor: string): boolean {
   return normalizeVisualValue(coatColor).includes("calico");
 }
@@ -1543,6 +1616,44 @@ function isCalicoColor(coatColor: string): boolean {
 function isColorpointColor(coatColor: string): boolean {
   const normalized = normalizeVisualValue(coatColor);
   return normalized.includes("colorpoint") || normalized.includes("pointed");
+}
+
+function isCat03LikeTabby(
+  color: string,
+  secondary: string,
+  presence: {
+    whitePresent: boolean;
+    orangePresent: boolean;
+    blackPresent: boolean;
+  },
+): boolean {
+  return presence.blackPresent &&
+    presence.orangePresent &&
+    (isBrownColor(color) ||
+      isGrayColor(color) ||
+      isBrownColor(secondary) ||
+      isGrayColor(secondary) ||
+      presence.whitePresent);
+}
+
+function isClearlyOrangeTabby(
+  color: string,
+  secondary: string,
+  presence: {
+    whitePresent: boolean;
+    orangePresent: boolean;
+    blackPresent: boolean;
+  },
+): boolean {
+  return isOrangeColor(color) &&
+    !isBrownColor(secondary) &&
+    !isGrayColor(secondary) &&
+    !isCreamColor(secondary) &&
+    secondary !== "mixed" &&
+    secondary !== "unknown" &&
+    secondary.length > 0 &&
+    !presence.blackPresent &&
+    presence.orangePresent;
 }
 
 function normalizeVisualValue(value: string): string {

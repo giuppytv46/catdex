@@ -34,5 +34,36 @@ void main() {
       expect(functionText, contains('if (solid && isBlackColor(color))'));
       expect(functionText, contains('return "nero solido";'));
     });
+
+    test('Cat03-like brown gray mackerel tabby does not become orange', () {
+      expect(
+        functionText,
+        contains('function normalizeCoatColorFromObservation('),
+      );
+      expect(
+        functionText,
+        contains('const rawCoatColor = coatColorFromObservation('),
+      );
+      expect(functionText, contains('function isCat03LikeTabby('));
+      expect(functionText, contains('function isClearlyOrangeTabby('));
+      expect(functionText, contains('current.includes("arancione")'));
+      expect(functionText, contains('return "marrone/grigio tigrato";'));
+      expect(functionText, contains('return "marrone/grigio tigrato";'));
+      expect(functionText, contains('return "marrone tigrato";'));
+      expect(functionText, contains('return "tigrato mackerel";'));
+      expect(functionText, contains('secondaryColor === "unknown"'));
+      expect(functionText, contains('secondaryUnknown'));
+      expect(functionText, contains('Orange tabby is allowed only when'));
+      expect(functionText, contains('must not become orange'));
+    });
+
+    test('true orange tabby remains allowed by post-processing guard', () {
+      expect(functionText, contains('observation.orangePresent'));
+      expect(functionText, contains('baseColor === "orange"'));
+      expect(functionText, contains('observation.visibleConfidence >= 0.9'));
+      expect(functionText, contains('!secondaryUnknown'));
+      expect(functionText, contains('return currentColor;'));
+      expect(functionText, contains('return "arancione tigrato";'));
+    });
   });
 }
