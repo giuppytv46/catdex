@@ -46,6 +46,7 @@ void main() {
       LocalPlayerSession.playerId,
     );
     final sessionDiscoveries = container.read(localDiscoverySessionProvider);
+    final catDex = container.read(catDexControllerProvider);
 
     expect(saveState.value?.status, LocalDiscoverySaveStatus.saved);
     expect(discoveries, hasLength(1));
@@ -75,6 +76,8 @@ void main() {
     expect(discoveries.single.card?.discoveryId, discoveries.single.id);
     expect(discoveries.single.card?.cardFrameStyle, 'green_simple_frame');
     expect(discoveries.single.card?.isEventCard, isFalse);
+    expect(catDex.entries.first.displayName, 'Nebbia');
+    expect(catDex.entries.first.discoveredPhotoPath, '/tmp/cat.jpg');
   });
 
   test('updates local player progress with discovery reward', () async {
@@ -135,6 +138,11 @@ void main() {
           .discovered,
       isTrue,
     );
+    expect(catDex.discoveredCount, 1);
+    expect(catDex.entries.first.species.id, savedSpeciesId);
+    expect(catDex.entries.first.discovered, isTrue);
+    expect(catDex.entries.first.discoveredPhotoPath, isNull);
+    expect(catDex.entries.skip(1).every((entry) => !entry.discovered), isTrue);
   });
 
   test(

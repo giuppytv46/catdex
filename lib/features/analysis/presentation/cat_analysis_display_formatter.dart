@@ -5,8 +5,9 @@ class CatAnalysisDisplayFormatter {
 
   static const _labels = {
     'domestic_tabby_cat': 'Gatto domestico tigrato',
-    'domestic_gray_cat': 'Gatto domestico bicolore',
+    'domestic_gray_cat': 'Gatto domestico',
     'domestic_black_cat': 'Gatto nero domestico',
+    'domestic_black_white_cat': 'Gatto domestico bicolore',
     'domestic_orange_cat': 'Gatto rosso domestico',
     'domestic_white_cat': 'Gatto bianco domestico',
     'domestic_tuxedo_cat': 'Gatto tuxedo domestico',
@@ -30,6 +31,10 @@ class CatAnalysisDisplayFormatter {
     'midnight': 'Mezzanotte',
     'lucky': 'Fortunato',
     'event_edition': 'Edizione evento',
+    'nero/bianco': 'Nero/bianco',
+    'bicolore': 'Bicolore',
+    'tuxedo': 'Tuxedo',
+    'marrone/grigio': 'Marrone/grigio',
     'marrone/grigio tigrato': 'Marrone/grigio tigrato',
     'tigrato mackerel': 'Tigrato mackerel',
     'sleepy': 'Sonnolento',
@@ -59,6 +64,56 @@ class CatAnalysisDisplayFormatter {
     return this.value(value);
   }
 
+  String speciesLabel({
+    required String speciesId,
+    String? coatColor,
+    String? coatPattern,
+  }) {
+    if (_usesBlackWhiteBicolorSafeguard(
+      speciesId: speciesId,
+      coatColor: coatColor,
+      coatPattern: coatPattern,
+    )) {
+      return _labels['domestic_black_white_cat']!;
+    }
+
+    return value(speciesId);
+  }
+
+  String coatColorLabel({
+    required String? coatColor,
+    String? speciesId,
+    String? coatPattern,
+    String fallback = 'Unknown',
+  }) {
+    if (_usesBlackWhiteBicolorSafeguard(
+      speciesId: speciesId,
+      coatColor: coatColor,
+      coatPattern: coatPattern,
+    )) {
+      return _labels['nero/bianco']!;
+    }
+
+    return nullableValue(coatColor, fallback: fallback);
+  }
+
+  String coatPatternLabel({
+    required String? coatPattern,
+    String? speciesId,
+    String? coatColor,
+    String fallback = 'Unknown',
+  }) {
+    if (_usesBlackWhiteBicolorSafeguard(
+      speciesId: speciesId,
+      coatColor: coatColor,
+      coatPattern: coatPattern,
+    )) {
+      return _labels['bicolore']!;
+    }
+
+    return nullableValue(coatPattern, fallback: fallback);
+  }
+
   String traits(List<CatTrait> traits, {String fallback = 'Unknown'}) {
     if (traits.isEmpty) {
       return fallback;
@@ -80,4 +135,27 @@ class CatAnalysisDisplayFormatter {
         .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
         .join(' ');
   }
+
+  bool _usesBlackWhiteBicolorSafeguard({
+    String? speciesId,
+    String? coatColor,
+    String? coatPattern,
+  }) {
+    final species = _normalize(speciesId);
+    final color = _normalize(coatColor);
+    final pattern = _normalize(coatPattern);
+
+    return (species == 'domestic_gray_cat' ||
+            species == 'domestic_tabby_cat') &&
+        (pattern.contains('bicolore') ||
+            pattern.contains('bicolor') ||
+            pattern.contains('tuxedo')) &&
+        (color.contains('marrone/grigio') ||
+            color.contains('brown/gray') ||
+            color.contains('gray') ||
+            color.contains('grey') ||
+            color.contains('grigio'));
+  }
+
+  String _normalize(String? value) => value?.trim().toLowerCase() ?? '';
 }

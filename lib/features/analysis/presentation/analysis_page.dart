@@ -270,7 +270,7 @@ class _AnalysisResultCard extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.lg),
               Text(
-                '✨ New Discovery!',
+                '✨ Nuova scoperta!',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: AppColors.ink,
@@ -331,28 +331,28 @@ class _AnalysisResultCard extends StatelessWidget {
               const SizedBox(height: AppSpacing.lg),
               _InfoTile(
                 icon: Icons.pets_rounded,
-                title: 'Species',
+                title: 'Specie',
                 value: breed,
                 color: AppColors.primaryPurple,
               ),
               const SizedBox(height: AppSpacing.md),
               _InfoTile(
                 icon: Icons.palette_rounded,
-                title: 'Coat',
+                title: 'Mantello',
                 value: coatColor,
                 color: AppColors.skyBlue,
               ),
               const SizedBox(height: AppSpacing.md),
               _InfoTile(
                 icon: Icons.visibility_rounded,
-                title: 'Eyes',
+                title: 'Occhi',
                 value: eyeColor,
                 color: AppColors.warning,
               ),
               const SizedBox(height: AppSpacing.md),
               _InfoTile(
                 icon: Icons.favorite_rounded,
-                title: 'Personality',
+                title: 'Personalità',
                 value: personality,
                 color: AppColors.primaryGreen,
               ),
@@ -789,7 +789,7 @@ class _StoryCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '📖 Story',
+              '📖 Storia',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: AppColors.white,
                 fontWeight: FontWeight.w900,
@@ -853,19 +853,19 @@ class _MoreDetailsSection extends StatelessWidget {
           AppSpacing.md,
         ),
         title: Text(
-          'More details',
+          'Altri dettagli',
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
             color: AppColors.ink,
             fontWeight: FontWeight.w900,
           ),
         ),
         children: [
-          _DetailLine(label: 'Confidence', value: confidence),
-          _DetailLine(label: 'Coat pattern', value: coatPattern),
-          _DetailLine(label: 'Hair length', value: hairLength),
-          _DetailLine(label: 'Estimated age', value: estimatedAge),
-          _DetailLine(label: 'Variant', value: variant),
-          _DetailLine(label: 'Traits', value: traits),
+          _DetailLine(label: 'Confidenza', value: confidence),
+          _DetailLine(label: 'Pattern mantello', value: coatPattern),
+          _DetailLine(label: 'Lunghezza pelo', value: hairLength),
+          _DetailLine(label: 'Età stimata', value: estimatedAge),
+          _DetailLine(label: 'Variante', value: variant),
+          _DetailLine(label: 'Tratti', value: traits),
         ],
       ),
     );

@@ -5,6 +5,7 @@ enum AppRoute {
   home('/home'),
   catDex('/catdex'),
   capture('/capture'),
+  cards('/cards'),
   analysis('/analysis'),
   discoveryReveal('/discovery-reveal'),
   friends('/friends'),

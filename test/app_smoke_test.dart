@@ -33,4 +33,34 @@ void main() {
     expect(find.text('Home'), findsWidgets);
     expect(find.text('Explorer'), findsOneWidget);
   });
+
+  testWidgets('bottom navigation shows CatDex Camera Carte Profilo', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'catdex.onboarding.completed': true,
+    });
+
+    final container = ProviderContainer(
+      overrides: [
+        onboardingRepositoryProvider.overrideWithValue(
+          const SharedPreferencesOnboardingRepository(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const CatDexApp()),
+    );
+    await tester.pumpAndSettle();
+
+    container.read(appRouterProvider).go(AppRoute.catDex.path);
+    await tester.pumpAndSettle();
+
+    expect(find.text('CatDex'), findsWidgets);
+    expect(find.text('Camera'), findsOneWidget);
+    expect(find.text('Carte'), findsOneWidget);
+    expect(find.text('Profilo'), findsOneWidget);
+  });
 }

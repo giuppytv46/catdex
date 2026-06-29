@@ -550,6 +550,10 @@ function observationPrompt(locale: string): string {
     "Brown or gray tabby must not become orange just because of warm lighting, beige areas, or sun highlights.",
     "If dark stripes sit on a gray or brown base with a beige muzzle or chest, return brown or gray rather than orange.",
     "If uncertain between brown or gray and orange for a common tabby cat, prefer brown or gray.",
+    "If the cat has large black areas and large white areas, return baseColor black, secondaryColor white, whitePresent true, blackPresent true, and coatPattern bicolor.",
+    "Use coatPattern tuxedo when black covers the back or head with a clear white chest, paws, muzzle, or face.",
+    "Do not classify black-and-white bicolor cats as brown, gray, tabby, or mackerel_tabby because of lighting.",
+    "Use tabby or mackerel_tabby only when clear stripes are visible.",
     "Use coatPattern mackerel_tabby for narrow vertical stripes; classic_tabby for swirled bullseye markings; spotted_tabby for spots; ticked_tabby for agouti ticking; tabby for visible stripes when subtype is uncertain.",
     "Use coatPattern calico only when clear white, orange, and black patches are visible.",
     "Use coatPattern tortoiseshell only when mixed black or brown and orange mottling is visible without large white patches.",
@@ -887,6 +891,10 @@ function normalizeCoatColorFromObservation(
     secondaryColor === "unknown" ||
     secondaryColor === "null";
 
+  if (isBlackWhiteBicolorObservation(observation, pattern)) {
+    return "nero/bianco";
+  }
+
   if (!tabby) {
     return currentColor;
   }
@@ -989,10 +997,17 @@ function breedFromObservationRules({
   const pattern = normalizeVisualValue(coatPattern);
   const shortOrMediumHair = hairLength === "pelo corto" ||
     hairLength === "pelo medio";
+  const blackWhiteBicolor = isBlackWhiteBicolorCoat(coatColor, coatPattern);
 
   // Phase 2 rule engine: common visual morphology wins over breed guessing.
   // Pure breeds require very strong visual evidence; otherwise CatDex defaults
   // to conservative domestic classifications.
+  if (blackWhiteBicolor) {
+    return pattern.includes("tuxedo")
+      ? "domestic_tuxedo_cat"
+      : "domestic_black_white_cat";
+  }
+
   if (isTabbyPattern(coatPattern) && shortOrMediumHair) {
     return "domestic_tabby_cat";
   }
@@ -1210,6 +1225,10 @@ function storyFromObservation({
 }
 
 function funFactForBreed(breed: string, coatPattern: string): string {
+  if (breed === "domestic_black_white_cat" || breed === "domestic_tuxedo_cat") {
+    return "I gatti bicolori hanno aree di mantello ben distinte: CatDex li riconosce come nero/bianco solo quando entrambi i colori sono chiaramente visibili.";
+  }
+
   if (breed === "domestic_tabby_cat" || isTabbyPattern(coatPattern)) {
     return "Il disegno tigrato e uno dei mantelli piu comuni nei gatti domestici e puo apparire in tonalita marroni, grigie o arancioni.";
   }
@@ -1249,10 +1268,12 @@ function italianBreedName(breed: string): string {
     domestic_tabby_cat: "gatto domestico tigrato",
     domestic_shorthair_cat: "gatto domestico a pelo corto",
     domestic_black_cat: "gatto domestico nero",
+    domestic_black_white_cat: "gatto domestico bicolore",
+    domestic_tuxedo_cat: "gatto tuxedo domestico",
     domestic_white_cat: "gatto domestico bianco",
     domestic_calico_cat: "gatto calico domestico",
     domestic_orange_cat: "gatto domestico arancione",
-    domestic_gray_cat: "gatto domestico grigio",
+    domestic_gray_cat: "gatto domestico",
     domestic_longhair_cat: "gatto domestico a pelo lungo",
     siamese: "gatto siamese",
   }[breed] ?? "gatto domestico";
@@ -1425,6 +1446,10 @@ function realisticCoatColor(
   const tabby = isTabbyPattern(pattern);
   const solid = isSolidPattern(pattern);
 
+  if (isBlackWhiteBicolorVisual(pattern, color, secondary, presence)) {
+    return "nero/bianco";
+  }
+
   if (pattern.includes("calico") && presence.whitePresent) {
     return presence.orangePresent && presence.blackPresent
       ? "bianco, arancione e nero"
@@ -1504,6 +1529,14 @@ function realisticCoatColor(
 
 function realisticCoatPattern(coatPattern: string): string {
   const normalized = normalizeVisualValue(coatPattern);
+  if (normalized.includes("tuxedo")) {
+    return "tuxedo";
+  }
+
+  if (normalized.includes("bicolor") || normalized.includes("bicolore")) {
+    return "bicolore";
+  }
+
   if (
     normalized.includes("tortoiseshell") ||
     normalized.includes("tortie") ||
@@ -1548,10 +1581,6 @@ function realisticCoatPattern(coatPattern: string): string {
     return "solido";
   }
 
-  if (normalized.includes("bicolor") || normalized.includes("bicolore")) {
-    return "bicolore";
-  }
-
   return coatPattern;
 }
 
@@ -1565,6 +1594,13 @@ function isTabbyPattern(coatPattern: string): boolean {
 function isSolidPattern(coatPattern: string): boolean {
   const normalized = normalizeVisualValue(coatPattern);
   return normalized.includes("solid") || normalized.includes("solido");
+}
+
+function isBicolorPattern(coatPattern: string): boolean {
+  const normalized = normalizeVisualValue(coatPattern);
+  return normalized.includes("bicolor") ||
+    normalized.includes("bicolore") ||
+    normalized.includes("tuxedo");
 }
 
 function isBlackColor(coatColor: string): boolean {
@@ -1616,6 +1652,48 @@ function isCalicoColor(coatColor: string): boolean {
 function isColorpointColor(coatColor: string): boolean {
   const normalized = normalizeVisualValue(coatColor);
   return normalized.includes("colorpoint") || normalized.includes("pointed");
+}
+
+function isBlackWhiteBicolorObservation(
+  observation: CatVisionObservation,
+  coatPattern: string,
+): boolean {
+  const baseColor = normalizeVisualValue(observation.baseColor ?? "");
+  const secondaryColor = normalizeVisualValue(observation.secondaryColor ?? "");
+  return isBicolorPattern(coatPattern) &&
+    observation.whitePresent &&
+    observation.blackPresent &&
+    !observation.orangePresent &&
+    (isBlackColor(baseColor) ||
+      isBlackColor(secondaryColor) ||
+      baseColor === "mixed" ||
+      secondaryColor === "mixed");
+}
+
+function isBlackWhiteBicolorCoat(
+  coatColor: string,
+  coatPattern: string,
+): boolean {
+  return isBicolorPattern(coatPattern) &&
+    isBlackColor(coatColor) &&
+    isWhiteColor(coatColor);
+}
+
+function isBlackWhiteBicolorVisual(
+  coatPattern: string,
+  color: string,
+  secondary: string,
+  presence: {
+    whitePresent: boolean;
+    orangePresent: boolean;
+    blackPresent: boolean;
+  },
+): boolean {
+  return isBicolorPattern(coatPattern) &&
+    presence.whitePresent &&
+    presence.blackPresent &&
+    !presence.orangePresent &&
+    (isBlackColor(color) || isBlackColor(secondary) || color === "mixed");
 }
 
 function isCat03LikeTabby(

@@ -132,7 +132,7 @@ class CatDexController extends Notifier<CatDexCollectionState> {
   List<CatDexCollectionEntry> _buildEntries(
     List<CatDiscovery> sessionDiscoveries,
   ) {
-    return [
+    final entries = [
       for (final item in CatDexSeedData.species.indexed)
         _entryForSpecies(
           index: item.$1,
@@ -140,6 +140,24 @@ class CatDexController extends Notifier<CatDexCollectionState> {
           sessionDiscoveries: sessionDiscoveries,
         ),
     ];
+
+    return entries..sort(_collectionSort);
+  }
+
+  int _collectionSort(CatDexCollectionEntry a, CatDexCollectionEntry b) {
+    if (a.discovered != b.discovered) {
+      return a.discovered ? -1 : 1;
+    }
+
+    if (a.discovered && b.discovered) {
+      final aDate = a.discovery?.discoveredAt;
+      final bDate = b.discovery?.discoveredAt;
+      if (aDate != null && bDate != null) {
+        return bDate.compareTo(aDate);
+      }
+    }
+
+    return a.collectionNumber.compareTo(b.collectionNumber);
   }
 
   CatDexCollectionEntry _entryForSpecies({

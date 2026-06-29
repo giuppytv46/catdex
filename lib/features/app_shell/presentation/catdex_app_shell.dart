@@ -43,14 +43,16 @@ class _CatDexBottomNavigationBar extends StatelessWidget {
     final labels = [
       l10n.catDexTitle,
       'Camera',
-      l10n.profileTitle,
+      'Carte',
+      'Profilo',
     ];
     const icons = [
       Icons.style_rounded,
       Icons.camera_alt_rounded,
+      Icons.collections_bookmark_rounded,
       Icons.person_rounded,
     ];
-    const branchIndexes = [1, 2, 4];
+    const branchIndexes = [1, 2, 3, 4];
     final selectedTabIndex = branchIndexes.indexOf(currentIndex);
 
     return SafeArea(
@@ -103,6 +105,7 @@ class _CatDexBottomNavigationBar extends StatelessWidget {
     return switch (index) {
       0 => AppRoute.catDex.path,
       1 => AppRoute.capture.path,
+      2 => AppRoute.cards.path,
       _ => AppRoute.profile.path,
     };
   }

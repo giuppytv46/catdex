@@ -35,6 +35,23 @@ void main() {
       expect(functionText, contains('return "nero solido";'));
     });
 
+    test('black and white bicolor safeguards run before tabby fallback', () {
+      expect(
+        functionText,
+        contains('function isBlackWhiteBicolorObservation('),
+      );
+      expect(functionText, contains('function isBlackWhiteBicolorCoat('));
+      expect(functionText, contains('function isBlackWhiteBicolorVisual('));
+      expect(functionText, contains('return "nero/bianco";'));
+      expect(functionText, contains('"domestic_black_white_cat"'));
+      expect(functionText, contains('"domestic_tuxedo_cat"'));
+      expect(
+        functionText,
+        contains('Do not classify black-and-white bicolor cats as brown'),
+      );
+      expect(functionText, contains('Use tabby or mackerel_tabby only'));
+    });
+
     test('Cat03-like brown gray mackerel tabby does not become orange', () {
       expect(
         functionText,

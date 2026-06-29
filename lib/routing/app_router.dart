@@ -4,6 +4,7 @@ import 'package:catdex/features/analysis/presentation/discovery_reveal_page.dart
 import 'package:catdex/features/app_shell/presentation/catdex_app_shell.dart';
 import 'package:catdex/features/capture/domain/entities/captured_photo.dart';
 import 'package:catdex/features/capture/presentation/capture_page.dart';
+import 'package:catdex/features/cards/presentation/cards_binder_page.dart';
 import 'package:catdex/features/catdex/presentation/catdex_page.dart';
 import 'package:catdex/features/error/presentation/global_error_page.dart';
 import 'package:catdex/features/friends/presentation/friends_page.dart';
@@ -68,10 +69,13 @@ final appRouterProvider = Provider<GoRouter>((_) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: AppRoute.friends.path,
-                name: AppRoute.friends.name,
+                path: AppRoute.cards.path,
+                name: AppRoute.cards.name,
                 pageBuilder: (_, state) {
-                  return _fadePage(state: state, child: const FriendsPage());
+                  return _fadePage(
+                    state: state,
+                    child: const CardsBinderPage(),
+                  );
                 },
               ),
             ],
@@ -91,6 +95,7 @@ final appRouterProvider = Provider<GoRouter>((_) {
       ),
       _animatedRoute(route: AppRoute.settings, child: const SettingsPage()),
       _animatedRoute(route: AppRoute.premium, child: const PremiumPage()),
+      _animatedRoute(route: AppRoute.friends, child: const FriendsPage()),
       GoRoute(
         path: AppRoute.analysis.path,
         name: AppRoute.analysis.name,

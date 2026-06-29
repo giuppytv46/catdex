@@ -97,6 +97,14 @@ class CatDexSeedData {
       active: true,
     ),
     CatSpecies(
+      id: 'domestic_black_white_cat',
+      displayName: 'Domestic Black and White Cat',
+      scientificName: 'Felis catus',
+      originCountry: 'Worldwide',
+      baseRarity: CatRarity.common,
+      active: true,
+    ),
+    CatSpecies(
       id: 'domestic_calico_cat',
       displayName: 'Domestic Calico Cat',
       scientificName: 'Felis catus',

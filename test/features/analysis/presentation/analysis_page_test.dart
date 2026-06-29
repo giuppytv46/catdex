@@ -61,30 +61,30 @@ void main() {
 
     expect(tester.takeException(), isNull);
 
-    expect(find.text('✨ New Discovery!'), findsOneWidget);
-    expect(find.text('Species'), findsOneWidget);
+    expect(find.text('✨ Nuova scoperta!'), findsOneWidget);
+    expect(find.text('Specie'), findsOneWidget);
     expect(find.text('Gatto domestico tigrato'), findsWidgets);
     expect(find.text('Comune'), findsOneWidget);
     expect(find.text('+80'), findsOneWidget);
     expect(find.text('XP'), findsOneWidget);
     expect(find.text('+15'), findsOneWidget);
     expect(find.text('Monete'), findsOneWidget);
-    expect(find.text('📖 Story'), findsOneWidget);
+    expect(find.text('📖 Storia'), findsOneWidget);
     expect(
       find.text('Un gatto tigrato osserva il mondo con calma.'),
       findsOneWidget,
     );
-    expect(find.text('More details'), findsOneWidget);
+    expect(find.text('Altri dettagli'), findsOneWidget);
 
-    await tester.tap(find.text('More details'));
+    await tester.tap(find.text('Altri dettagli'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Confidence'), findsOneWidget);
-    expect(find.text('Coat pattern'), findsOneWidget);
-    expect(find.text('Hair length'), findsOneWidget);
-    expect(find.text('Estimated age'), findsOneWidget);
-    expect(find.text('Variant'), findsOneWidget);
-    expect(find.text('Traits'), findsOneWidget);
+    expect(find.text('Confidenza'), findsOneWidget);
+    expect(find.text('Pattern mantello'), findsOneWidget);
+    expect(find.text('Lunghezza pelo'), findsOneWidget);
+    expect(find.text('Età stimata'), findsOneWidget);
+    expect(find.text('Variante'), findsOneWidget);
+    expect(find.text('Tratti'), findsOneWidget);
   });
 }
 
