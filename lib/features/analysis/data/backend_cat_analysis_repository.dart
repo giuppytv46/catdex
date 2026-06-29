@@ -9,6 +9,7 @@ import 'package:catdex/features/analysis/domain/entities/cat_analysis_exception.
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_result.dart';
 import 'package:catdex/features/analysis/domain/repositories/cat_analysis_repository.dart';
 import 'package:catdex/features/capture/domain/entities/captured_photo.dart';
+import 'package:flutter/foundation.dart';
 
 class BackendCatAnalysisRepository implements CatAnalysisRepository {
   const BackendCatAnalysisRepository({
@@ -33,7 +34,11 @@ class BackendCatAnalysisRepository implements CatAnalysisRepository {
           .analyzeCatPhoto(_requestBody(photo))
           .timeout(_timeout);
 
-      return _parser.parse(response);
+      debugPrint('CATDEX_RAW_HTTP ${_safeJson(response)}');
+      final result = _parser.parse(response);
+      debugPrint('CATDEX_MODEL ${_safeJson(_analysisDebugJson(result))}');
+
+      return result;
     } on CatAnalysisException {
       rethrow;
     } on Object catch (error) {
@@ -70,5 +75,38 @@ class BackendCatAnalysisRepository implements CatAnalysisRepository {
     };
 
     return 'data:$contentType;base64,${base64Encode(bytes)}';
+  }
+
+  Map<String, Object?> _analysisDebugJson(CatAnalysisResult result) {
+    return {
+      'breed': result.displayBreed,
+      'coatColor': result.visualTraits.coatColor,
+      'coatPattern': result.visualTraits.coatPattern,
+      'eyeColor': result.visualTraits.eyeColor,
+      'hairLength': result.visualTraits.hairLength,
+      'estimatedAge': result.estimatedAge,
+      'traits': result.visualTraits.notableTraits
+          .map(
+            (trait) => {
+              'name': trait.name,
+              'value': trait.value,
+              'rarityWeight': trait.rarityWeight,
+            },
+          )
+          .toList(growable: false),
+      'personality': result.displayPersonality,
+      'rarity': result.displayRarity,
+      'variant': result.displayVariant,
+      'story': result.story,
+      'funFact': result.funFact,
+    };
+  }
+
+  String _safeJson(Object? value) {
+    try {
+      return jsonEncode(value);
+    } on Object {
+      return value.toString();
+    }
   }
 }

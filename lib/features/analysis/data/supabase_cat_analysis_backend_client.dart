@@ -22,6 +22,9 @@ class SupabaseCatAnalysisBackendClient implements CatAnalysisBackendClient {
         'analyze_cat_photo',
         body: body,
       );
+      debugPrint(
+        'CATDEX_JSON_DECODED ${_safeJson(_decodedJson(response.data))}',
+      );
       debugPrint('CATDEX_AI_RAW ${_safeJson(response.data)}');
 
       return response.data;
@@ -41,5 +44,17 @@ class SupabaseCatAnalysisBackendClient implements CatAnalysisBackendClient {
     } on Object {
       return value.toString();
     }
+  }
+
+  Object? _decodedJson(Object? value) {
+    if (value is String) {
+      try {
+        return jsonDecode(value);
+      } on FormatException {
+        return value;
+      }
+    }
+
+    return value;
   }
 }

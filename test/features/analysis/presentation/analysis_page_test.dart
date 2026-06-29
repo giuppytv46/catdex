@@ -68,18 +68,19 @@ void main() {
     await _expectVisibleText(tester, 'Umore');
     await _expectVisibleText(tester, 'Storia');
     await _expectVisibleText(tester, 'Curiosita');
-    await _expectVisibleText(tester, 'arancione tigrato');
-    await _expectVisibleText(tester, 'tigrato');
+    await _expectVisibleText(tester, 'Gatto domestico tigrato');
+    await _expectVisibleText(tester, 'Marrone/grigio tigrato');
+    await _expectVisibleText(tester, 'Tigrato mackerel');
     await _expectVisibleText(tester, 'occhi gialli');
     await _expectVisibleText(tester, 'pelo corto');
     await _expectVisibleText(tester, 'adult');
     await _expectVisibleText(
       tester,
-      'Posture: watching, Mood: alert',
+      'Mantello: Marrone/grigio tigrato, Pattern: Tigrato mackerel',
     );
-    await _expectVisibleText(tester, 'calm_observer');
-    await _expectVisibleText(tester, 'ordinary');
-    await _expectVisibleText(tester, 'standard');
+    await _expectVisibleText(tester, 'Curioso');
+    await _expectVisibleText(tester, 'Comune');
+    await _expectVisibleText(tester, 'Normale');
     await _expectVisibleText(
       tester,
       'Un gatto arancione osserva il mondo con calma.',
@@ -88,6 +89,9 @@ void main() {
       tester,
       'I mantelli arancioni sono spesso tabby.',
     );
+    expect(find.textContaining('domestic_tabby_cat'), findsNothing);
+    expect(find.textContaining('common'), findsNothing);
+    expect(find.textContaining('normal'), findsNothing);
     expect(find.textContaining('European Shorthair'), findsNothing);
     expect(find.textContaining('Tortoiseshell'), findsNothing);
     expect(find.textContaining('Squama di tartaruga'), findsNothing);
@@ -125,25 +129,29 @@ CapturedPhoto _photo() {
 
 Map<String, Object?> _backendJson() {
   return {
-    'breed': 'domestic_orange_cat',
+    'breed': 'domestic_tabby_cat',
     'confidence': 0.91,
     'candidates': [
-      {'breed': 'domestic_orange_cat', 'confidence': 0.91},
+      {'breed': 'domestic_tabby_cat', 'confidence': 0.91},
     ],
-    'coatColor': 'arancione tigrato',
-    'coatPattern': 'tigrato',
+    'coatColor': 'marrone/grigio tigrato',
+    'coatPattern': 'tigrato mackerel',
     'eyeColor': 'occhi gialli',
     'hairLength': 'pelo corto',
     'estimatedAge': 'adult',
     'traits': [
-      {'name': 'Posture', 'value': 'watching', 'rarityWeight': 1},
-      {'name': 'Mood', 'value': 'alert', 'rarityWeight': 1},
+      {
+        'name': 'Mantello',
+        'value': 'marrone/grigio tigrato',
+        'rarityWeight': 1,
+      },
+      {'name': 'Pattern', 'value': 'tigrato mackerel', 'rarityWeight': 1},
     ],
-    'personality': 'calm_observer',
-    'rarity': 'ordinary',
-    'variant': 'standard',
-    'story': 'Un gatto arancione osserva il mondo con calma.',
-    'funFact': 'I mantelli arancioni sono spesso tabby.',
+    'personality': 'curious',
+    'rarity': 'common',
+    'variant': 'normal',
+    'story': 'Un gatto tigrato osserva il mondo con calma.',
+    'funFact': 'I mantelli tigrati sono molto comuni nei gatti domestici.',
     'safetyStatus': 'safe',
     'analyzedAt': '2026-06-28T12:00:00.000Z',
   };
