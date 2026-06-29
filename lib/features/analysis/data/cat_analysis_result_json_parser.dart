@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_confidence.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_result.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_breed_candidate.dart';
@@ -13,7 +15,7 @@ class CatAnalysisResultJsonParser {
   const CatAnalysisResultJsonParser();
 
   CatAnalysisResult parse(Object? json) {
-    final map = _optionalMap(json);
+    final map = _optionalMap(_decodeJson(json));
     if (map == null) {
       return _safeFallback();
     }
@@ -54,6 +56,18 @@ class CatAnalysisResultJsonParser {
     } on FormatException {
       return _safeFallback();
     }
+  }
+
+  Object? _decodeJson(Object? value) {
+    if (value is String) {
+      try {
+        return jsonDecode(value);
+      } on FormatException {
+        return value;
+      }
+    }
+
+    return value;
   }
 
   CatBreedCandidate _breedCandidate(Object? json) {

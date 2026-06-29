@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:catdex/features/analysis/data/cat_analysis_result_json_parser.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
@@ -49,6 +51,27 @@ void main() {
     expect(result.displayRarity, 'common');
     expect(result.displayVariant, 'normal');
     expect(result.displayPersonality, 'curious');
+  });
+
+  test('preserves current backend values from decoded or encoded JSON', () {
+    const parser = CatAnalysisResultJsonParser();
+    final json = _currentBackendJson();
+
+    final decodedResult = parser.parse(json);
+    final encodedResult = parser.parse(jsonEncode(json));
+
+    for (final result in [decodedResult, encodedResult]) {
+      expect(result.displayBreed, 'domestic_tabby_cat');
+      expect(result.primaryBreed.species.id, 'domestic_tabby_cat');
+      expect(result.visualTraits.coatPattern, 'tigrato mackerel');
+      expect(result.visualTraits.coatColor, 'marrone/grigio tigrato');
+      expect(result.displayRarity, 'common');
+      expect(result.rarity, CatRarity.common);
+      expect(result.displayVariant, 'normal');
+      expect(result.variant.id, 'normal');
+      expect(result.displayPersonality, 'curious');
+      expect(result.personality, CatPersonality.curious);
+    }
   });
 
   test('preserves backend breed instead of applying local conversion', () {
@@ -229,6 +252,42 @@ Map<String, Object?> _realJson() {
     'rarity': 'common',
     'variant': 'normal',
     'story': 'A curious local cat joins CatDex.',
+    'safetyStatus': 'safe',
+    'analyzedAt': '2026-06-28T12:00:00.000Z',
+  };
+}
+
+Map<String, Object?> _currentBackendJson() {
+  return {
+    'breed': 'domestic_tabby_cat',
+    'confidence': 0.82,
+    'candidates': [
+      {
+        'breed': 'domestic_tabby_cat',
+        'confidence': 0.82,
+      },
+      {
+        'breed': 'domestic_shorthair_cat',
+        'confidence': 0.64,
+      },
+    ],
+    'coatColor': 'marrone/grigio tigrato',
+    'coatPattern': 'tigrato mackerel',
+    'eyeColor': 'occhi gialli',
+    'hairLength': 'pelo corto',
+    'estimatedAge': 'adulto',
+    'traits': [
+      {
+        'name': 'Mantello',
+        'value': 'marrone/grigio tigrato, tigrato mackerel',
+        'rarityWeight': 1,
+      },
+    ],
+    'personality': 'curious',
+    'rarity': 'common',
+    'variant': 'normal',
+    'story': 'Un gatto domestico tigrato entra nel CatDex.',
+    'funFact': 'I gatti tigrati domestici sono molto comuni.',
     'safetyStatus': 'safe',
     'analyzedAt': '2026-06-28T12:00:00.000Z',
   };
