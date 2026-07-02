@@ -1,0 +1,52 @@
+{
+  "cardNumber": {
+    "x": 140,
+    "y": 191,
+    "width": 250,
+    "height": 90,
+    "fontSize": 54,
+    "fontFamily": "CinzelDecorative",
+    "color": "#ffffff",
+    "align": "left",
+    "letterSpacing": 2
+  },
+  "catName": {
+    "x": 424,
+    "y": 190,
+    "width": 640,
+    "height": 95,
+    "fontSize": 58,
+    "fontFamily": "CinzelDecorative",
+    "color": "#ffffff",
+    "align": "center",
+    "letterSpacing": 4
+  },
+  "stars": {
+    "x": 1081,
+    "y": 211,
+    "width": 300,
+    "height": 70,
+    "starSize": 42,
+    "gap": 8
+  },
+  "species": {
+    "x": 314,
+    "y": 1536,
+    "width": 870,
+    "height": 95,
+    "fontSize": 50,
+    "fontFamily": "CinzelDecorative",
+    "color": "#172033",
+    "align": "center",
+    "letterSpacing": 0
+  },
+  "artwork": {
+    "x": 250,
+    "y": 390,
+    "width": 1000,
+    "height": 850,
+    "fit": "contain",
+    "anchor": "center",
+    "offsetY": 80
+  }
+}

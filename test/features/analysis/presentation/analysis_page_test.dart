@@ -86,6 +86,44 @@ void main() {
     expect(find.text('Variante'), findsOneWidget);
     expect(find.text('Tratti'), findsOneWidget);
   });
+
+  testWidgets('Analysis page normalizes bicolor story and display values', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(900, 2600);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          catAnalysisRepositoryProvider.overrideWithValue(
+            _BackendValueRepository(_bicolorBackendJson()),
+          ),
+        ],
+        child: MaterialApp(
+          locale: const Locale('it'),
+          theme: AppTheme.light(),
+          localizationsDelegates: CatDexLocalizations.localizationsDelegates,
+          supportedLocales: CatDexLocalizations.supportedLocales,
+          home: AnalysisPage(photo: _photo()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Gatto domestico bicolore'), findsWidgets);
+    expect(find.text('Nero/bianco'), findsOneWidget);
+    expect(find.textContaining('nero e bianco'), findsOneWidget);
+    expect(find.textContaining('marrone/grigio'), findsNothing);
+    expect(find.textContaining('tigrato mackerel'), findsNothing);
+
+    await tester.tap(find.text('Altri dettagli'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bicolore'), findsWidgets);
+  });
 }
 
 CapturedPhoto _photo() {
@@ -122,6 +160,32 @@ Map<String, Object?> _backendJson() {
     'variant': 'normal',
     'story': 'Un gatto tigrato osserva il mondo con calma.',
     'funFact': 'I mantelli tigrati sono molto comuni nei gatti domestici.',
+    'safetyStatus': 'safe',
+    'analyzedAt': '2026-06-28T12:00:00.000Z',
+  };
+}
+
+Map<String, Object?> _bicolorBackendJson() {
+  return {
+    'breed': 'domestic_gray_cat',
+    'confidence': 0.91,
+    'candidates': [
+      {'breed': 'domestic_gray_cat', 'confidence': 0.91},
+    ],
+    'coatColor': 'marrone/grigio',
+    'coatPattern': 'bicolore',
+    'eyeColor': 'occhi gialli',
+    'hairLength': 'pelo corto',
+    'estimatedAge': 'adult',
+    'traits': [
+      {'name': 'Mantello', 'value': 'marrone/grigio', 'rarityWeight': 1},
+      {'name': 'Pattern', 'value': 'tigrato mackerel', 'rarityWeight': 1},
+    ],
+    'personality': 'curious',
+    'rarity': 'common',
+    'variant': 'normal',
+    'story': 'Un gatto marrone/grigio tigrato osserva il mondo.',
+    'funFact': 'Il mantello tigrato mackerel crea strisce sottili.',
     'safetyStatus': 'safe',
     'analyzedAt': '2026-06-28T12:00:00.000Z',
   };

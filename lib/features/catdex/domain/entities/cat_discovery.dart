@@ -82,8 +82,17 @@ class CatDiscoveryCard {
     required this.originalPhotoPath,
     required this.generatedAt,
     this.eventThemeId,
+    this.cardImageUrl,
+    this.cardImagePath,
+    this.aiIllustrationUrl,
+    this.aiIllustrationPath,
+    this.illustratedCatImageUrl,
+    this.illustratedCatImagePath,
     this.cutoutImagePath,
-  });
+    this.illustratedCatPath,
+    this.cardTemplateId = 'common_clean',
+    this.cardVersion = 1,
+  }) : cardGeneratedAt = generatedAt;
 
   final String cardId;
   final String discoveryId;
@@ -92,7 +101,17 @@ class CatDiscoveryCard {
   final String cardRarityStyle;
   final String? eventThemeId;
   final bool isEventCard;
+  final String? cardImageUrl;
+  final String? cardImagePath;
+  final String? aiIllustrationUrl;
+  final String? aiIllustrationPath;
+  final String? illustratedCatImageUrl;
+  final String? illustratedCatImagePath;
   final String? cutoutImagePath;
+  final String? illustratedCatPath;
+  final String cardTemplateId;
   final String? originalPhotoPath;
   final DateTime generatedAt;
+  final DateTime? cardGeneratedAt;
+  final int cardVersion;
 }

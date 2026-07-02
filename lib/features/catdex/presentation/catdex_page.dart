@@ -1,13 +1,13 @@
 import 'dart:async';
-import 'dart:io';
 
-import 'package:catdex/features/analysis/presentation/cat_analysis_display_formatter.dart';
+import 'package:catdex/features/analysis/presentation/cat_display_data.dart';
+import 'package:catdex/features/analysis/presentation/cat_display_formatter.dart';
 import 'package:catdex/features/catdex/application/catdex_controller.dart';
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:catdex/features/catdex/application/local_player_progress_session_controller.dart';
-import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/catdex_collection.dart';
+import 'package:catdex/shared/images/catdex_image_resolver.dart';
 import 'package:catdex/theme/app_colors.dart';
 import 'package:catdex/theme/app_spacing.dart';
 import 'package:flutter/material.dart';
@@ -150,7 +150,324 @@ class CatDexPage extends ConsumerWidget {
     unawaited(
       Navigator.of(context, rootNavigator: true).push(
         MaterialPageRoute<void>(
-          builder: (_) => CatDexTradingCardPage(entry: entry),
+          builder: (_) => CatDexDetailPage(entry: entry),
+        ),
+      ),
+    );
+  }
+}
+
+class CatDexDetailPage extends StatelessWidget {
+  const CatDexDetailPage({required this.entry, super.key});
+
+  final CatDexCollectionEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final discovery = entry.discovery;
+    final rarity = _entryRarity(entry);
+    final displayData = _displayDataForEntry(entry);
+    final speciesLabel =
+        displayData?.displaySpecies ?? entry.species.displayName;
+    final name = displayData?.displayName ?? entry.displayName ?? speciesLabel;
+    final resolvedImage = CatDexImageResolver.resolveBestImagePath(
+      discovery: discovery,
+      discoveredPhotoPath: entry.discoveredPhotoPath,
+    );
+    debugPrint('CATDEX_DETAIL_DISCOVERY_ID ${discovery?.id ?? '-'}');
+    debugPrint('CATDEX_DETAIL_IMAGE_PATH ${resolvedImage.path ?? '-'}');
+    debugPrint(
+      'CATDEX_DETAIL_SHOWING_PLACEHOLDER ${resolvedImage.usesPlaceholder}',
+    );
+
+    return Scaffold(
+      backgroundColor: AppColors.backgroundGray,
+      appBar: AppBar(
+        title: Text(name),
+        backgroundColor: AppColors.backgroundGray,
+        surfaceTintColor: Colors.transparent,
+      ),
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.md,
+          AppSpacing.lg,
+          AppSpacing.xxl + MediaQuery.paddingOf(context).bottom,
+        ),
+        children: [
+          AspectRatio(
+            aspectRatio: 1.15,
+            child: _CatPhotoFrame(
+              resolvedImage: resolvedImage,
+              rarity: rarity,
+              frameStyle: entry.cardFrameStyle,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _CatDetailHeader(
+            name: name,
+            species: speciesLabel,
+            rarity: rarity,
+            personality: displayData?.displayPersonality ?? '-',
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _CatDetailSection(
+            title: 'Dettagli',
+            rows: [
+              _CatDetailRow(
+                label: 'Mantello',
+                value: displayData?.displayCoatColor ?? '-',
+              ),
+              _CatDetailRow(
+                label: 'Pattern',
+                value: displayData?.displayCoatPattern ?? '-',
+              ),
+              _CatDetailRow(
+                label: 'Occhi',
+                value: displayData?.displayEyeColor ?? '-',
+              ),
+              _CatDetailRow(
+                label: 'Pelo',
+                value: displayData?.displayHairLength ?? '-',
+              ),
+              _CatDetailRow(
+                label: 'Età',
+                value: displayData?.displayAge ?? '-',
+              ),
+              _CatDetailRow(
+                label: 'Scoperto il',
+                value: _formatDate(discovery?.discoveredAt),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _CatDetailTextCard(
+            title: 'Storia',
+            value:
+                displayData?.displayStory ??
+                'Una nuova storia CatDex sta prendendo forma.',
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _CatDetailTextCard(
+            title: 'Curiosità',
+            value:
+                displayData?.displayFunFact ??
+                'Continua a esplorare per scoprire altri dettagli.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CatDetailHeader extends StatelessWidget {
+  const _CatDetailHeader({
+    required this.name,
+    required this.species,
+    required this.rarity,
+    required this.personality,
+  });
+
+  final String name;
+  final String species;
+  final CatRarity rarity;
+  final String personality;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = _cardStyleForRarity(rarity);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              name,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              species,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppColors.ink.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                _RarityBadge(rarity: rarity, color: style.frameColor),
+                _DetailChip(icon: Icons.psychology_rounded, label: personality),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CatDetailSection extends StatelessWidget {
+  const _CatDetailSection({required this.title, required this.rows});
+
+  final String title;
+  final List<_CatDetailRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            for (final row in rows) row,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CatDetailRow extends StatelessWidget {
+  const _CatDetailRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 96,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: AppColors.primaryPurple,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CatDetailTextCard extends StatelessWidget {
+  const _CatDetailTextCard({required this.title, required this.value});
+
+  final String title;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.ink.withValues(alpha: 0.78),
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailChip extends StatelessWidget {
+  const _DetailChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.primaryPurple.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: AppColors.primaryPurple),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: AppColors.primaryPurple,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -510,7 +827,9 @@ class _CatCollectionCard extends StatelessWidget {
     final discovered = entry.discovered;
     final rarity = _entryRarity(entry);
     final style = _cardStyleForRarity(rarity);
-    final speciesLabel = _speciesLabel(entry);
+    final displayData = _displayDataForEntry(entry);
+    final speciesLabel =
+        displayData?.displaySpecies ?? entry.species.displayName;
     final name = entry.displayName ?? speciesLabel;
 
     return Semantics(
@@ -561,6 +880,7 @@ class _CatCollectionCard extends StatelessWidget {
                   ? _DiscoveredCardContent(
                       entry: entry,
                       name: name,
+                      displayData: displayData,
                       style: style,
                     )
                   : const _LockedCardContent(),
@@ -576,18 +896,24 @@ class _DiscoveredCardContent extends StatelessWidget {
   const _DiscoveredCardContent({
     required this.entry,
     required this.name,
+    required this.displayData,
     required this.style,
   });
 
   final CatDexCollectionEntry entry;
   final String name;
+  final CatDisplayData? displayData;
   final _TradingCardStyle style;
 
   @override
   Widget build(BuildContext context) {
     final rarity = _entryRarity(entry);
-    final speciesLabel = _speciesLabel(entry);
-    final hasPhoto = _hasUsablePhoto(entry.discoveredPhotoPath);
+    final speciesLabel =
+        displayData?.displaySpecies ?? entry.species.displayName;
+    final resolvedImage = CatDexImageResolver.resolveForEntry(entry);
+    final hasPhoto = !resolvedImage.usesPlaceholder;
+    debugPrint('CATDEX_GRID_DISCOVERY_ID ${entry.discovery?.id ?? '-'}');
+    debugPrint('CATDEX_GRID_IMAGE_PATH ${resolvedImage.path ?? '-'}');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -597,7 +923,7 @@ class _DiscoveredCardContent extends StatelessWidget {
             children: [
               Positioned.fill(
                 child: _CatPhotoFrame(
-                  photoPath: entry.discoveredPhotoPath,
+                  resolvedImage: resolvedImage,
                   rarity: rarity,
                   frameStyle: entry.cardFrameStyle,
                 ),
@@ -731,19 +1057,17 @@ class _LockedCardContent extends StatelessWidget {
 
 class _CatPhotoFrame extends StatelessWidget {
   const _CatPhotoFrame({
-    required this.photoPath,
+    required this.resolvedImage,
     required this.rarity,
     this.frameStyle,
   });
 
-  final String? photoPath;
+  final CatDexResolvedImage resolvedImage;
   final CatRarity rarity;
   final String? frameStyle;
 
   @override
   Widget build(BuildContext context) {
-    final image = _imageProviderForPath(photoPath);
-
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(26),
@@ -763,10 +1087,10 @@ class _CatPhotoFrame extends StatelessWidget {
               ],
             ),
           ),
-          child: image == null
+          child: resolvedImage.provider == null
               ? const _PhotoPlaceholder()
               : Image(
-                  image: image,
+                  image: resolvedImage.provider!,
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => const _PhotoPlaceholder(),
                 ),
@@ -873,547 +1197,6 @@ class _RarityBadge extends StatelessWidget {
   }
 }
 
-class CatDexTradingCardPage extends StatelessWidget {
-  const CatDexTradingCardPage({required this.entry, super.key});
-
-  final CatDexCollectionEntry entry;
-
-  @override
-  Widget build(BuildContext context) {
-    // TODO(CatDex): remove background from cat image
-    // TODO(CatDex): generate cat cutout image
-    // TODO(CatDex): place cat cutout over illustrated card background
-    // TODO(CatDex): create night card background
-    // TODO(CatDex): create seasonal event cards
-    // TODO(CatDex): Halloween card frame
-    // TODO(CatDex): Christmas card frame
-    // TODO(CatDex): Summer card frame
-    // TODO(CatDex): rainy weather card frame
-    // TODO(CatDex): create animated legendary card frame
-    return Scaffold(
-      backgroundColor: AppColors.darkBackground,
-      appBar: AppBar(
-        title: const Text('CatDex Card'),
-        backgroundColor: AppColors.darkBackground,
-        foregroundColor: AppColors.white,
-        surfaceTintColor: Colors.transparent,
-      ),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.xxl + MediaQuery.paddingOf(context).bottom,
-        ),
-        children: [
-          Center(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final cardWidth = constraints.maxWidth.clamp(0, 430).toDouble();
-
-                return SizedBox(
-                  width: cardWidth,
-                  child: AspectRatio(
-                    aspectRatio: 2.5 / 3.5,
-                    child: CatDexTradingCard(entry: entry, width: cardWidth),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class CollectibleCatCardPage extends CatDexTradingCardPage {
-  const CollectibleCatCardPage({required super.entry, super.key});
-}
-
-class CatDexTradingCard extends StatelessWidget {
-  const CatDexTradingCard({
-    required this.entry,
-    required this.width,
-    this.compact = false,
-    super.key,
-  });
-
-  final CatDexCollectionEntry entry;
-  final double width;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final discovery = entry.discovery;
-    final rarity = _entryRarity(entry);
-    final style = _cardStyleForRarity(rarity);
-    final name = entry.displayName ?? _speciesLabel(entry);
-    final backgroundStyle = discovery?.card?.cardBackgroundStyle ?? 'default';
-    final isNight = backgroundStyle == 'night';
-    final isEvent = discovery?.card?.isEventCard ?? false;
-    final photoPaths = _CardPhotoPaths.fromDiscovery(discovery);
-
-    return _CollectibleCardFrame(
-      rarity: rarity,
-      backgroundStyle: backgroundStyle,
-      compact: compact,
-      child: ConstrainedBox(
-        constraints: compact
-            ? const BoxConstraints.expand()
-            : BoxConstraints(minHeight: width * 1.4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _TradingCardHeader(
-              number: entry.collectionNumber,
-              name: name,
-              style: style,
-              compact: compact,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _CardImageWindow(
-              photoPaths: photoPaths,
-              rarity: rarity,
-              frameStyle: entry.cardFrameStyle,
-              hasPhoto: photoPaths.hasAnyUsablePhoto,
-              compact: compact,
-            ),
-            SizedBox(height: compact ? AppSpacing.sm : AppSpacing.md),
-            _CardTypeLine(
-              species: _speciesLabel(entry),
-              hairLength: _formatOptional(discovery?.hairLength),
-              isNight: isNight,
-              isEvent: isEvent,
-              compact: compact,
-            ),
-            if (!compact) ...[
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  Expanded(
-                    child: _CardRewardPill(
-                      icon: Icons.bolt_rounded,
-                      label: '+${discovery?.xpEarned ?? 0} XP',
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: _CardRewardPill(
-                      icon: Icons.paid_rounded,
-                      label: '+${discovery?.coinsEarned ?? 0} Monete',
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _CardAbility(personality: discovery?.personality.name),
-              const SizedBox(height: AppSpacing.md),
-              _TraitSection(discovery: discovery),
-              const SizedBox(height: AppSpacing.md),
-              _LoreBox(story: _shortStory(discovery?.story)),
-              const SizedBox(height: AppSpacing.lg),
-              _CardFooter(
-                cardId: discovery?.card?.cardId ?? 'card-${entry.species.id}',
-                discoveredAt: discovery?.discoveredAt,
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TradingCardHeader extends StatelessWidget {
-  const _TradingCardHeader({
-    required this.number,
-    required this.name,
-    required this.style,
-    required this.compact,
-  });
-
-  final int number;
-  final String name;
-  final _TradingCardStyle style;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.white.withValues(alpha: 0.32)),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  '#${number.toString().padLeft(4, '0')}',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.white.withValues(alpha: 0.82),
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const Spacer(),
-                _StarRow(count: style.starCount, size: compact ? 11 : 16),
-              ],
-            ),
-            SizedBox(height: compact ? 2 : AppSpacing.xs),
-            Text(
-              name,
-              maxLines: compact ? 1 : 2,
-              overflow: TextOverflow.ellipsis,
-              style:
-                  (compact
-                          ? Theme.of(context).textTheme.titleSmall
-                          : Theme.of(context).textTheme.headlineSmall)
-                      ?.copyWith(
-                        color: AppColors.white,
-                        fontWeight: FontWeight.w900,
-                      ),
-            ),
-            SizedBox(height: compact ? 2 : AppSpacing.xs),
-            Text(
-              style.cardLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.white.withValues(alpha: 0.82),
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CardImageWindow extends StatelessWidget {
-  const _CardImageWindow({
-    required this.photoPaths,
-    required this.rarity,
-    required this.frameStyle,
-    required this.hasPhoto,
-    required this.compact,
-  });
-
-  final _CardPhotoPaths photoPaths;
-  final CatRarity rarity;
-  final String? frameStyle;
-  final bool hasPhoto;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: compact ? 1.05 : 1.2,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: AppColors.ink.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(5),
-                child: _CardArtwork(
-                  photoPaths: photoPaths,
-                  rarity: rarity,
-                  frameStyle: frameStyle,
-                ),
-              ),
-            ),
-          ),
-          if (!hasPhoto && !compact)
-            const Positioned(
-              left: AppSpacing.md,
-              bottom: AppSpacing.md,
-              child: _LegacyDiscoveryBadge(),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CardArtwork extends StatelessWidget {
-  const _CardArtwork({
-    required this.photoPaths,
-    required this.rarity,
-    required this.frameStyle,
-  });
-
-  final _CardPhotoPaths photoPaths;
-  final CatRarity rarity;
-  final String? frameStyle;
-
-  @override
-  Widget build(BuildContext context) {
-    final cutoutImage = _imageProviderForPath(photoPaths.cutoutImagePath);
-    if (cutoutImage == null) {
-      return _CatPhotoFrame(
-        photoPath: photoPaths.displayPhotoPath ?? photoPaths.originalPhotoPath,
-        rarity: rarity,
-        frameStyle: frameStyle,
-      );
-    }
-
-    // TODO(CatDex): remove background from cat photo
-    // TODO(CatDex): generate cat cutout image
-    // TODO(CatDex): use cutoutImagePath when available
-    // TODO(CatDex): place cat silhouette/cutout over illustrated backgrounds
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: _rarityColor(rarity), width: 3),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    _rarityColor(rarity).withValues(alpha: 0.85),
-                    AppColors.skyBlue.withValues(alpha: 0.72),
-                    AppColors.primaryPurple.withValues(alpha: 0.82),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.sm),
-              child: Image(
-                image: cutoutImage,
-                fit: BoxFit.contain,
-                errorBuilder: (_, _, _) => _CatPhotoFrame(
-                  photoPath:
-                      photoPaths.displayPhotoPath ??
-                      photoPaths.originalPhotoPath,
-                  rarity: rarity,
-                  frameStyle: frameStyle,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CardTypeLine extends StatelessWidget {
-  const _CardTypeLine({
-    required this.species,
-    required this.hairLength,
-    required this.isNight,
-    required this.isEvent,
-    required this.compact,
-  });
-
-  final String species;
-  final String hairLength;
-  final bool isNight;
-  final bool isEvent;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Text(
-          '$species • $hairLength',
-          maxLines: compact ? 2 : 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: AppColors.white,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        if (isNight) const _CardTag(label: 'Carta Notturna'),
-        if (isEvent) const _CardTag(label: 'Evento speciale'),
-      ],
-    );
-  }
-}
-
-class _CardTag extends StatelessWidget {
-  const _CardTag({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: 3,
-        ),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: AppColors.white,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TraitSection extends StatelessWidget {
-  const _TraitSection({required this.discovery});
-
-  final CatDiscovery? discovery;
-
-  @override
-  Widget build(BuildContext context) {
-    final speciesId = discovery?.speciesId;
-    final coatColor = discovery?.coatColor;
-    final coatPattern = discovery?.coatPattern;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          children: [
-            _TraitRow(
-              label: 'Mantello',
-              value: _coatColorLabel(
-                speciesId: speciesId,
-                coatColor: coatColor,
-                coatPattern: coatPattern,
-              ),
-            ),
-            _TraitRow(
-              label: 'Pattern',
-              value: _coatPatternLabel(
-                speciesId: speciesId,
-                coatColor: coatColor,
-                coatPattern: coatPattern,
-              ),
-            ),
-            _TraitRow(
-              label: 'Occhi',
-              value: _formatOptional(discovery?.eyeColor),
-            ),
-            _TraitRow(
-              label: 'Età',
-              value: _formatOptional(discovery?.estimatedAge),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TraitRow extends StatelessWidget {
-  const _TraitRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 84,
-            child: Text(
-              '$label:',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: AppColors.primaryPurple,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: AppColors.ink,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CardFooter extends StatelessWidget {
-  const _CardFooter({required this.cardId, required this.discoveredAt});
-
-  final String cardId;
-  final DateTime? discoveredAt;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.ink.withValues(alpha: 0.24),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.sm),
-        child: Column(
-          children: [
-            _CardMetaRow(label: 'ID carta', value: _shortCardId(cardId)),
-            _CardMetaRow(
-              label: 'Scoperto il',
-              value: _formatDate(discoveredAt),
-            ),
-            Text(
-              'CatDex Card',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.white.withValues(alpha: 0.74),
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _StarRow extends StatelessWidget {
   const _StarRow({required this.count, this.size = 16});
 
@@ -1446,288 +1229,6 @@ class _TradingCardStyle {
   final Color frameColor;
   final int starCount;
   final String cardLabel;
-}
-
-class _CollectibleCardFrame extends StatelessWidget {
-  const _CollectibleCardFrame({
-    required this.rarity,
-    required this.backgroundStyle,
-    required this.child,
-    required this.compact,
-  });
-
-  final CatRarity rarity;
-  final String backgroundStyle;
-  final Widget child;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final frameColor = _rarityColor(rarity);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: _frameGradient(rarity),
-        borderRadius: BorderRadius.circular(compact ? 24 : 38),
-        boxShadow: [
-          BoxShadow(
-            color: frameColor.withValues(alpha: 0.34),
-            blurRadius: compact ? 18 : 34,
-            offset: Offset(0, compact ? 8 : 18),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(compact ? 3 : 5),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: _cardBackground(backgroundStyle, rarity),
-            borderRadius: BorderRadius.circular(compact ? 21 : 33),
-            border: Border.all(color: AppColors.white.withValues(alpha: 0.4)),
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.lg),
-            child: child,
-          ),
-        ),
-      ),
-    );
-  }
-
-  LinearGradient _frameGradient(CatRarity rarity) {
-    return switch (rarity) {
-      CatRarity.common => const LinearGradient(
-        colors: [AppColors.primaryGreen, Color(0xFF86EFAC)],
-      ),
-      CatRarity.uncommon => const LinearGradient(
-        colors: [AppColors.skyBlue, Color(0xFF1D4ED8)],
-      ),
-      CatRarity.rare => const LinearGradient(
-        colors: [AppColors.primaryPurple, Color(0xFFC084FC)],
-      ),
-      CatRarity.epic => const LinearGradient(
-        colors: [AppColors.warning, AppColors.primaryPurple],
-      ),
-      CatRarity.legendary => const LinearGradient(
-        colors: [Color(0xFFFFFBEB), AppColors.warning, Color(0xFFB45309)],
-      ),
-      CatRarity.mythic => const LinearGradient(
-        colors: [Color(0xFFEF4444), AppColors.warning, AppColors.primaryPurple],
-      ),
-    };
-  }
-
-  LinearGradient _cardBackground(String style, CatRarity rarity) {
-    if (style == 'night') {
-      return const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF111827), Color(0xFF312E81), Color(0xFF581C87)],
-      );
-    }
-
-    if (style == 'event') {
-      return LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          AppColors.primaryGreen,
-          _rarityColor(rarity),
-          AppColors.primaryPurple,
-        ],
-      );
-    }
-
-    return LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [
-        _rarityColor(rarity).withValues(alpha: 0.92),
-        AppColors.skyBlue,
-        AppColors.primaryPurple,
-      ],
-    );
-  }
-}
-
-class _CardRewardPill extends StatelessWidget {
-  const _CardRewardPill({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.white.withValues(alpha: 0.3)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: AppColors.warning, size: 20),
-            const SizedBox(width: AppSpacing.xs),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppColors.white,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CardAbility extends StatelessWidget {
-  const _CardAbility({required this.personality});
-
-  final String? personality;
-
-  @override
-  Widget build(BuildContext context) {
-    final title = _abilityTitle(personality);
-    final description = _abilityDescription(personality);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.white.withValues(alpha: 0.3)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.psychology_rounded, color: AppColors.white),
-                const SizedBox(width: AppSpacing.xs),
-                Text(
-                  'Abilità',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.white.withValues(alpha: 0.78),
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.white,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.white.withValues(alpha: 0.84),
-                fontWeight: FontWeight.w700,
-                height: 1.25,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LoreBox extends StatelessWidget {
-  const _LoreBox({required this.story});
-
-  final String story;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Storia',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: AppColors.primaryPurple,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              story,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.ink,
-                fontWeight: FontWeight.w600,
-                height: 1.35,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CardMetaRow extends StatelessWidget {
-  const _CardMetaRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: AppColors.white.withValues(alpha: 0.72),
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: AppColors.white,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 Color _rarityColor(CatRarity rarity) {
@@ -1771,33 +1272,6 @@ _TradingCardStyle _cardStyleForRarity(CatRarity rarity) {
   };
 }
 
-class _CardPhotoPaths {
-  const _CardPhotoPaths({
-    required this.cutoutImagePath,
-    required this.displayPhotoPath,
-    required this.originalPhotoPath,
-  });
-
-  factory _CardPhotoPaths.fromDiscovery(CatDiscovery? discovery) {
-    return _CardPhotoPaths(
-      cutoutImagePath: discovery?.card?.cutoutImagePath,
-      displayPhotoPath: discovery?.displayPhotoPath,
-      originalPhotoPath:
-          discovery?.card?.originalPhotoPath ?? discovery?.originalPhotoPath,
-    );
-  }
-
-  final String? cutoutImagePath;
-  final String? displayPhotoPath;
-  final String? originalPhotoPath;
-
-  bool get hasAnyUsablePhoto {
-    return _hasUsablePhoto(cutoutImagePath) ||
-        _hasUsablePhoto(displayPhotoPath) ||
-        _hasUsablePhoto(originalPhotoPath);
-  }
-}
-
 String _rarityLabel(CatRarity rarity) {
   return switch (rarity) {
     CatRarity.common => '🟢 Comune',
@@ -1813,118 +1287,16 @@ CatRarity _entryRarity(CatDexCollectionEntry entry) {
   return entry.discovery?.rarity ?? entry.species.baseRarity;
 }
 
-String _speciesLabel(CatDexCollectionEntry entry) {
+CatDisplayData? _displayDataForEntry(CatDexCollectionEntry entry) {
   final discovery = entry.discovery;
-  return const CatAnalysisDisplayFormatter().speciesLabel(
-    speciesId: discovery?.speciesId ?? entry.species.id,
-    coatColor: discovery?.coatColor,
-    coatPattern: discovery?.coatPattern,
-  );
-}
-
-String _format(String value) {
-  return const CatAnalysisDisplayFormatter().value(value);
-}
-
-String _formatOptional(String? value) {
-  final trimmed = value?.trim();
-  if (trimmed == null || trimmed.isEmpty) {
-    return '-';
-  }
-
-  return _format(trimmed);
-}
-
-String _coatColorLabel({
-  required String? speciesId,
-  required String? coatColor,
-  required String? coatPattern,
-}) {
-  return const CatAnalysisDisplayFormatter().coatColorLabel(
-    speciesId: speciesId,
-    coatColor: coatColor,
-    coatPattern: coatPattern,
-    fallback: '-',
-  );
-}
-
-String _coatPatternLabel({
-  required String? speciesId,
-  required String? coatColor,
-  required String? coatPattern,
-}) {
-  return const CatAnalysisDisplayFormatter().coatPatternLabel(
-    speciesId: speciesId,
-    coatColor: coatColor,
-    coatPattern: coatPattern,
-    fallback: '-',
-  );
-}
-
-String _abilityTitle(String? personality) {
-  return switch (personality?.trim().toLowerCase()) {
-    'curious' => 'Curioso osservatore',
-    'relaxed' => 'Animo tranquillo',
-    'playful' => 'Spirito giocherellone',
-    _ => 'Animo curioso',
-  };
-}
-
-String _abilityDescription(String? personality) {
-  return switch (personality?.trim().toLowerCase()) {
-    'curious' => 'Ama osservare il mondo prima di avvicinarsi.',
-    'relaxed' => 'Porta calma nella collezione CatDex.',
-    'playful' => 'Trasforma ogni scoperta in un piccolo gioco.',
-    _ => 'Aggiunge carattere alla tua collezione CatDex.',
-  };
-}
-
-String _shortStory(String? value) {
-  final trimmed = value?.trim();
-  if (trimmed == null || trimmed.isEmpty) {
-    return 'Una nuova storia CatDex sta prendendo forma.';
-  }
-
-  if (trimmed.length <= 128) {
-    return trimmed;
-  }
-
-  return '${trimmed.substring(0, 125).trimRight()}...';
-}
-
-String _shortCardId(String cardId) {
-  if (cardId.length <= 14) {
-    return cardId;
-  }
-
-  return '${cardId.substring(0, 6)}...${cardId.substring(cardId.length - 4)}';
-}
-
-bool _hasUsablePhoto(String? path) {
-  final trimmed = path?.trim();
-  if (trimmed == null || trimmed.isEmpty) {
-    return false;
-  }
-
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    return true;
-  }
-
-  return File(trimmed).existsSync();
-}
-
-ImageProvider<Object>? _imageProviderForPath(String? path) {
-  final trimmed = path?.trim();
-  if (trimmed == null || trimmed.isEmpty) {
+  if (discovery == null) {
     return null;
   }
 
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    return NetworkImage(trimmed);
-  }
-
-  final file = File(trimmed);
-  return file.existsSync() ? FileImage(file) : null;
+  return const CatDisplayFormatter().fromDiscovery(
+    discovery,
+    fallbackName: entry.displayName,
+  );
 }
 
 String _formatDate(DateTime? date) {

@@ -15,7 +15,9 @@ dependencies:
   geocoding: ^4.0.0
   geolocator: ^14.0.2
   go_router: ^16.0.0
+  image: ^4.5.4
   image_picker: ^1.1.2
+  path_provider: ^2.1.5
   permission_handler: ^12.0.1
   shared_preferences: ^2.5.3
   supabase_flutter: ^2.15.0
@@ -29,3 +31,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/cards/templates/common_card_template.png
+    - assets/cards/test_illustrated_cat.png

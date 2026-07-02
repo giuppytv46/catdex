@@ -6,7 +6,7 @@ import 'package:catdex/features/analysis/application/discovery_reveal_sound_hook
 import 'package:catdex/features/analysis/application/local_discovery_save_controller.dart';
 import 'package:catdex/features/analysis/application/local_discovery_save_state.dart';
 import 'package:catdex/features/analysis/domain/entities/discovery_reveal_args.dart';
-import 'package:catdex/features/analysis/presentation/cat_analysis_display_formatter.dart';
+import 'package:catdex/features/analysis/presentation/cat_display_formatter.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/routing/app_routes.dart';
 import 'package:catdex/theme/app_colors.dart';
@@ -211,7 +211,7 @@ class _RevealCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
     final result = args.result;
-    const formatter = CatAnalysisDisplayFormatter();
+    final displayData = const CatDisplayFormatter().fromAnalysis(result);
     final rarityColor = _rarityColor(result.rarity);
     final shimmer =
         _isShinyVariant(result.variant.id) || _isRareRarity(result.rarity);
@@ -278,7 +278,7 @@ class _RevealCard extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Text(
-                        formatter.value(result.displayBreed),
+                        displayData.displaySpecies,
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(
@@ -293,13 +293,13 @@ class _RevealCard extends StatelessWidget {
                         runSpacing: AppSpacing.sm,
                         children: [
                           _RevealBadge(
-                            label: formatter.value(result.displayRarity),
+                            label: displayData.displayRarity,
                           ),
                           _RevealBadge(
-                            label: formatter.value(result.displayVariant),
+                            label: displayData.displayVariant,
                           ),
                           _RevealBadge(
-                            label: formatter.value(result.displayPersonality),
+                            label: displayData.displayPersonality,
                           ),
                         ],
                       ),
@@ -641,8 +641,11 @@ class _ResultDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
     final result = args.result;
-    const formatter = CatAnalysisDisplayFormatter();
-    final traits = formatter.traits(result.visualTraits.notableTraits);
+    final displayData = const CatDisplayFormatter().fromAnalysis(result);
+    final traits =
+        '${displayData.displayCoatColor}, '
+        '${displayData.displayCoatPattern}, '
+        '${displayData.displayEyeColor}';
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -663,7 +666,10 @@ class _ResultDetails extends StatelessWidget {
               label: l10n.traitsLabel,
               value: traits,
             ),
-            _DetailLine(label: l10n.storyLabel, value: result.story),
+            _DetailLine(
+              label: l10n.storyLabel,
+              value: displayData.displayStory,
+            ),
           ],
         ),
       ),

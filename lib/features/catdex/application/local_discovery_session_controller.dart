@@ -21,6 +21,13 @@ class LocalDiscoverySessionController extends Notifier<List<CatDiscovery>> {
     state = [discovery, ...state];
   }
 
+  void replaceDiscovery(CatDiscovery discovery) {
+    state = [
+      for (final item in state)
+        if (item.id == discovery.id) discovery else item,
+    ];
+  }
+
   Future<void> _loadPersistedDiscoveries() async {
     final activeSession = ref.read(activeCatDexSessionProvider);
     final discoveryRepository = ref.read(discoveryRepositoryProvider);

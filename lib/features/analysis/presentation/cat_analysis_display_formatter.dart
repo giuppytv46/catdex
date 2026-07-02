@@ -5,7 +5,7 @@ class CatAnalysisDisplayFormatter {
 
   static const _labels = {
     'domestic_tabby_cat': 'Gatto domestico tigrato',
-    'domestic_gray_cat': 'Gatto domestico',
+    'domestic_gray_cat': 'Gatto domestico bicolore',
     'domestic_black_cat': 'Gatto nero domestico',
     'domestic_black_white_cat': 'Gatto domestico bicolore',
     'domestic_orange_cat': 'Gatto rosso domestico',
@@ -18,10 +18,10 @@ class CatAnalysisDisplayFormatter {
     'domestic_longhair_cat': 'Gatto domestico a pelo lungo',
     'common': 'Comune',
     'uncommon': 'Non comune',
-    'rare': 'Raro',
-    'epic': 'Epico',
-    'legendary': 'Leggendario',
-    'mythic': 'Leggendario',
+    'rare': 'Rara',
+    'epic': 'Epica',
+    'legendary': 'Leggendaria',
+    'mythic': 'Leggendaria',
     'normal': 'Normale',
     'shiny': 'Brillante',
     'golden': 'Dorato',
@@ -145,16 +145,27 @@ class CatAnalysisDisplayFormatter {
     final color = _normalize(coatColor);
     final pattern = _normalize(coatPattern);
 
-    return (species == 'domestic_gray_cat' ||
-            species == 'domestic_tabby_cat') &&
-        (pattern.contains('bicolore') ||
-            pattern.contains('bicolor') ||
-            pattern.contains('tuxedo')) &&
-        (color.contains('marrone/grigio') ||
-            color.contains('brown/gray') ||
-            color.contains('gray') ||
-            color.contains('grey') ||
-            color.contains('grigio'));
+    final bicolorSpecies =
+        species == 'domestic_gray_cat' ||
+        species == 'domestic_tabby_cat' ||
+        species == 'domestic_shorthair_cat' ||
+        species == 'domestic_black_white_cat' ||
+        species == 'domestic_tuxedo_cat';
+    final bicolorPattern =
+        pattern.contains('bicolore') ||
+        pattern.contains('bicolor') ||
+        pattern.contains('tuxedo') ||
+        pattern.contains('bianco') ||
+        pattern.contains('white') ||
+        pattern.contains('nero') ||
+        pattern.contains('black');
+    final bicolorColor =
+        color.contains('nero/bianco') ||
+        color.contains('bianco/nero') ||
+        color.contains('black/white') ||
+        color.contains('white/black');
+
+    return bicolorSpecies && (bicolorPattern || bicolorColor);
   }
 
   String _normalize(String? value) => value?.trim().toLowerCase() ?? '';

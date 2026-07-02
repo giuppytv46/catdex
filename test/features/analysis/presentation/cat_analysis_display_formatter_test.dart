@@ -7,7 +7,7 @@ void main() {
 
   test('formats backend technical labels as readable Italian labels', () {
     expect(formatter.value('domestic_tabby_cat'), 'Gatto domestico tigrato');
-    expect(formatter.value('domestic_gray_cat'), 'Gatto domestico');
+    expect(formatter.value('domestic_gray_cat'), 'Gatto domestico bicolore');
     expect(formatter.value('domestic_black_cat'), 'Gatto nero domestico');
     expect(
       formatter.value('domestic_black_white_cat'),
@@ -24,9 +24,9 @@ void main() {
     );
     expect(formatter.value('common'), 'Comune');
     expect(formatter.value('uncommon'), 'Non comune');
-    expect(formatter.value('rare'), 'Raro');
-    expect(formatter.value('epic'), 'Epico');
-    expect(formatter.value('legendary'), 'Leggendario');
+    expect(formatter.value('rare'), 'Rara');
+    expect(formatter.value('epic'), 'Epica');
+    expect(formatter.value('legendary'), 'Leggendaria');
     expect(formatter.value('normal'), 'Normale');
     expect(formatter.value('nero/bianco'), 'Nero/bianco');
     expect(formatter.value('bicolore'), 'Bicolore');
@@ -85,6 +85,22 @@ void main() {
         coatPattern: 'bicolore',
       ),
       'Gatto domestico bicolore',
+    );
+    expect(
+      formatter.speciesLabel(
+        speciesId: 'domestic_shorthair_cat',
+        coatColor: 'black/white',
+        coatPattern: 'unknown',
+      ),
+      'Gatto domestico bicolore',
+    );
+    expect(
+      formatter.coatColorLabel(
+        speciesId: 'domestic_tabby_cat',
+        coatColor: 'nero/bianco',
+        coatPattern: 'tuxedo',
+      ),
+      'Nero/bianco',
     );
   });
 

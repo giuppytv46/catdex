@@ -1,0 +1,36 @@
+{
+  "finalCardUrl": "/generated/cards/57b20dc3-8c94-4f78-b377-c1e2928cb99c/final-card.png",
+  "illustratedCatUrl": "/generated/cards/57b20dc3-8c94-4f78-b377-c1e2928cb99c/illustrated-cat.png",
+  "analysisJson": {
+    "customName": "",
+    "suggestedName": "CAT-B99C",
+    "displaySpecies": "Gatto domestico",
+    "coatColor": "unknown",
+    "coatPattern": "unknown",
+    "eyeColor": "unknown",
+    "hairLength": "unknown",
+    "estimatedAge": "unknown",
+    "personality": "curious",
+    "rarity": "common",
+    "variant": "standard",
+    "shortDescription": "A newly discovered CatDex companion.",
+    "story": "This cat joined the CatDex from a captured photo and awaits a richer AI analysis.",
+    "funFact": "Every CatDex card is composed with deterministic layout slots."
+  },
+  "selectedTemplateKey": "default/common",
+  "discoveryId": "57b20dc3-8c94-4f78-b377-c1e2928cb99c",
+  "originalPhotoUrl": "http://localhost:3000/cards/test_illustrated_cat.png",
+  "cardText": {
+    "cardTitle": "CAT-B99C",
+    "speciesLine": "Gatto domestico",
+    "abilityName": "curious Instinct",
+    "abilityDescription": "A newly discovered CatDex companion.",
+    "flavorText": "This cat joined the CatDex from a captured photo and awaits a richer AI analysis.",
+    "funFact": "Every CatDex card is composed with deterministic layout slots."
+  },
+  "finalCardPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/57b20dc3-8c94-4f78-b377-c1e2928cb99c/final-card.png",
+  "illustratedCatPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/57b20dc3-8c94-4f78-b377-c1e2928cb99c/illustrated-cat.png",
+  "analysisPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/57b20dc3-8c94-4f78-b377-c1e2928cb99c/analysis.json",
+  "metadataPath": "/generated/cards/57b20dc3-8c94-4f78-b377-c1e2928cb99c/metadata.json",
+  "createdAt": "2026-07-02T00:00:27.675Z"
+}

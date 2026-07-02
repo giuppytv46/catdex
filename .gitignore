@@ -31,3 +31,7 @@ ios/Runner.xcworkspace/xcshareddata/
 
 # macOS
 .DS_Store
+
+# CatDex card renderer
+card-renderer/node_modules/
+card-renderer/.next/

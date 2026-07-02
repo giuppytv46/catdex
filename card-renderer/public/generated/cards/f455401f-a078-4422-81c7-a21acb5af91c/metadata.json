@@ -1,0 +1,36 @@
+{
+  "finalCardUrl": "/generated/cards/f455401f-a078-4422-81c7-a21acb5af91c/final-card.png",
+  "illustratedCatUrl": "/generated/cards/f455401f-a078-4422-81c7-a21acb5af91c/illustrated-cat.png",
+  "analysisJson": {
+    "customName": "MochETTO",
+    "suggestedName": "MochETTO",
+    "displaySpecies": "Gatto domestico tigrato",
+    "coatColor": "Marrone/grigio tigrato",
+    "coatPattern": "Tigrato mackerel",
+    "eyeColor": "occhi ambrati",
+    "hairLength": "pelo corto",
+    "estimatedAge": "unknown",
+    "personality": "Rilassato",
+    "rarity": "common",
+    "variant": "standard",
+    "shortDescription": "A newly discovered CatDex companion.",
+    "story": "Un gatto domestico tigrato dal mantello marrone/grigio tigrato tigrato mackerel disteso con espressione rilassata all'aperto entra nel tuo CatDex con un'aria curiosa e attenta.",
+    "funFact": "Il disegno tigrato e uno dei mantelli piu comuni nei gatti domestici e puo apparire in tonalita marroni, grigie o arancioni."
+  },
+  "selectedTemplateKey": "default/common",
+  "discoveryId": "f455401f-a078-4422-81c7-a21acb5af91c",
+  "originalPhotoUrl": "https://ymdwnohcnjcijgbqnriy.supabase.co/storage/v1/object/sign/cat-photos/catdex/originals/local-explorer/f455401f-a078-4422-81c7-a21acb5af91c.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV81Yjg1NWU4Yi03NTFkLTRjZjYtOWU1My0xOWZmNjk3OGI2MTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjYXQtcGhvdG9zL2NhdGRleC9vcmlnaW5hbHMvbG9jYWwtZXhwbG9yZXIvZjQ1NTQwMWYtYTA3OC00NDIyLTgxYzctYTIxYWNiNWFmOTFjLmpwZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODMwMzU0OTgsImV4cCI6MTc4MzEyMTg5OH0.NpLivkSGlbfuTosk1DJ_eTmVfEjF4iCT6mePgXq0usY",
+  "cardText": {
+    "cardTitle": "MOCHETTO",
+    "speciesLine": "Gatto domestico tigrato",
+    "abilityName": "Rilassato Instinct",
+    "abilityDescription": "A newly discovered CatDex companion.",
+    "flavorText": "Un gatto domestico tigrato dal mantello marrone/grigio tigrato tigrato mackerel disteso con espressione rilassata all'aperto entra nel tuo CatDex con un'aria curiosa e attenta.",
+    "funFact": "Il disegno tigrato e uno dei mantelli piu comuni nei gatti domestici e puo apparire in tonalita marroni, grigie o arancioni."
+  },
+  "finalCardPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/f455401f-a078-4422-81c7-a21acb5af91c/final-card.png",
+  "illustratedCatPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/f455401f-a078-4422-81c7-a21acb5af91c/illustrated-cat.png",
+  "analysisPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/f455401f-a078-4422-81c7-a21acb5af91c/analysis.json",
+  "metadataPath": "/generated/cards/f455401f-a078-4422-81c7-a21acb5af91c/metadata.json",
+  "createdAt": "2026-07-02T23:39:04.283Z"
+}

@@ -8,7 +8,8 @@ import 'package:catdex/features/analysis/application/cat_analysis_state.dart';
 import 'package:catdex/features/analysis/domain/entities/analysis_status.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_result.dart';
 import 'package:catdex/features/analysis/domain/entities/discovery_reveal_args.dart';
-import 'package:catdex/features/analysis/presentation/cat_analysis_display_formatter.dart';
+import 'package:catdex/features/analysis/presentation/cat_display_data.dart';
+import 'package:catdex/features/analysis/presentation/cat_display_formatter.dart';
 import 'package:catdex/features/capture/domain/entities/captured_photo.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/routing/app_routes.dart';
@@ -207,27 +208,21 @@ class _AnalysisResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const formatter = CatAnalysisDisplayFormatter();
-    final traitDisplay = formatter.traits(result.visualTraits.notableTraits);
-    final breed = formatter.value(result.displayBreed);
-    final rarity = formatter.value(result.displayRarity);
-    final variant = formatter.value(result.displayVariant);
-    final personality = formatter.value(result.displayPersonality);
-    final coatColor = formatter.value(result.visualTraits.coatColor);
-    final coatPattern = formatter.value(result.visualTraits.coatPattern);
-    final eyeColor = formatter.value(result.visualTraits.eyeColor);
-    final hairLength = formatter.value(result.visualTraits.hairLength);
-    final estimatedAge = formatter.nullableValue(result.estimatedAge);
+    final displayData = const CatDisplayFormatter().fromAnalysis(result);
+    final traitDisplay =
+        '${displayData.displayCoatColor}, '
+        '${displayData.displayCoatPattern}, '
+        '${displayData.displayEyeColor}';
     final confidence =
         '${result.confidence.percentage}% ${result.confidence.label}';
 
     debugPrint(
       'CATDEX_AI_UI_FIELDS '
-      '${_safeJson(_analysisUiDebugJson(result, traitDisplay))}',
+      '${_safeJson(_analysisUiDebugJson(result, displayData, traitDisplay))}',
     );
     debugPrint(
       'CATDEX_UI_MODEL '
-      '${_safeJson(_analysisUiDebugJson(result, traitDisplay))}',
+      '${_safeJson(_analysisUiDebugJson(result, displayData, traitDisplay))}',
     );
 
     return TweenAnimationBuilder<double>(
@@ -279,7 +274,7 @@ class _AnalysisResultCard extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                breed,
+                displayData.displaySpecies,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: AppColors.primaryPurple,
@@ -289,7 +284,7 @@ class _AnalysisResultCard extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               Center(
                 child: _RarityBadge(
-                  label: rarity,
+                  label: displayData.displayRarity,
                   color: _rarityColor(result.rarity),
                   icon: _rarityIcon(result.rarity),
                 ),
@@ -324,7 +319,7 @@ class _AnalysisResultCard extends StatelessWidget {
                 children: [
                   _PersonalityChip(
                     icon: Icons.psychology_alt_rounded,
-                    label: personality,
+                    label: displayData.displayPersonality,
                   ),
                 ],
               ),
@@ -332,40 +327,43 @@ class _AnalysisResultCard extends StatelessWidget {
               _InfoTile(
                 icon: Icons.pets_rounded,
                 title: 'Specie',
-                value: breed,
+                value: displayData.displaySpecies,
                 color: AppColors.primaryPurple,
               ),
               const SizedBox(height: AppSpacing.md),
               _InfoTile(
                 icon: Icons.palette_rounded,
                 title: 'Mantello',
-                value: coatColor,
+                value: displayData.displayCoatColor,
                 color: AppColors.skyBlue,
               ),
               const SizedBox(height: AppSpacing.md),
               _InfoTile(
                 icon: Icons.visibility_rounded,
                 title: 'Occhi',
-                value: eyeColor,
+                value: displayData.displayEyeColor,
                 color: AppColors.warning,
               ),
               const SizedBox(height: AppSpacing.md),
               _InfoTile(
                 icon: Icons.favorite_rounded,
                 title: 'Personalità',
-                value: personality,
+                value: displayData.displayPersonality,
                 color: AppColors.primaryGreen,
               ),
               const SizedBox(height: AppSpacing.lg),
-              _StoryCard(story: result.story, funFact: result.funFact),
+              _StoryCard(
+                story: displayData.displayStory,
+                funFact: displayData.displayFunFact,
+              ),
               const SizedBox(height: AppSpacing.md),
               _MoreDetailsSection(
                 confidence: confidence,
-                coatPattern: coatPattern,
-                hairLength: hairLength,
-                estimatedAge: estimatedAge,
+                coatPattern: displayData.displayCoatPattern,
+                hairLength: displayData.displayHairLength,
+                estimatedAge: displayData.displayAge,
                 traits: traitDisplay,
-                variant: variant,
+                variant: displayData.displayVariant,
               ),
               const SizedBox(height: AppSpacing.lg),
               FilledButton.icon(
@@ -389,6 +387,7 @@ class _AnalysisResultCard extends StatelessWidget {
 
   Map<String, Object?> _analysisUiDebugJson(
     CatAnalysisResult result,
+    CatDisplayData displayData,
     String traitDisplay,
   ) {
     return {
@@ -413,6 +412,7 @@ class _AnalysisResultCard extends StatelessWidget {
       'story': result.story,
       'funFact': result.funFact,
       'traitDisplay': traitDisplay,
+      'displayData': displayData.toDebugJson(),
     };
   }
 
