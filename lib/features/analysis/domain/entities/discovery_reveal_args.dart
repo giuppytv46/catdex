@@ -5,8 +5,12 @@ class DiscoveryRevealArgs {
   const DiscoveryRevealArgs({
     required this.photo,
     required this.result,
+    this.suggestedName = 'Mochi',
+    this.usesEditedDetails = false,
   });
 
   final CapturedPhoto photo;
   final CatAnalysisResult result;
+  final String suggestedName;
+  final bool usesEditedDetails;
 }

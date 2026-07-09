@@ -83,11 +83,11 @@ void main() {
     expect(binder, contains('CATDEX_UI_REGENERATE_ALL_BUTTON_TAPPED'));
     expect(binder, contains('CATDEX_UI_REGENERATE_SINGLE_BUTTON_TAPPED'));
     expect(binder, contains('CATDEX_REGENERATE_ALL_STARTED'));
-    expect(binder, contains('Creo illustrazione'));
-    expect(binder, contains('Genero carta'));
-    expect(binder, contains('Rigenera carte'));
-    expect(preview, contains('Rigenera carta'));
-    expect(binder, contains('Genera carta'));
+    expect(binder, contains('l10n.generatingIllustration'));
+    expect(binder, contains('l10n.generateCard'));
+    expect(binder, contains('l10n.regenerateCards'));
+    expect(preview, contains('l10n.regenerateCard'));
+    expect(binder, contains('l10n.generateCard'));
     expect(preview, contains('Image.network'));
     expect(preview, contains('Image.file'));
     expect(page, contains('Image.network'));

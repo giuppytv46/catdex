@@ -74,9 +74,9 @@ void main() {
       find.text('Un gatto tigrato osserva il mondo con calma.'),
       findsOneWidget,
     );
-    expect(find.text('Altri dettagli'), findsOneWidget);
+    expect(find.text('Dettagli'), findsOneWidget);
 
-    await tester.tap(find.text('Altri dettagli'));
+    await tester.tap(find.text('Dettagli'));
     await tester.pumpAndSettle();
 
     expect(find.text('Confidenza'), findsOneWidget);
@@ -119,7 +119,7 @@ void main() {
     expect(find.textContaining('marrone/grigio'), findsNothing);
     expect(find.textContaining('tigrato mackerel'), findsNothing);
 
-    await tester.tap(find.text('Altri dettagli'));
+    await tester.tap(find.text('Dettagli'));
     await tester.pumpAndSettle();
 
     expect(find.text('Bicolore'), findsWidgets);

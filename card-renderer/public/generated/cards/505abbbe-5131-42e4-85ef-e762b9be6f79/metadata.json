@@ -1,0 +1,36 @@
+{
+  "finalCardUrl": "/generated/cards/505abbbe-5131-42e4-85ef-e762b9be6f79/final-card.png",
+  "illustratedCatUrl": "/generated/cards/505abbbe-5131-42e4-85ef-e762b9be6f79/illustrated-cat.png",
+  "analysisJson": {
+    "customName": "Mochettk",
+    "suggestedName": "Mochettk",
+    "displaySpecies": "Gatto calico domestico",
+    "coatColor": "Calico",
+    "coatPattern": "Calico",
+    "eyeColor": "occhi gialli",
+    "hairLength": "pelo medio",
+    "estimatedAge": "unknown",
+    "personality": "Sonnolento",
+    "rarity": "common",
+    "variant": "standard",
+    "shortDescription": "A newly discovered CatDex companion.",
+    "story": "Un gatto calico domestico dal mantello calico calico in piedi con espressione curiosa in strada entra nel tuo CatDex con un'aria curiosa e attenta.",
+    "funFact": "Molti gatti domestici hanno origini miste: CatDex privilegia una classificazione prudente quando la razza non e chiara."
+  },
+  "selectedTemplateKey": "default/common",
+  "discoveryId": "505abbbe-5131-42e4-85ef-e762b9be6f79",
+  "originalPhotoUrl": "https://ymdwnohcnjcijgbqnriy.supabase.co/storage/v1/object/sign/cat-photos/catdex/originals/local-explorer/505abbbe-5131-42e4-85ef-e762b9be6f79.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV81Yjg1NWU4Yi03NTFkLTRjZjYtOWU1My0xOWZmNjk3OGI2MTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjYXQtcGhvdG9zL2NhdGRleC9vcmlnaW5hbHMvbG9jYWwtZXhwbG9yZXIvNTA1YWJiYmUtNTEzMS00MmU0LTg1ZWYtZTc2MmI5YmU2Zjc5LmpwZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODM1NTE3NTEsImV4cCI6MTc4MzYzODE1MX0.blW710DncJzOipywFAXMR-Y2wYdp7m_XTcQeE3ENjis",
+  "cardText": {
+    "cardTitle": "MOCHETTK",
+    "speciesLine": "Gatto calico domestico",
+    "abilityName": "Sonnolento Instinct",
+    "abilityDescription": "A newly discovered CatDex companion.",
+    "flavorText": "Un gatto calico domestico dal mantello calico calico in piedi con espressione curiosa in strada entra nel tuo CatDex con un'aria curiosa e attenta.",
+    "funFact": "Molti gatti domestici hanno origini miste: CatDex privilegia una classificazione prudente quando la razza non e chiara."
+  },
+  "finalCardPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/505abbbe-5131-42e4-85ef-e762b9be6f79/final-card.png",
+  "illustratedCatPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/505abbbe-5131-42e4-85ef-e762b9be6f79/illustrated-cat.png",
+  "analysisPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/505abbbe-5131-42e4-85ef-e762b9be6f79/analysis.json",
+  "metadataPath": "/generated/cards/505abbbe-5131-42e4-85ef-e762b9be6f79/metadata.json",
+  "createdAt": "2026-07-08T23:02:34.121Z"
+}

@@ -1,15 +1,25 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import type { CatAnalysisJson } from './types';
 import { publicCardUrl, savePngArtifact } from './storage';
 import { removeBackgroundFromPng } from './backgroundRemovalService';
+import { isMockArtworkEnabled } from './config';
 
 type CreateCatIllustrationInput = {
   discoveryId: string;
   photoUrl: string;
   analysis: CatAnalysisJson;
   cardStyle: string;
+  publicBaseUrl?: string;
 };
 
 export async function createCatIllustration(input: CreateCatIllustrationInput): Promise<string> {
+  const mockArtworkEnabled = isMockArtworkEnabled();
+  console.log('CATDEX_MOCK_AI_ARTWORK_ENABLED', mockArtworkEnabled);
+  if (mockArtworkEnabled) {
+    return createMockCatIllustration(input.discoveryId, input.publicBaseUrl);
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error('missing_OPENAI_API_KEY');
@@ -60,7 +70,7 @@ export async function createCatIllustration(input: CreateCatIllustrationInput): 
   const firstImage = body.data?.[0];
   if (firstImage?.b64_json) {
     const imageBytes = Buffer.from(firstImage.b64_json, 'base64');
-    return saveIllustration(input.discoveryId, imageBytes);
+    return saveIllustration(input.discoveryId, imageBytes, input.publicBaseUrl);
   }
 
   if (firstImage?.url) {
@@ -72,7 +82,7 @@ export async function createCatIllustration(input: CreateCatIllustrationInput): 
       throw new Error(error);
     }
 
-    return saveIllustration(input.discoveryId, Buffer.from(await responseImage.arrayBuffer()));
+    return saveIllustration(input.discoveryId, Buffer.from(await responseImage.arrayBuffer()), input.publicBaseUrl);
   }
 
   console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_TRANSPARENT_FAILED', true);
@@ -80,8 +90,15 @@ export async function createCatIllustration(input: CreateCatIllustrationInput): 
   throw new Error('missing_generated_image');
 }
 
-export function fallbackCatIllustration(photoUrl: string): string {
-  return photoUrl;
+async function createMockCatIllustration(discoveryId: string, publicBaseUrl?: string): Promise<string> {
+  console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_SOURCE', 'mock_ai_artwork');
+  console.log('CATDEX_GENERATE_CARD_OPENAI_SKIPPED_MOCK_MODE');
+  console.log('CATDEX_BG_REMOVAL_SKIPPED_MOCK_MODE');
+
+  const mockArtworkPath = path.join(process.cwd(), 'assets/cards/mock/mock-cat-artwork.png');
+  const imageBytes = await readFile(mockArtworkPath);
+  await savePngArtifact(discoveryId, 'illustrated-cat.png', bufferToArrayBuffer(imageBytes));
+  return publicCardUrl(discoveryId, 'illustrated-cat.png', publicBaseUrl);
 }
 
 function illustrationPrompt(input: CreateCatIllustrationInput): string {
@@ -104,7 +121,7 @@ function illustrationPrompt(input: CreateCatIllustrationInput): string {
   ].join('\n');
 }
 
-async function saveIllustration(discoveryId: string, imageBytes: Buffer): Promise<string> {
+async function saveIllustration(discoveryId: string, imageBytes: Buffer, publicBaseUrl?: string): Promise<string> {
   console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_SOURCE', 'ai');
   await savePngArtifact(discoveryId, 'raw-illustrated-cat.png', bufferToArrayBuffer(imageBytes));
   console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_RAW_SAVED', true);
@@ -115,7 +132,7 @@ async function saveIllustration(discoveryId: string, imageBytes: Buffer): Promis
   console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_FINAL_TRANSPARENT', hasAlpha);
 
   await savePngArtifact(discoveryId, 'illustrated-cat.png', bufferToArrayBuffer(finalImageBytes));
-  return publicCardUrl(discoveryId, 'illustrated-cat.png');
+  return publicCardUrl(discoveryId, 'illustrated-cat.png', publicBaseUrl);
 }
 
 function pngHasAlpha(imageBytes: Buffer): boolean {

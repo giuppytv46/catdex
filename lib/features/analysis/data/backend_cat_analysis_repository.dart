@@ -46,6 +46,83 @@ class BackendCatAnalysisRepository implements CatAnalysisRepository {
     }
   }
 
+  Future<String?> recheckEyeColor(CapturedPhoto photo) async {
+    try {
+      final response = await _client
+          .analyzeCatPhoto({
+            ..._requestBody(photo),
+            'task': 'eye_color_only',
+            'mode': 'eye_color_recheck',
+            'instruction': _eyeColorRecheckInstruction,
+          })
+          .timeout(_timeout);
+      debugPrint('CATDEX_EYE_COLOR_RECHECK_HTTP ${_safeJson(response)}');
+
+      return _eyeColorFromResponse(response);
+    } on Object catch (error) {
+      debugPrint('CATDEX_EYE_COLOR_RECHECK_ERROR $error');
+      return null;
+    }
+  }
+
+  Future<String?> recheckCoatColor(CapturedPhoto photo) async {
+    try {
+      final response = await _client
+          .analyzeCatPhoto({
+            ..._requestBody(photo),
+            'task': 'coat_color_only',
+            'mode': 'coat_color_recheck',
+            'instruction': _coatColorRecheckInstruction,
+          })
+          .timeout(_timeout);
+      debugPrint('CATDEX_COAT_COLOR_RECHECK_HTTP ${_safeJson(response)}');
+
+      return _coatColorFromResponse(response);
+    } on Object catch (error) {
+      debugPrint('CATDEX_COAT_COLOR_RECHECK_ERROR $error');
+      return null;
+    }
+  }
+
+  static const _coatColorRecheckInstruction = '''
+Look only at the cat's coat color.
+
+Is this cat orange/ginger/red tabby or brown/gray tabby?
+
+Return exactly one:
+- arancione tigrato
+- marrone/grigio tigrato
+- grigio tigrato
+- nero tigrato
+- altro
+
+If the fur is orange, ginger, marmalade, golden-orange, or red, return:
+arancione tigrato
+''';
+
+  static const _eyeColorRecheckInstruction = '''
+Look only at the cat's eyes in this image.
+
+Are the irises visible?
+
+Return exactly one of:
+- occhi ambrati
+- occhi gialli
+- occhi verdi
+- occhi azzurri
+- occhi eterocromi
+- Non rilevato
+
+Rules:
+- orange / copper / amber / yellow-orange / golden-orange = occhi ambrati
+- yellow / gold = occhi gialli
+- green = occhi verdi
+- blue = occhi azzurri
+- mixed / heterochromia = occhi eterocromi
+
+If the eyes are visible, do NOT return Non rilevato.
+''';
+
   Map<String, Object?> _requestBody(CapturedPhoto photo) {
     return {
       if (photo.path.startsWith('http://') || photo.path.startsWith('https://'))
@@ -63,6 +140,44 @@ class BackendCatAnalysisRepository implements CatAnalysisRepository {
       },
       'locale': 'it',
     };
+  }
+
+  String? _eyeColorFromResponse(Object? response) {
+    final decoded = response is String ? _decodeJson(response) : response;
+    if (decoded is String) {
+      return decoded.trim().isEmpty ? null : decoded.trim();
+    }
+    if (decoded is Map) {
+      final eyeColor = decoded['eyeColor'];
+      if (eyeColor is String && eyeColor.trim().isNotEmpty) {
+        return eyeColor.trim();
+      }
+    }
+
+    return null;
+  }
+
+  String? _coatColorFromResponse(Object? response) {
+    final decoded = response is String ? _decodeJson(response) : response;
+    if (decoded is String) {
+      return decoded.trim().isEmpty ? null : decoded.trim();
+    }
+    if (decoded is Map) {
+      final coatColor = decoded['coatColor'];
+      if (coatColor is String && coatColor.trim().isNotEmpty) {
+        return coatColor.trim();
+      }
+    }
+
+    return null;
+  }
+
+  Object? _decodeJson(String value) {
+    try {
+      return jsonDecode(value);
+    } on FormatException {
+      return value;
+    }
   }
 
   String _localPhotoDataUrl(CapturedPhoto photo) {

@@ -2,12 +2,15 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:catdex/core/localization/catdex_localizations.dart';
+import 'package:catdex/features/ads/presentation/catdex_banner_ad_widget.dart';
 import 'package:catdex/features/capture/application/capture_controller.dart';
 import 'package:catdex/features/capture/application/capture_state.dart';
 import 'package:catdex/features/capture/application/photo_upload_controller.dart';
 import 'package:catdex/features/capture/application/photo_upload_state.dart';
 import 'package:catdex/features/location/application/location_controller.dart';
 import 'package:catdex/features/location/application/location_state.dart';
+import 'package:catdex/features/premium/application/local_monetization_service.dart';
+import 'package:catdex/features/premium/presentation/usage_status_chip.dart';
 import 'package:catdex/routing/app_routes.dart';
 import 'package:catdex/theme/app_colors.dart';
 import 'package:catdex/theme/app_spacing.dart';
@@ -28,6 +31,10 @@ class CapturePage extends ConsumerWidget {
     final uploadController = ref.read(photoUploadControllerProvider.notifier);
     final locationController = ref.read(locationControllerProvider.notifier);
     final uploading = uploadState.status == PhotoUploadStatus.uploading;
+    final picking =
+        captureState.status == CaptureStatus.requestingPermission ||
+        captureState.status == CaptureStatus.picking;
+    final monetizationSummary = ref.watch(monetizationStatusSummaryProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.captureTitle)),
@@ -43,7 +50,7 @@ class CapturePage extends ConsumerWidget {
             _CaptureHero(state: captureState),
             const SizedBox(height: AppSpacing.lg),
             Text(
-              l10n.captureHeading,
+              l10n.captureChooseCatPhoto,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w800,
@@ -51,7 +58,7 @@ class CapturePage extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              l10n.captureEmptyMessage,
+              l10n.captureChooseCatPhotoSubtitle,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
@@ -61,6 +68,29 @@ class CapturePage extends ConsumerWidget {
             if (uploadState.status == PhotoUploadStatus.failed &&
                 uploadState.message != null)
               _CaptureMessage(message: uploadState.message!),
+            const SizedBox(height: AppSpacing.md),
+            if (monetizationSummary.maybeWhen(
+                  data: (summary) => summary,
+                  orElse: () => null,
+                )
+                case final summary?)
+              Center(
+                child: UsageStatusChip(
+                  summary: summary,
+                  label: summary.isPremium
+                      ? l10n.premiumAnalysesUnlimited
+                      : l10n.analysesRemainingToday(
+                          summary.remainingDailyAnalyses,
+                          summary.maxDailyAnalyses,
+                          summary.extraAnalysisCredits,
+                        ),
+                  icon: Icons.auto_awesome_rounded,
+                  backgroundColor: const Color(0xFF16314D),
+                  borderColor: const Color(0xFF2F7FD1),
+                  iconColor: const Color(0xFF7FDBFF),
+                  textColor: const Color(0xFFEAF4FF),
+                ),
+              ),
             const SizedBox(height: AppSpacing.md),
             _CaptureActions(
               state: captureState,
@@ -100,6 +130,10 @@ class CapturePage extends ConsumerWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : Text(l10n.continueAction),
+            ),
+            CatDexBannerAdWidget(
+              placementLog: 'CATDEX_AD_BANNER_PLACEMENT_BOTTOM_CAPTURE',
+              safeForAds: !picking && !uploading,
             ),
           ],
         ),
@@ -212,13 +246,13 @@ class _CaptureActions extends StatelessWidget {
         FilledButton.icon(
           onPressed: busy ? null : onTakePhoto,
           icon: const Icon(Icons.photo_camera_rounded),
-          label: Text(l10n.takePhotoAction),
+          label: Text(l10n.captureTakePhoto),
         ),
         const SizedBox(height: AppSpacing.sm),
         OutlinedButton.icon(
           onPressed: busy ? null : onImportFromGallery,
           icon: const Icon(Icons.photo_library_rounded),
-          label: Text(l10n.importFromGalleryAction),
+          label: Text(l10n.captureImportFromGallery),
         ),
       ],
     );

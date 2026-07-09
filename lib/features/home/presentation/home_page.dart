@@ -1,4 +1,5 @@
 import 'package:catdex/core/localization/catdex_localizations.dart';
+import 'package:catdex/features/ads/presentation/catdex_banner_ad_widget.dart';
 import 'package:catdex/features/home/application/home_controller.dart';
 import 'package:catdex/features/home/domain/entities/home_dashboard.dart';
 import 'package:catdex/routing/app_routes.dart';
@@ -55,6 +56,9 @@ class HomePage extends ConsumerWidget {
           _SectionTitle(title: l10n.quickActionsTitle),
           const SizedBox(height: AppSpacing.md),
           const _QuickActions(),
+          const CatDexBannerAdWidget(
+            placementLog: 'CATDEX_AD_BANNER_PLACEMENT_HOME',
+          ),
         ],
       ),
     );

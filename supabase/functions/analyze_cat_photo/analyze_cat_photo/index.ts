@@ -2,6 +2,9 @@ type AnalyzeCatPhotoRequest = {
   image_url?: string;
   base64_image?: string;
   photoReference?: string;
+  mode?: string;
+  task?: string;
+  instruction?: string;
   user_id?: string;
   locale?: string;
   metadata?: {
@@ -29,7 +32,14 @@ type AnalysisJson = {
   confidence: number;
   candidates: CandidateJson[];
   coatColor: string;
+  dominantVisibleCoatColor?: string;
+  visualEvidence?: string;
+  visibleEvidence?: string;
+  coatColorConfidence?: number;
+  colorConfidence?: number;
   coatPattern: string;
+  coatPatternConfidence?: number;
+  patternConfidence?: number;
   eyeColor: string;
   hairLength: string;
   estimatedAge: string;
@@ -40,6 +50,8 @@ type AnalysisJson = {
   story: string;
   funFact: string;
   safetyStatus: "safe" | "no_cat" | "inappropriate" | "malformed";
+  uncertaintyReason?: string;
+  needsReview?: boolean;
   analyzedAt: string;
 };
 
@@ -57,6 +69,30 @@ type CatVisionObservation = {
   expression: string | null;
   environment: string | null;
   visibleConfidence: number;
+  safetyStatus: "safe" | "no_cat" | "inappropriate" | "malformed";
+};
+
+type CatVisualInspectionConfidence = {
+  coatBaseColor: number;
+  hasWhite: number;
+  coatPattern: number;
+  eyeColor: number;
+  hairLength: number;
+};
+
+type CatVisualInspection = {
+  coatBaseColor: string | null;
+  hasWhite: boolean;
+  coatPattern: string | null;
+  eyeColor: string | null;
+  hairLength: string | null;
+  visibleEyes: boolean;
+  estimatedAge: string | null;
+  posture: string | null;
+  expression: string | null;
+  environment: string | null;
+  confidence: CatVisualInspectionConfidence;
+  reasoningShort: string;
   safetyStatus: "safe" | "no_cat" | "inappropriate" | "malformed";
 };
 
@@ -87,14 +123,18 @@ const jsonHeaders = {
   "Content-Type": "application/json",
 };
 const observedColors = [
-  "brown",
-  "gray",
-  "orange",
   "black",
-  "white",
-  "cream",
+  "gray",
   "blue_gray",
-  "mixed",
+  "white",
+  "orange",
+  "cream",
+  "brown",
+  "chocolate",
+  "cinnamon",
+  "lilac",
+  "calico",
+  "tortoiseshell",
   "unknown",
 ] as const;
 const observedPatterns = [
@@ -110,6 +150,7 @@ const observedPatterns = [
   "tortoiseshell",
   "colorpoint",
   "smoke",
+  "shaded",
   "unknown",
 ] as const;
 const observedEyeColors = [
@@ -118,7 +159,8 @@ const observedEyeColors = [
   "green",
   "blue",
   "copper",
-  "orange",
+  "hazel",
+  "odd_eyes",
   "unknown",
 ] as const;
 const observedHairLengths = ["short", "medium", "long", "unknown"] as const;
@@ -211,13 +253,50 @@ Deno.serve(async (request: Request) => {
   }
 
   try {
+    if (isEyeColorOnlyRequest(body)) {
+      const eyeColor = await detectEyeColorFromPhoto({
+        imageInput,
+        openAiKey,
+        requestId,
+      });
+      return jsonResponse({ eyeColor: eyeColor ?? "Non rilevato" }, 200);
+    }
+
+    if (isCoatColorOnlyRequest(body)) {
+      const coatBaseColor = await detectCoatBaseColorFromPhoto({
+        imageInput,
+        openAiKey,
+        requestId,
+      });
+      const coatColor = coatBaseColor === "orange"
+        ? "arancione tigrato"
+        : coatBaseColor === "gray" || coatBaseColor === "blue_gray"
+        ? "grigio tigrato"
+        : coatBaseColor === "black"
+        ? "nero tigrato"
+        : coatBaseColor === "brown"
+        ? "marrone/grigio tigrato"
+        : "altro";
+      return jsonResponse({ coatColor }, 200);
+    }
+
+    console.log("CATDEX_VISUAL_INSPECTION_STARTED");
     const aiJson = await analyzeWithOpenAi({
       imageInput,
       locale: body.locale ?? "en",
       openAiKey,
       requestId,
     });
-    const analysis = buildAnalysisFromAiResponse(aiJson, {
+    console.log(`CATDEX_VISUAL_INSPECTION_RAW_JSON ${safeForLog(JSON.stringify(aiJson), 1600)}`);
+    const inspection = parseCatVisualInspection(aiJson);
+    const finalInspection = await visualInspectionWithRetries({
+      inspection,
+      imageInput,
+      openAiKey,
+      requestId,
+    });
+    const observation = observationFromVisualInspection(finalInspection);
+    const analysis = analysisFromObservation(observation, {
       activeEventId: activeEventIdFor(body),
     });
     console.log(`[analyze_cat_photo] JSON validation complete`, {
@@ -263,6 +342,14 @@ Deno.serve(async (request: Request) => {
     );
   }
 });
+
+function isEyeColorOnlyRequest(body: AnalyzeCatPhotoRequest): boolean {
+  return body.task === "eye_color_only" || body.mode === "eye_color_recheck";
+}
+
+function isCoatColorOnlyRequest(body: AnalyzeCatPhotoRequest): boolean {
+  return body.task === "coat_color_only" || body.mode === "coat_color_recheck";
+}
 
 function openAiModelFromEnv(): string {
   const configuredModel = Deno.env.get("OPENAI_MODEL")?.trim();
@@ -406,7 +493,7 @@ async function analyzeWithOpenAi({
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: "catdex_cat_observation",
+          name: "catdex_cat_visual_inspection",
           strict: true,
           schema: observationJsonSchema(),
         },
@@ -468,41 +555,355 @@ async function analyzeWithOpenAi({
   return parsed;
 }
 
+async function detectEyeColorFromPhoto({
+  imageInput,
+  openAiKey,
+  requestId,
+}: {
+  imageInput: string;
+  openAiKey: string;
+  requestId: string;
+}): Promise<string | null> {
+  console.log(`[analyze_cat_photo] targeted eye color request started`, {
+    requestId,
+    model: openAiModel,
+  });
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openAiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: openAiModel,
+      max_tokens: 120,
+      temperature: 0,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "catdex_eye_color_recheck",
+          strict: true,
+          schema: eyeColorRecheckJsonSchema(),
+        },
+      },
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: eyeColorRecheckPrompt(),
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: imageInput,
+              },
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  console.log(`[analyze_cat_photo] targeted eye color response status`, {
+    requestId,
+    status: response.status,
+    ok: response.ok,
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error(`[analyze_cat_photo] targeted eye color error body`, {
+      requestId,
+      status: response.status,
+      body: safeForLog(errorBody, 800),
+    });
+    return null;
+  }
+
+  const payload = await response.json();
+  const text = extractOutputText(payload);
+  if (text === null) {
+    return null;
+  }
+
+  const parsed = parseJsonObject(text);
+  if (typeof parsed !== "object" || parsed === null) {
+    return null;
+  }
+
+  const eyeColor = stringValue((parsed as Record<string, unknown>).eyeColor);
+  return normalizeDetectedEyeColor(eyeColor);
+}
+
+async function detectEyeColorEnumFromPhoto({
+  imageInput,
+  openAiKey,
+  requestId,
+}: {
+  imageInput: string;
+  openAiKey: string;
+  requestId: string;
+}): Promise<string | null> {
+  const value = await targetedSingleFieldInspection({
+    imageInput,
+    openAiKey,
+    requestId,
+    schemaName: "catdex_eye_color_enum_recheck",
+    fieldName: "eyeColor",
+    enumValues: [
+      "amber",
+      "yellow",
+      "green",
+      "blue",
+      "copper",
+      "hazel",
+      "odd_eyes",
+      "unknown",
+    ],
+    prompt: eyeColorEnumRecheckPrompt(),
+  });
+  return nullableAllowedValue(value, observedEyeColors);
+}
+
+async function detectCoatBaseColorFromPhoto({
+  imageInput,
+  openAiKey,
+  requestId,
+}: {
+  imageInput: string;
+  openAiKey: string;
+  requestId: string;
+}): Promise<string | null> {
+  const value = await targetedSingleFieldInspection({
+    imageInput,
+    openAiKey,
+    requestId,
+    schemaName: "catdex_coat_base_color_recheck",
+    fieldName: "coatBaseColor",
+    enumValues: [
+      "black",
+      "gray",
+      "blue_gray",
+      "white",
+      "orange",
+      "cream",
+      "brown",
+      "chocolate",
+      "cinnamon",
+      "lilac",
+      "calico",
+      "tortoiseshell",
+      "unknown",
+    ],
+    prompt: coatBaseColorRecheckPrompt(),
+  });
+  return nullableAllowedValue(value, observedColors);
+}
+
+async function detectCoatPatternFromPhoto({
+  imageInput,
+  openAiKey,
+  requestId,
+}: {
+  imageInput: string;
+  openAiKey: string;
+  requestId: string;
+}): Promise<string | null> {
+  const value = await targetedSingleFieldInspection({
+    imageInput,
+    openAiKey,
+    requestId,
+    schemaName: "catdex_coat_pattern_recheck",
+    fieldName: "coatPattern",
+    enumValues: [
+      "solid",
+      "bicolor",
+      "tuxedo",
+      "tabby",
+      "mackerel_tabby",
+      "spotted_tabby",
+      "classic_tabby",
+      "ticked_tabby",
+      "calico",
+      "tortoiseshell",
+      "colorpoint",
+      "smoke",
+      "shaded",
+      "unknown",
+    ],
+    prompt: coatPatternRecheckPrompt(),
+  });
+  return nullableAllowedValue(value, observedPatterns);
+}
+
+async function targetedSingleFieldInspection({
+  imageInput,
+  openAiKey,
+  requestId,
+  schemaName,
+  fieldName,
+  enumValues,
+  prompt,
+}: {
+  imageInput: string;
+  openAiKey: string;
+  requestId: string;
+  schemaName: string;
+  fieldName: string;
+  enumValues: string[];
+  prompt: string;
+}): Promise<string | null> {
+  console.log(`[analyze_cat_photo] targeted ${fieldName} request started`, {
+    requestId,
+    model: openAiModel,
+  });
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openAiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: openAiModel,
+      max_tokens: 80,
+      temperature: 0,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: schemaName,
+          strict: true,
+          schema: singleFieldJsonSchema(fieldName, enumValues),
+        },
+      },
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: imageInput } },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error(`[analyze_cat_photo] targeted ${fieldName} error`, {
+      requestId,
+      status: response.status,
+      body: safeForLog(errorBody, 800),
+    });
+    return null;
+  }
+
+  const payload = await response.json();
+  const text = extractOutputText(payload);
+  if (text === null) {
+    return null;
+  }
+
+  const parsed = parseJsonObject(text);
+  if (typeof parsed !== "object" || parsed === null) {
+    return null;
+  }
+
+  const value = stringValue((parsed as Record<string, unknown>)[fieldName]);
+  return value.length === 0 ? null : value;
+}
+
 function observationJsonSchema(): Record<string, unknown> {
   return {
     type: "object",
     additionalProperties: false,
     required: [
-      "baseColor",
-      "secondaryColor",
-      "whitePresent",
-      "orangePresent",
-      "blackPresent",
+      "coatBaseColor",
+      "hasWhite",
       "coatPattern",
       "eyeColor",
       "hairLength",
+      "visibleEyes",
       "estimatedAge",
       "posture",
       "expression",
       "environment",
-      "visibleConfidence",
+      "confidence",
+      "reasoningShort",
       "safetyStatus",
     ],
     properties: {
-      baseColor: nullableEnumSchema(observedColors),
-      secondaryColor: nullableEnumSchema(observedColors),
-      whitePresent: { type: "boolean" },
-      orangePresent: { type: "boolean" },
-      blackPresent: { type: "boolean" },
+      coatBaseColor: nullableEnumSchema(observedColors),
+      hasWhite: { type: "boolean" },
       coatPattern: nullableEnumSchema(observedPatterns),
       eyeColor: nullableEnumSchema(observedEyeColors),
       hairLength: nullableEnumSchema(observedHairLengths),
+      visibleEyes: { type: "boolean" },
       estimatedAge: nullableEnumSchema(observedAges),
       posture: nullableEnumSchema(observedPostures),
       expression: nullableEnumSchema(observedExpressions),
       environment: nullableEnumSchema(observedEnvironments),
-      visibleConfidence: { type: "number" },
+      confidence: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "coatBaseColor",
+          "hasWhite",
+          "coatPattern",
+          "eyeColor",
+          "hairLength",
+        ],
+        properties: {
+          coatBaseColor: { type: "number" },
+          hasWhite: { type: "number" },
+          coatPattern: { type: "number" },
+          eyeColor: { type: "number" },
+          hairLength: { type: "number" },
+        },
+      },
+      reasoningShort: { type: "string" },
       safetyStatus: { type: "string" },
+    },
+  };
+}
+
+function eyeColorRecheckJsonSchema(): Record<string, unknown> {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["eyeColor"],
+    properties: {
+      eyeColor: {
+        type: "string",
+        enum: [
+          "occhi ambrati",
+          "occhi gialli",
+          "occhi verdi",
+          "occhi azzurri",
+          "occhi eterocromi",
+          "Non rilevato",
+        ],
+      },
+    },
+  };
+}
+
+function singleFieldJsonSchema(
+  fieldName: string,
+  enumValues: string[],
+): Record<string, unknown> {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: [fieldName],
+    properties: {
+      [fieldName]: {
+        type: "string",
+        enum: enumValues,
+      },
     },
   };
 }
@@ -514,6 +915,65 @@ function nullableEnumSchema(values: readonly string[]): Record<string, unknown> 
       { type: "null" },
     ],
   };
+}
+
+function coatBaseColorRecheckPrompt(): string {
+  return [
+    "Look only at the cat's main fur base color, ignoring shadows and stripe darkness.",
+    "Return JSON only.",
+    "Return exactly one: black, gray, blue_gray, white, orange, cream, brown, chocolate, cinnamon, lilac, calico, tortoiseshell, unknown.",
+    "orange, ginger, marmalade, red, golden-orange, or warm copper fur => orange.",
+    "cool gray, silver, slate, or blue-gray fur => gray or blue_gray.",
+    "brown or taupe non-orange fur => brown.",
+    "mixed orange/black mottled fur => tortoiseshell.",
+    "white + orange + black patches => calico.",
+    "Do not return brown or gray for orange/ginger cats.",
+  ].join(" ");
+}
+
+function coatPatternRecheckPrompt(): string {
+  return [
+    "Look only at the cat's coat markings and white distribution.",
+    "Return JSON only.",
+    "Return exactly one: solid, bicolor, tuxedo, tabby, mackerel_tabby, classic_tabby, spotted_tabby, ticked_tabby, calico, tortoiseshell, colorpoint, smoke, shaded, unknown.",
+    "visible stripes => tabby or a more specific tabby subtype.",
+    "narrow vertical stripes => mackerel_tabby.",
+    "swirled bullseye markings => classic_tabby.",
+    "spots => spotted_tabby.",
+    "agouti/ticked fur with subtle stripes => ticked_tabby.",
+    "large white patches with another color => bicolor.",
+    "black/white formal pattern => tuxedo.",
+    "orange/black mottling => tortoiseshell.",
+    "white/orange/black patches => calico.",
+  ].join(" ");
+}
+
+function eyeColorEnumRecheckPrompt(): string {
+  return [
+    "Look only at the cat's irises.",
+    "Return JSON only.",
+    "Return exactly one: amber, yellow, green, blue, copper, hazel, odd_eyes, unknown.",
+    "If eyes are visible, do not return unknown.",
+    "amber, orange, copper, or golden-orange eyes => amber or copper.",
+    "yellow or gold eyes => yellow.",
+    "green eyes => green.",
+    "blue eyes => blue.",
+    "two different eye colors => odd_eyes.",
+    "Use unknown only if eyes are closed, hidden, blurred, or outside frame.",
+  ].join(" ");
+}
+
+function eyeColorRecheckPrompt(): string {
+  return [
+    "Look only at the cat's eyes.",
+    "Are the cat's eyes visible? If yes, choose the closest eye color.",
+    "Return JSON only.",
+    "Return one of exactly: occhi ambrati, occhi gialli, occhi verdi, occhi azzurri, occhi eterocromi, Non rilevato.",
+    "Use occhi ambrati for amber, copper, orange, yellow-orange, or golden-orange eyes.",
+    "Use occhi gialli for yellow or gold eyes.",
+    "Use Non rilevato only if the eyes are closed, hidden, outside frame, or impossible to see.",
+    "For gray/white bicolor cats with visible orange or yellow-orange eyes, prefer occhi ambrati.",
+  ].join(" ");
 }
 
 function safeForLog(value: string, maxLength: number): string {
@@ -530,44 +990,57 @@ function safeForLog(value: string, maxLength: number): string {
 
 function observationPrompt(locale: string): string {
   return [
-    "VISION ENGINE: strict feline visual morphology observation.",
-    "Behave like a feline morphology expert, not a breed guesser.",
-    "Analyze only the cat. Ignore humans and never identify people.",
+    "You are a cat visual inspector.",
+    "Analyze ONLY the visible cat in the image.",
+    "Ignore humans and never identify people.",
     "Reject inappropriate images. If no cat is visible, set safetyStatus to no_cat.",
-    "Return JSON only, with no markdown.",
-    "STRICT VISUAL OBSERVATION ONLY. Describe only objectively visible facts.",
-    "Never infer breed during this phase.",
-    "Do not return breed.",
-    "Do not return breed, rarity, variant, personality, story, funFact, or candidates.",
-    "Never infer rarity, variant, personality, story, funFact, or candidates.",
-    "Return only visible facts: baseColor, secondaryColor, whitePresent, orangePresent, blackPresent, coatPattern, eyeColor, hairLength, estimatedAge, posture, environment, expression, visibleConfidence, safetyStatus.",
-    "If a visual fact is uncertain, return unknown.",
-    "If anything is uncertain, return unknown for enum fields or false for color-presence booleans unless the color is clearly visible.",
-    "Never invent. Never infer. Never guess.",
-    "Never guess calico, tortoiseshell, colorpoint, blue eyes, or long hair unless clearly visible.",
-    "For common striped cats, prefer baseColor brown or gray and coatPattern tabby or mackerel_tabby when those stripes are objectively visible.",
-    "Orange tabby is allowed only when the coat is clearly orange or ginger across most of the body.",
-    "Brown or gray tabby must not become orange just because of warm lighting, beige areas, or sun highlights.",
-    "If dark stripes sit on a gray or brown base with a beige muzzle or chest, return brown or gray rather than orange.",
-    "If uncertain between brown or gray and orange for a common tabby cat, prefer brown or gray.",
-    "Use coatPattern mackerel_tabby for narrow vertical stripes; classic_tabby for swirled bullseye markings; spotted_tabby for spots; ticked_tabby for agouti ticking; tabby for visible stripes when subtype is uncertain.",
-    "Use coatPattern calico only when clear white, orange, and black patches are visible.",
-    "Use coatPattern tortoiseshell only when mixed black or brown and orange mottling is visible without large white patches.",
-    "Use coatPattern colorpoint only when Siamese-like darker ears, face, tail, or paws are visible.",
-    "Use baseColor black only if the cat is mostly solid black.",
-    "Use baseColor white only if the cat is mostly white.",
-    "Use eyeColor blue only if the eyes are clearly blue.",
-    "Use hairLength long only if the fur is clearly long; otherwise use short, medium, or unknown.",
-    "Allowed baseColor and secondaryColor values only: brown, gray, orange, black, white, cream, blue_gray, mixed, unknown, null.",
-    "Allowed coatPattern values only: solid, mackerel_tabby, classic_tabby, spotted_tabby, ticked_tabby, tabby, bicolor, tuxedo, calico, tortoiseshell, colorpoint, smoke, unknown, null.",
-    "Allowed eyeColor values only: amber, yellow, green, blue, copper, orange, unknown, null.",
+    "Return strict JSON only. No markdown. No explanation outside JSON.",
+    "Analyze only objective visible cat facts. Do not return breed, rarity, variant, story, funFact, personality, or candidates.",
+    "Do not guess breed before visual traits. First identify objective visual traits.",
+    "Separate color from pattern.",
+    "coatBaseColor = main visible fur color.",
+    "hasWhite = true if there are visible white fur areas.",
+    "coatPattern = markings or structure such as tabby, bicolor, tuxedo, solid, calico, tortoiseshell, colorpoint.",
+    "Important color rules:",
+    "orange, ginger, marmalade, red, golden-orange, warm copper fur => coatBaseColor orange.",
+    "cool gray, silver, slate, blue-gray fur => coatBaseColor gray or blue_gray.",
+    "true black fur => coatBaseColor black.",
+    "pure white or mostly white fur => coatBaseColor white.",
+    "cream or pale warm beige fur => coatBaseColor cream.",
+    "brown or taupe non-orange fur => coatBaseColor brown.",
+    "mixed orange/black mottled fur => coatPattern tortoiseshell.",
+    "white + orange + black patches => coatPattern calico.",
+    "Important pattern rules:",
+    "visible stripes => tabby or a more specific tabby subtype.",
+    "narrow vertical stripes => mackerel_tabby.",
+    "swirled bullseye markings => classic_tabby.",
+    "spots => spotted_tabby.",
+    "agouti/ticked fur with subtle stripes => ticked_tabby.",
+    "two-color cat with white patches => bicolor.",
+    "black, gray, orange, or brown plus white chest/face/paws can be bicolor.",
+    "black/white formal pattern can be tuxedo.",
+    "Siamese-like darker ears/face/paws/tail => colorpoint.",
+    "no visible markings => solid.",
+    "Important eye rules:",
+    "If the cat's eyes are visible, visibleEyes must be true and eyeColor must NOT be unknown.",
+    "amber/orange/copper/golden-orange eyes => amber or copper.",
+    "yellow/gold eyes => yellow.",
+    "green eyes => green.",
+    "blue eyes => blue.",
+    "two different eye colors => odd_eyes.",
+    "Only use unknown eyeColor when eyes are closed, hidden, blurred, or outside frame.",
+    "Use hairLength long only if fur is clearly long; otherwise choose short, medium, or unknown.",
+    "All confidence values must be numbers from 0.0 to 1.0.",
+    "reasoningShort must be one short non-user-facing sentence.",
+    "Allowed coatBaseColor values only: black, gray, blue_gray, white, orange, cream, brown, chocolate, cinnamon, lilac, calico, tortoiseshell, unknown, null.",
+    "Allowed coatPattern values only: solid, bicolor, tuxedo, tabby, mackerel_tabby, classic_tabby, spotted_tabby, ticked_tabby, calico, tortoiseshell, colorpoint, smoke, shaded, unknown, null.",
+    "Allowed eyeColor values only: amber, yellow, green, blue, copper, hazel, odd_eyes, unknown, null.",
     "Allowed hairLength values only: short, medium, long, unknown, null.",
     "Allowed estimatedAge values only: kitten, adult, senior, unknown, null.",
     "Allowed posture values only: sitting, lying, standing, walking, crouching, unknown, null.",
     "Allowed expression values only: alert, curious, relaxed, sleeping, playful, unknown, null.",
     "Allowed environment values only: indoor, outdoor, garden, street, house, unknown, null.",
-    "visibleConfidence must be 0.0 to 1.0 and reflect only visual fact confidence.",
-    "JSON keys: baseColor, secondaryColor, whitePresent, orangePresent, blackPresent, coatPattern, eyeColor, hairLength, estimatedAge, posture, environment, expression, visibleConfidence, safetyStatus.",
+    "JSON keys: coatBaseColor, hasWhite, coatPattern, eyeColor, hairLength, visibleEyes, estimatedAge, posture, environment, expression, confidence, reasoningShort, safetyStatus.",
     `Requested locale is ${locale}; observation values may be simple English visual labels because the backend rule engine localizes final output.`,
   ].join(" ");
 }
@@ -663,8 +1136,326 @@ function buildAnalysisFromAiResponse(
   value: unknown,
   context: { activeEventId: string | null },
 ): AnalysisJson {
-  const observation = parseVisionEngineObservation(value);
+  const observation = observationFromVisualInspection(
+    parseCatVisualInspection(value),
+  );
   return analysisFromObservation(observation, context);
+}
+
+function parseCatVisualInspection(value: unknown): CatVisualInspection {
+  if (typeof value !== "object" || value === null) {
+    throw new MalformedAiResponseError();
+  }
+
+  const item = value as Record<string, unknown>;
+  const safetyStatus = stringValue(item.safetyStatus);
+  if (safetyStatus === "no_cat" || safetyStatus === "inappropriate") {
+    return {
+      ...safeFallbackVisualInspection(),
+      safetyStatus,
+    };
+  }
+
+  const confidenceMap = typeof item.confidence === "object" &&
+      item.confidence !== null
+    ? item.confidence as Record<string, unknown>
+    : {};
+
+  const inspection: CatVisualInspection = {
+    coatBaseColor: nullableAllowedValue(item.coatBaseColor, observedColors),
+    hasWhite: booleanValue(item.hasWhite),
+    coatPattern: nullableAllowedValue(item.coatPattern, observedPatterns),
+    eyeColor: nullableAllowedValue(item.eyeColor, observedEyeColors),
+    hairLength: nullableAllowedValue(item.hairLength, observedHairLengths),
+    visibleEyes: booleanValue(item.visibleEyes),
+    estimatedAge: nullableAllowedValue(item.estimatedAge, observedAges),
+    posture: nullableAllowedValue(item.posture, observedPostures),
+    expression: nullableAllowedValue(item.expression, observedExpressions),
+    environment: nullableAllowedValue(item.environment, observedEnvironments),
+    confidence: {
+      coatBaseColor: confidenceValue(confidenceMap.coatBaseColor),
+      hasWhite: confidenceValue(confidenceMap.hasWhite),
+      coatPattern: confidenceValue(confidenceMap.coatPattern),
+      eyeColor: confidenceValue(confidenceMap.eyeColor),
+      hairLength: confidenceValue(confidenceMap.hairLength),
+    },
+    reasoningShort: safeForLog(stringValue(item.reasoningShort), 180),
+    safetyStatus: "safe",
+  };
+
+  validateVisualInspection(inspection);
+  return inspection;
+}
+
+function validateVisualInspection(inspection: CatVisualInspection): void {
+  for (const value of Object.values(inspection.confidence)) {
+    if (value < 0 || value > 1) {
+      throw new MalformedAiResponseError();
+    }
+  }
+}
+
+function safeFallbackVisualInspection(): CatVisualInspection {
+  return {
+    coatBaseColor: null,
+    hasWhite: false,
+    coatPattern: null,
+    eyeColor: null,
+    hairLength: null,
+    visibleEyes: false,
+    estimatedAge: null,
+    posture: null,
+    expression: null,
+    environment: null,
+    confidence: {
+      coatBaseColor: 0.35,
+      hasWhite: 0.35,
+      coatPattern: 0.35,
+      eyeColor: 0.35,
+      hairLength: 0.35,
+    },
+    reasoningShort: "Fallback visual inspection.",
+    safetyStatus: "safe",
+  };
+}
+
+function observationFromVisualInspection(
+  inspection: CatVisualInspection,
+): CatVisionObservation {
+  const baseColor = inspection.coatBaseColor;
+  return {
+    baseColor,
+    secondaryColor: inspection.hasWhite ? "white" : null,
+    whitePresent: inspection.hasWhite,
+    orangePresent: baseColor === "orange",
+    blackPresent: baseColor === "black",
+    coatPattern: inspection.coatPattern,
+    eyeColor: inspection.eyeColor,
+    hairLength: inspection.hairLength,
+    estimatedAge: inspection.estimatedAge,
+    posture: inspection.posture,
+    expression: inspection.expression,
+    environment: inspection.environment,
+    visibleConfidence: averageConfidence(inspection.confidence),
+    safetyStatus: inspection.safetyStatus,
+  };
+}
+
+async function visualInspectionWithRetries({
+  inspection,
+  imageInput,
+  openAiKey,
+  requestId,
+}: {
+  inspection: CatVisualInspection;
+  imageInput: string;
+  openAiKey: string;
+  requestId: string;
+}): Promise<CatVisualInspection> {
+  let updated = inspection;
+  console.log("CATDEX_VISUAL_INSPECTION_VALID true");
+
+  const retryReasons: string[] = [];
+  const recheckedFields = new Set<string>();
+  const lowConfidenceThreshold = 0.75;
+
+  const recheckEyeColor = async (reason: string) => {
+    if (recheckedFields.has("eyeColor")) {
+      return;
+    }
+    recheckedFields.add("eyeColor");
+    retryReasons.push(reason);
+    console.log("CATDEX_RECHECK_FIELD eyeColor");
+    console.log("CATDEX_RECHECK_STARTED true");
+    const eyeColor = await detectEyeColorEnumFromPhoto({
+      imageInput,
+      openAiKey,
+      requestId,
+    });
+    console.log(`CATDEX_RECHECK_RESULT ${eyeColor ?? "-"}`);
+    if (!isUnknownValue(eyeColor)) {
+      updated = {
+        ...updated,
+        eyeColor,
+        confidence: { ...updated.confidence, eyeColor: 0.9 },
+      };
+      console.log("CATDEX_RECHECK_APPLIED true");
+      return;
+    }
+    console.log("CATDEX_RECHECK_APPLIED false");
+  };
+
+  const recheckCoatBaseColor = async (reason: string) => {
+    if (recheckedFields.has("coatBaseColor")) {
+      return;
+    }
+    recheckedFields.add("coatBaseColor");
+    retryReasons.push(reason);
+    console.log("CATDEX_RECHECK_FIELD coatBaseColor");
+    console.log("CATDEX_RECHECK_STARTED true");
+    const coatBaseColor = await detectCoatBaseColorFromPhoto({
+      imageInput,
+      openAiKey,
+      requestId,
+    });
+    console.log(`CATDEX_RECHECK_RESULT ${coatBaseColor ?? "-"}`);
+    if (!isUnknownValue(coatBaseColor)) {
+      updated = {
+        ...updated,
+        coatBaseColor,
+        confidence: { ...updated.confidence, coatBaseColor: 0.9 },
+      };
+      console.log("CATDEX_RECHECK_APPLIED true");
+      return;
+    }
+    console.log("CATDEX_RECHECK_APPLIED false");
+  };
+
+  const recheckCoatPattern = async (reason: string) => {
+    if (recheckedFields.has("coatPattern")) {
+      return;
+    }
+    recheckedFields.add("coatPattern");
+    retryReasons.push(reason);
+    console.log("CATDEX_RECHECK_FIELD coatPattern");
+    console.log("CATDEX_RECHECK_STARTED true");
+    const coatPattern = await detectCoatPatternFromPhoto({
+      imageInput,
+      openAiKey,
+      requestId,
+    });
+    console.log(`CATDEX_RECHECK_RESULT ${coatPattern ?? "-"}`);
+    if (!isUnknownValue(coatPattern)) {
+      updated = {
+        ...updated,
+        coatPattern,
+        confidence: { ...updated.confidence, coatPattern: 0.9 },
+      };
+      console.log("CATDEX_RECHECK_APPLIED true");
+      return;
+    }
+    console.log("CATDEX_RECHECK_APPLIED false");
+  };
+
+  if (
+    updated.visibleEyes &&
+    (isUnknownValue(updated.eyeColor) ||
+      updated.confidence.eyeColor < lowConfidenceThreshold)
+  ) {
+    await recheckEyeColor(
+      isUnknownValue(updated.eyeColor)
+        ? "eyeColor_unknown_visibleEyes"
+        : "eyeColor_low_confidence",
+    );
+  }
+
+  if (
+    isUnknownValue(updated.coatBaseColor) ||
+    updated.confidence.coatBaseColor < lowConfidenceThreshold
+  ) {
+    await recheckCoatBaseColor(
+      isUnknownValue(updated.coatBaseColor)
+        ? "coatBaseColor_unknown"
+        : "coatBaseColor_low_confidence",
+    );
+  }
+
+  if (
+    isUnknownValue(updated.coatPattern) ||
+    updated.confidence.coatPattern < lowConfidenceThreshold
+  ) {
+    await recheckCoatPattern(
+      isUnknownValue(updated.coatPattern)
+        ? "coatPattern_unknown"
+        : "coatPattern_low_confidence",
+    );
+  }
+
+  if (
+    isTabbyPattern(updated.coatPattern ?? "") &&
+    (updated.coatBaseColor === "brown" ||
+      updated.coatBaseColor === "gray" ||
+      isUnknownValue(updated.coatBaseColor))
+  ) {
+    await recheckCoatBaseColor("tabby_base_color_ambiguous");
+  }
+
+  if (
+    updated.hasWhite &&
+    !isBicolorPattern(updated.coatPattern ?? "") &&
+    updated.coatPattern !== "calico" &&
+    updated.coatPattern !== "colorpoint"
+  ) {
+    await recheckCoatPattern("hasWhite_pattern_guard");
+  }
+
+  if (
+    isBicolorPattern(updated.coatPattern ?? "") &&
+    isUnknownValue(updated.coatBaseColor)
+  ) {
+    await recheckCoatBaseColor("bicolor_base_color_unknown");
+  }
+
+  console.log(
+    `CATDEX_VISUAL_INSPECTION_RETRY_REASON ${
+      retryReasons.length === 0 ? "-" : retryReasons.join(",")
+    }`,
+  );
+  console.log(
+    `CATDEX_VISUAL_INSPECTION_FINAL_JSON ${
+      safeForLog(JSON.stringify(updated), 1600)
+    }`,
+  );
+  return updated;
+}
+
+async function observationWithTargetedEyeColor({
+  observation,
+  imageInput,
+  openAiKey,
+  requestId,
+}: {
+  observation: CatVisionObservation;
+  imageInput: string;
+  openAiKey: string;
+  requestId: string;
+}): Promise<CatVisionObservation> {
+  const mainEyeColor = realisticEyeColor(observation.eyeColor);
+  const needsRecheck = isMissingEyeColor(mainEyeColor);
+  console.log(`CATDEX_EYE_COLOR_MAIN_ANALYSIS ${mainEyeColor}`);
+  console.log(`CATDEX_EYE_COLOR_RECHECK_STARTED ${needsRecheck}`);
+
+  if (
+    !needsRecheck ||
+    observation.safetyStatus === "no_cat" ||
+    observation.safetyStatus === "inappropriate"
+  ) {
+    console.log("CATDEX_EYE_COLOR_RECHECK_RESULT -");
+    console.log(`CATDEX_EYE_COLOR_NORMALIZED ${mainEyeColor}`);
+    console.log("CATDEX_EYE_COLOR_DECISION main_analysis");
+    return observation;
+  }
+
+  const recheckResult = await detectEyeColorFromPhoto({
+    imageInput,
+    openAiKey,
+    requestId,
+  });
+  const normalizedRecheck = realisticEyeColor(recheckResult);
+  console.log(`CATDEX_EYE_COLOR_RECHECK_RESULT ${normalizedRecheck}`);
+
+  if (!isMissingEyeColor(normalizedRecheck)) {
+    console.log(`CATDEX_EYE_COLOR_NORMALIZED ${normalizedRecheck}`);
+    console.log("CATDEX_EYE_COLOR_DECISION recheck");
+    return {
+      ...observation,
+      eyeColor: eyeColorEnumFromItalian(normalizedRecheck),
+    };
+  }
+
+  console.log(`CATDEX_EYE_COLOR_NORMALIZED ${mainEyeColor}`);
+  console.log("CATDEX_EYE_COLOR_DECISION not_visible");
+  return observation;
 }
 
 function parseVisionEngineObservation(value: unknown): CatVisionObservation {
@@ -720,7 +1511,14 @@ function toResultEnvelope(analysis: AnalysisJson): JsonResponseBody {
     confidence: analysis.confidence,
     candidates: analysis.candidates,
     coatColor: analysis.coatColor,
+    dominantVisibleCoatColor: analysis.dominantVisibleCoatColor,
+    visualEvidence: analysis.visualEvidence,
+    visibleEvidence: analysis.visibleEvidence,
+    coatColorConfidence: analysis.coatColorConfidence,
+    colorConfidence: analysis.colorConfidence,
     coatPattern: analysis.coatPattern,
+    coatPatternConfidence: analysis.coatPatternConfidence,
+    patternConfidence: analysis.patternConfidence,
     eyeColor: analysis.eyeColor,
     hairLength: analysis.hairLength,
     estimatedAge: analysis.estimatedAge,
@@ -731,6 +1529,8 @@ function toResultEnvelope(analysis: AnalysisJson): JsonResponseBody {
     story: analysis.story,
     funFact: analysis.funFact,
     safetyStatus: analysis.safetyStatus,
+    uncertaintyReason: analysis.uncertaintyReason,
+    needsReview: analysis.needsReview,
     analyzedAt: analysis.analyzedAt,
   };
 }
@@ -838,6 +1638,30 @@ function classifyWithRuleEngine(
   const rarity = rarityFromObservationRules(breed);
   const variant = variantFromRuleEngine(context.activeEventId);
 
+  console.log(`CATDEX_VISUAL_COAT_BASE_COLOR ${observation.baseColor ?? "-"}`);
+  console.log(`CATDEX_VISUAL_HAS_WHITE ${observation.whitePresent}`);
+  console.log(`CATDEX_VISUAL_COAT_PATTERN ${observation.coatPattern ?? "-"}`);
+  console.log(`CATDEX_VISUAL_EYE_COLOR ${observation.eyeColor ?? "-"}`);
+  console.log(`CATDEX_VISUAL_VISIBLE_EYES ${!isMissingEyeColor(eyeColor)}`);
+  console.log(`CATDEX_VISUAL_HAIR_LENGTH ${observation.hairLength ?? "-"}`);
+  console.log(`CATDEX_MAPPED_COAT_COLOR ${coatColor}`);
+  console.log(`CATDEX_MAPPED_COAT_PATTERN ${coatPattern}`);
+  console.log(`CATDEX_MAPPED_EYE_COLOR ${eyeColor}`);
+  console.log(`CATDEX_MAPPED_BREED ${breed}`);
+  console.log(`CATDEX_MAPPED_DISPLAY_SPECIES ${displaySpeciesFromMappedValues({
+    breed,
+    coatColor,
+    coatPattern,
+  })}`);
+  console.log(`CATDEX_ORANGE_TABBY_DETECTED ${
+    isOrangeColor(coatColor) && isTabbyPattern(coatPattern)
+  }`);
+  console.log(`CATDEX_BICOLOR_DETECTED ${isBicolorPattern(coatPattern)}`);
+  console.log(`CATDEX_CALICO_DETECTED ${isCalicoPattern(coatPattern)}`);
+  console.log(`CATDEX_TORTOISESHELL_DETECTED ${
+    isTortoiseshellPattern(coatPattern)
+  }`);
+
   return {
     breed,
     confidence,
@@ -851,6 +1675,38 @@ function classifyWithRuleEngine(
     rarity,
     variant,
   };
+}
+
+function displaySpeciesFromMappedValues({
+  breed,
+  coatColor,
+  coatPattern,
+}: {
+  breed: string;
+  coatColor: string;
+  coatPattern: string;
+}): string {
+  if (isOrangeColor(coatColor) && isTabbyPattern(coatPattern)) {
+    return "Gatto domestico arancione tigrato";
+  }
+
+  if (isBicolorPattern(coatPattern)) {
+    return "Gatto domestico bicolore";
+  }
+
+  if (isCalicoPattern(coatPattern)) {
+    return "Gatto domestico calico";
+  }
+
+  if (isTortoiseshellPattern(coatPattern)) {
+    return "Gatto domestico tartarugato";
+  }
+
+  if (breed === "domestic_tabby_cat") {
+    return "Gatto domestico tigrato";
+  }
+
+  return breed;
 }
 
 function coatColorFromObservation(
@@ -887,8 +1743,26 @@ function normalizeCoatColorFromObservation(
     secondaryColor === "unknown" ||
     secondaryColor === "null";
 
+  if (isBlackWhiteBicolorObservation(observation, pattern)) {
+    return "nero/bianco";
+  }
+
+  if (isBicolorPattern(pattern)) {
+    return bicolorCoatColorFromObservation(
+      observation,
+      currentColor,
+      baseColor,
+      secondaryColor,
+      pattern,
+    );
+  }
+
   if (!tabby) {
     return currentColor;
+  }
+
+  if (baseColor === "orange" && observation.orangePresent) {
+    return "arancione tigrato";
   }
 
   const orangeAllowed = observation.orangePresent &&
@@ -922,6 +1796,70 @@ function normalizeCoatColorFromObservation(
   return currentColor;
 }
 
+function bicolorCoatColorFromObservation(
+  observation: CatVisionObservation,
+  currentColor: string,
+  baseColor: string,
+  secondaryColor: string,
+  coatPattern: string,
+): string {
+  const current = normalizeVisualValue(currentColor);
+  const combined = normalizeVisualValue(
+    `${currentColor} ${observation.baseColor ?? ""} ${
+      observation.secondaryColor ?? ""
+    } ${coatPattern}`,
+  );
+
+  if (
+    combined.includes("nero/bianco") ||
+    combined.includes("bianco/nero") ||
+    combined.includes("black/white") ||
+    combined.includes("white/black") ||
+    combined.includes("tuxedo") ||
+    (observation.blackPresent &&
+      !isGrayColor(baseColor) &&
+      !isGrayColor(secondaryColor))
+  ) {
+    return "nero/bianco";
+  }
+
+  if (
+    isGrayColor(baseColor) ||
+    isGrayColor(secondaryColor) ||
+    combined.includes("grigio") ||
+    combined.includes("gray") ||
+    combined.includes("grey") ||
+    combined.includes("silver") ||
+    combined.includes("smoke")
+  ) {
+    return "grigio/bianco";
+  }
+
+  if (
+    observation.orangePresent ||
+    isOrangeColor(baseColor) ||
+    isOrangeColor(secondaryColor) ||
+    combined.includes("ginger") ||
+    combined.includes("rosso")
+  ) {
+    return "arancione/bianco";
+  }
+
+  if (
+    isBrownColor(baseColor) ||
+    isBrownColor(secondaryColor) ||
+    combined.includes("marrone")
+  ) {
+    return "marrone/bianco";
+  }
+
+  if (current.length > 0 && current !== "unknown" && current !== "null") {
+    return currentColor;
+  }
+
+  return "bicolore";
+}
+
 function realisticHairLength(hairLength: string | null): string {
   const normalized = normalizeVisualValue(hairLength ?? "");
   if (normalized.includes("long") || normalized.includes("lung")) {
@@ -945,11 +1883,32 @@ function realisticEyeColor(eyeColor: string | null): string {
     return "occhi azzurri";
   }
 
+  if (
+    normalized.includes("odd_eyes") ||
+    normalized.includes("heterochromia") ||
+    normalized.includes("eterocrom") ||
+    normalized.includes("mixed")
+  ) {
+    return "occhi eterocromi";
+  }
+
   if (normalized.includes("green") || normalized.includes("verd")) {
     return "occhi verdi";
   }
 
-  if (normalized.includes("amber") || normalized.includes("ambr")) {
+  if (
+    normalized.includes("amber") ||
+    normalized.includes("ambr") ||
+    normalized.includes("orange") ||
+    normalized.includes("copper") ||
+    normalized.includes("rame") ||
+    normalized.includes("golden") ||
+    normalized.includes("yellow-orange")
+  ) {
+    return "occhi ambrati";
+  }
+
+  if (normalized.includes("hazel") || normalized.includes("nocciola")) {
     return "occhi ambrati";
   }
 
@@ -963,6 +1922,79 @@ function realisticEyeColor(eyeColor: string | null): string {
   }
 
   return "Non rilevato";
+}
+
+function normalizeDetectedEyeColor(eyeColor: string): string {
+  const normalized = normalizeVisualValue(eyeColor);
+  if (
+    normalized.includes("ambr") ||
+    normalized.includes("amber") ||
+    normalized.includes("orange") ||
+    normalized.includes("arancione") ||
+    normalized.includes("copper") ||
+    normalized.includes("rame") ||
+    normalized.includes("yellow-orange") ||
+    normalized.includes("golden-orange")
+  ) {
+    return "occhi ambrati";
+  }
+
+  if (
+    normalized.includes("giall") ||
+    normalized.includes("yellow") ||
+    normalized.includes("gold") ||
+    normalized.includes("dorat")
+  ) {
+    return "occhi gialli";
+  }
+
+  if (normalized.includes("verd") || normalized.includes("green")) {
+    return "occhi verdi";
+  }
+
+  if (
+    normalized.includes("azzurr") ||
+    normalized.includes("blu") ||
+    normalized.includes("blue")
+  ) {
+    return "occhi azzurri";
+  }
+
+  if (
+    normalized.includes("eterocrom") ||
+    normalized.includes("heterochromia") ||
+    normalized.includes("mixed")
+  ) {
+    return "occhi eterocromi";
+  }
+
+  return "Non rilevato";
+}
+
+function eyeColorEnumFromItalian(eyeColor: string): string {
+  const normalized = normalizeVisualValue(eyeColor);
+  if (normalized.includes("ambr")) {
+    return "amber";
+  }
+  if (normalized.includes("giall")) {
+    return "yellow";
+  }
+  if (normalized.includes("verd")) {
+    return "green";
+  }
+  if (normalized.includes("azzurr")) {
+    return "blue";
+  }
+  return "unknown";
+}
+
+function isMissingEyeColor(eyeColor: string | null): boolean {
+  const normalized = normalizeVisualValue(eyeColor ?? "");
+  return normalized.length === 0 ||
+    normalized === "-" ||
+    normalized === "unknown" ||
+    normalized === "null" ||
+    normalized.includes("non rilevato");
 }
 
 function italianAgeOrFallback(value: string | null, fallback: string): string {
@@ -989,10 +2021,25 @@ function breedFromObservationRules({
   const pattern = normalizeVisualValue(coatPattern);
   const shortOrMediumHair = hairLength === "pelo corto" ||
     hairLength === "pelo medio";
+  const blackWhiteBicolor = isBlackWhiteBicolorCoat(coatColor, coatPattern);
 
   // Phase 2 rule engine: common visual morphology wins over breed guessing.
   // Pure breeds require very strong visual evidence; otherwise CatDex defaults
   // to conservative domestic classifications.
+  if (isCalicoPattern(coatPattern)) {
+    return "domestic_calico_cat";
+  }
+
+  if (isTortoiseshellPattern(coatPattern)) {
+    return "domestic_tortoiseshell_cat";
+  }
+
+  if (blackWhiteBicolor) {
+    return pattern.includes("tuxedo")
+      ? "domestic_tuxedo_cat"
+      : "domestic_black_white_cat";
+  }
+
   if (isTabbyPattern(coatPattern) && shortOrMediumHair) {
     return "domestic_tabby_cat";
   }
@@ -1210,6 +2257,10 @@ function storyFromObservation({
 }
 
 function funFactForBreed(breed: string, coatPattern: string): string {
+  if (breed === "domestic_black_white_cat" || breed === "domestic_tuxedo_cat") {
+    return "I gatti bicolori hanno aree di mantello ben distinte: CatDex li riconosce come nero/bianco solo quando entrambi i colori sono chiaramente visibili.";
+  }
+
   if (breed === "domestic_tabby_cat" || isTabbyPattern(coatPattern)) {
     return "Il disegno tigrato e uno dei mantelli piu comuni nei gatti domestici e puo apparire in tonalita marroni, grigie o arancioni.";
   }
@@ -1249,10 +2300,13 @@ function italianBreedName(breed: string): string {
     domestic_tabby_cat: "gatto domestico tigrato",
     domestic_shorthair_cat: "gatto domestico a pelo corto",
     domestic_black_cat: "gatto domestico nero",
+    domestic_black_white_cat: "gatto domestico bicolore",
+    domestic_tuxedo_cat: "gatto tuxedo domestico",
     domestic_white_cat: "gatto domestico bianco",
     domestic_calico_cat: "gatto calico domestico",
+    domestic_tortoiseshell_cat: "gatto domestico tartarugato",
     domestic_orange_cat: "gatto domestico arancione",
-    domestic_gray_cat: "gatto domestico grigio",
+    domestic_gray_cat: "gatto domestico",
     domestic_longhair_cat: "gatto domestico a pelo lungo",
     siamese: "gatto siamese",
   }[breed] ?? "gatto domestico";
@@ -1302,53 +2356,63 @@ function italianEnvironment(environment: string | null): string {
 
 function safeFallbackAnalysis(): AnalysisJson {
   return {
-    breed: "domestic_shorthair_cat",
-    confidence: 0.35,
-    candidates: [{ breed: "domestic_shorthair_cat", confidence: 0.35 }],
-    coatColor: "Unknown",
-    coatPattern: "Unknown",
-    eyeColor: "Unknown",
-    hairLength: "Unknown",
-    estimatedAge: "adulto",
-    traits: [{ name: "Umore", value: "Curioso", rarityWeight: 1 }],
-    personality: "curious",
+    breed: "domestic_cat",
+    confidence: 0.2,
+    candidates: [{ breed: "domestic_cat", confidence: 0.2 }],
+    coatColor: "Non rilevato",
+    dominantVisibleCoatColor: "unknown",
+    visualEvidence: "Analisi non riuscita",
+    visibleEvidence: "Analisi non riuscita",
+    coatColorConfidence: 0.2,
+    colorConfidence: 0.2,
+    coatPattern: "Non rilevato",
+    coatPatternConfidence: 0.2,
+    patternConfidence: 0.2,
+    eyeColor: "Non rilevato",
+    hairLength: "Non rilevato",
+    estimatedAge: "Non rilevato",
+    traits: [],
+    personality: "unknown",
     rarity: "common",
     variant: "normal",
-    story:
-      "Questo gatto di quartiere resta un piccolo mistero, ma merita comunque una carta CatDex tutta sua.",
-    funFact:
-      "Molti gatti domestici hanno origini miste: CatDex privilegia una classificazione prudente quando la razza non e chiara.",
+    story: "Analisi non riuscita. Puoi correggere i dettagli manualmente.",
+    funFact: "Ogni gatto ha caratteristiche uniche.",
     safetyStatus: "safe",
+    uncertaintyReason: "safe_fallback_analysis",
+    needsReview: true,
     analyzedAt: new Date().toISOString(),
   };
 }
 
 function mockAnalysisResult(mockReason: string): JsonResponseBody {
+  console.log("CATDEX_EDGE_MOCK_ANALYSIS_RETURNED_SAFE_UNKNOWN");
+  console.log("CATDEX_EDGE_MOCK_BROWN_TABBY_DISABLED");
   return {
     ...toResultEnvelope({
-      breed: "domestic_tabby_cat",
-      confidence: 0.82,
-      candidates: [
-        { breed: "domestic_tabby_cat", confidence: 0.82 },
-        { breed: "domestic_shorthair_cat", confidence: 0.64 },
-      ],
-      coatColor: "marrone",
-      coatPattern: "tigrato",
-      eyeColor: "occhi ambrati",
-      hairLength: "pelo corto",
-      estimatedAge: "adulto",
-      traits: [
-        { name: "Posa", value: "in osservazione", rarityWeight: 1 },
-        { name: "Umore", value: "curioso", rarityWeight: 1 },
-      ],
-      personality: "curious",
+      breed: "domestic_cat",
+      confidence: 0.2,
+      candidates: [{ breed: "domestic_cat", confidence: 0.2 }],
+      coatColor: "Non rilevato",
+      dominantVisibleCoatColor: "unknown",
+      visualEvidence: "Analisi non riuscita",
+      visibleEvidence: "Analisi non riuscita",
+      coatColorConfidence: 0.2,
+      colorConfidence: 0.2,
+      coatPattern: "Non rilevato",
+      coatPatternConfidence: 0.2,
+      patternConfidence: 0.2,
+      eyeColor: "Non rilevato",
+      hairLength: "Non rilevato",
+      estimatedAge: "Non rilevato",
+      traits: [],
+      personality: "unknown",
       rarity: "common",
       variant: "normal",
-      story:
-        "Questo gatto curioso sembra pronto a diventare il protagonista di una nuova carta CatDex.",
-      funFact:
-        "I gatti tigrati domestici sono molto comuni e possono avere pattern molto diversi tra loro.",
+      story: "Analisi non riuscita. Puoi correggere i dettagli manualmente.",
+      funFact: "Ogni gatto ha caratteristiche uniche.",
       safetyStatus: "safe",
+      uncertaintyReason: "real_ai_analysis_failed_or_mock_disabled",
+      needsReview: true,
       analyzedAt: new Date().toISOString(),
     }),
     backend: {
@@ -1425,16 +2489,16 @@ function realisticCoatColor(
   const tabby = isTabbyPattern(pattern);
   const solid = isSolidPattern(pattern);
 
-  if (pattern.includes("calico") && presence.whitePresent) {
-    return presence.orangePresent && presence.blackPresent
-      ? "bianco, arancione e nero"
-      : "mantello misto";
+  if (isBlackWhiteBicolorVisual(pattern, color, secondary, presence)) {
+    return "nero/bianco";
   }
 
-  if (pattern.includes("tartarugato")) {
-    return presence.orangePresent && presence.blackPresent
-      ? "nero e arancione"
-      : "mantello misto";
+  if (pattern.includes("calico") || isCalicoColor(color)) {
+    return "calico";
+  }
+
+  if (pattern.includes("tartarugato") || color.includes("tortoiseshell")) {
+    return "tartarugato";
   }
 
   if (tabby) {
@@ -1504,6 +2568,14 @@ function realisticCoatColor(
 
 function realisticCoatPattern(coatPattern: string): string {
   const normalized = normalizeVisualValue(coatPattern);
+  if (normalized.includes("tuxedo")) {
+    return "tuxedo";
+  }
+
+  if (normalized.includes("bicolor") || normalized.includes("bicolore")) {
+    return "bicolore";
+  }
+
   if (
     normalized.includes("tortoiseshell") ||
     normalized.includes("tortie") ||
@@ -1548,10 +2620,6 @@ function realisticCoatPattern(coatPattern: string): string {
     return "solido";
   }
 
-  if (normalized.includes("bicolor") || normalized.includes("bicolore")) {
-    return "bicolore";
-  }
-
   return coatPattern;
 }
 
@@ -1565,6 +2633,24 @@ function isTabbyPattern(coatPattern: string): boolean {
 function isSolidPattern(coatPattern: string): boolean {
   const normalized = normalizeVisualValue(coatPattern);
   return normalized.includes("solid") || normalized.includes("solido");
+}
+
+function isBicolorPattern(coatPattern: string): boolean {
+  const normalized = normalizeVisualValue(coatPattern);
+  return normalized.includes("bicolor") ||
+    normalized.includes("bicolore") ||
+    normalized.includes("tuxedo");
+}
+
+function isCalicoPattern(coatPattern: string): boolean {
+  return normalizeVisualValue(coatPattern).includes("calico");
+}
+
+function isTortoiseshellPattern(coatPattern: string): boolean {
+  const normalized = normalizeVisualValue(coatPattern);
+  return normalized.includes("tortoiseshell") ||
+    normalized.includes("tortie") ||
+    normalized.includes("tartarugat");
 }
 
 function isBlackColor(coatColor: string): boolean {
@@ -1618,6 +2704,48 @@ function isColorpointColor(coatColor: string): boolean {
   return normalized.includes("colorpoint") || normalized.includes("pointed");
 }
 
+function isBlackWhiteBicolorObservation(
+  observation: CatVisionObservation,
+  coatPattern: string,
+): boolean {
+  const baseColor = normalizeVisualValue(observation.baseColor ?? "");
+  const secondaryColor = normalizeVisualValue(observation.secondaryColor ?? "");
+  return isBicolorPattern(coatPattern) &&
+    observation.whitePresent &&
+    observation.blackPresent &&
+    !observation.orangePresent &&
+    (isBlackColor(baseColor) ||
+      isBlackColor(secondaryColor) ||
+      baseColor === "mixed" ||
+      secondaryColor === "mixed");
+}
+
+function isBlackWhiteBicolorCoat(
+  coatColor: string,
+  coatPattern: string,
+): boolean {
+  return isBicolorPattern(coatPattern) &&
+    isBlackColor(coatColor) &&
+    isWhiteColor(coatColor);
+}
+
+function isBlackWhiteBicolorVisual(
+  coatPattern: string,
+  color: string,
+  secondary: string,
+  presence: {
+    whitePresent: boolean;
+    orangePresent: boolean;
+    blackPresent: boolean;
+  },
+): boolean {
+  return isBicolorPattern(coatPattern) &&
+    presence.whitePresent &&
+    presence.blackPresent &&
+    !presence.orangePresent &&
+    (isBlackColor(color) || isBlackColor(secondary) || color === "mixed");
+}
+
 function isCat03LikeTabby(
   color: string,
   secondary: string,
@@ -1650,8 +2778,6 @@ function isClearlyOrangeTabby(
     !isGrayColor(secondary) &&
     !isCreamColor(secondary) &&
     secondary !== "mixed" &&
-    secondary !== "unknown" &&
-    secondary.length > 0 &&
     !presence.blackPresent &&
     presence.orangePresent;
 }
@@ -1720,8 +2846,31 @@ function numberValue(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+function confidenceValue(value: unknown): number {
+  const confidence = numberValue(value);
+  return Math.min(1, Math.max(0, confidence));
+}
+
+function averageConfidence(confidence: CatVisualInspectionConfidence): number {
+  return (
+    confidence.coatBaseColor +
+    confidence.hasWhite +
+    confidence.coatPattern +
+    confidence.eyeColor +
+    confidence.hairLength
+  ) / 5;
+}
+
 function booleanValue(value: unknown): boolean {
   return value === true;
+}
+
+function isUnknownValue(value: string | null): boolean {
+  return value === null ||
+    value.trim().length === 0 ||
+    value === "-" ||
+    value === "unknown" ||
+    value === "null";
 }
 
 class OpenAiRequestError extends Error {

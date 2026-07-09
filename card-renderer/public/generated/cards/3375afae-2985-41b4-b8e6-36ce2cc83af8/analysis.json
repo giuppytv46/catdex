@@ -1,16 +1,16 @@
 {
-  "customName": "",
-  "suggestedName": "CAT-3AF8",
-  "displaySpecies": "Gatto domestico",
-  "coatColor": "unknown",
-  "coatPattern": "unknown",
-  "eyeColor": "unknown",
-  "hairLength": "unknown",
+  "customName": "Mochi",
+  "suggestedName": "Mochi",
+  "displaySpecies": "Gatto domestico bicolore",
+  "coatColor": "Grigio/bianco",
+  "coatPattern": "Bicolore",
+  "eyeColor": "occhi gialli",
+  "hairLength": "pelo lungo",
   "estimatedAge": "unknown",
-  "personality": "curious",
+  "personality": "Rilassato",
   "rarity": "common",
   "variant": "standard",
   "shortDescription": "A newly discovered CatDex companion.",
-  "story": "This cat joined the CatDex from a captured photo and awaits a richer AI analysis.",
-  "funFact": "Every CatDex card is composed with deterministic layout slots."
+  "story": "Un gatto domestico bicolore dal mantello grigio e bianco entra nel tuo CatDex con uno sguardo curioso e attento.",
+  "funFact": "I gatti bicolore hanno spesso macchie uniche: ogni mantello è diverso dagli altri."
 }

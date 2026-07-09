@@ -70,3 +70,14 @@ assets/cards/templates/events/<eventName>/<rarity>/
 ```
 
 Each template folder contains `template.png` and `layout.json`.
+
+## Mock AI artwork mode
+
+Use mock mode when developing without OpenAI image-generation calls:
+
+```sh
+CATDEX_MOCK_AI_ARTWORK=true npm run dev
+```
+
+In this mode `/api/generate-card` skips OpenAI and remove.bg, then renders with
+`assets/cards/mock/mock-cat-artwork.png` instead of the original photo.

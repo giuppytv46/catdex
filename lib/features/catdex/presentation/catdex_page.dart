@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:catdex/core/localization/catdex_localizations.dart';
+import 'package:catdex/features/ads/presentation/catdex_banner_ad_widget.dart';
 import 'package:catdex/features/analysis/presentation/cat_display_data.dart';
 import 'package:catdex/features/analysis/presentation/cat_display_formatter.dart';
 import 'package:catdex/features/catdex/application/catdex_controller.dart';
@@ -18,6 +20,7 @@ class CatDexPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = CatDexLocalizations.of(context);
     final state = ref.watch(catDexControllerProvider);
     final controller = ref.read(catDexControllerProvider.notifier);
     final progress = ref.watch(localPlayerProgressSessionProvider);
@@ -37,10 +40,14 @@ class CatDexPage extends ConsumerWidget {
             pinned: true,
             backgroundColor: AppColors.backgroundGray,
             surfaceTintColor: Colors.transparent,
-            title: const Text('CatDex'),
+            foregroundColor: const Color(0xFF1E243B),
+            title: Text(
+              l10n.catDexTitle,
+              style: const TextStyle(color: Color(0xFF1E243B)),
+            ),
             actions: [
               IconButton(
-                tooltip: 'Profilo',
+                tooltip: l10n.profileTitle,
                 onPressed: () {},
                 icon: const Icon(Icons.person_rounded),
               ),
@@ -84,51 +91,112 @@ class CatDexPage extends ConsumerWidget {
                   },
                 ),
                 const SizedBox(height: AppSpacing.lg),
+                const CatDexBannerAdWidget(
+                  placementLog: 'CATDEX_AD_BANNER_PLACEMENT_TOP_CATDEX',
+                ),
+                const SizedBox(height: AppSpacing.lg),
               ],
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
+          ..._collectionGridSlivers(context, state.visibleEntries),
+          const SliverPadding(
+            padding: EdgeInsets.fromLTRB(
               AppSpacing.lg,
               0,
               AppSpacing.lg,
               128,
             ),
-            sliver: SliverGrid.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisExtent: 268,
-                mainAxisSpacing: AppSpacing.md,
-                crossAxisSpacing: AppSpacing.md,
+            sliver: SliverToBoxAdapter(
+              child: CatDexBannerAdWidget(
+                placementLog: 'CATDEX_AD_BANNER_PLACEMENT_BOTTOM_CATDEX',
               ),
-              itemCount: state.visibleEntries.length,
-              itemBuilder: (context, index) {
-                final entry = state.visibleEntries[index];
-                return TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: 1),
-                  duration: Duration(milliseconds: 260 + (index % 8) * 45),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, value, child) {
-                    return Opacity(
-                      opacity: value,
-                      child: Transform.translate(
-                        offset: Offset(0, 18 * (1 - value)),
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: _CatCollectionCard(
-                    key: ValueKey('catdex_card_${entry.species.id}'),
-                    entry: entry,
-                    onTap: () => _openEntry(context, entry),
-                  ),
-                );
-              },
             ),
           ),
         ],
       ),
     );
+  }
+
+  List<Widget> _collectionGridSlivers(
+    BuildContext context,
+    List<CatDexCollectionEntry> entries,
+  ) {
+    if (entries.isEmpty) {
+      return [
+        const SliverFillRemaining(
+          hasScrollBody: false,
+          child: _CatDexEmptyState(),
+        ),
+      ];
+    }
+
+    final slivers = <Widget>[];
+    for (var start = 0; start < entries.length; start += 6) {
+      final end = start + 6 > entries.length ? entries.length : start + 6;
+      final chunk = entries.sublist(start, end);
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            0,
+            AppSpacing.lg,
+            AppSpacing.lg,
+          ),
+          sliver: SliverGrid.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisExtent: 268,
+              mainAxisSpacing: AppSpacing.md,
+              crossAxisSpacing: AppSpacing.md,
+            ),
+            itemCount: chunk.length,
+            itemBuilder: (context, index) {
+              final globalIndex = start + index;
+              final entry = chunk[index];
+              return TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: Duration(milliseconds: 260 + (globalIndex % 8) * 45),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, child) {
+                  return Opacity(
+                    opacity: value,
+                    child: Transform.translate(
+                      offset: Offset(0, 18 * (1 - value)),
+                      child: child,
+                    ),
+                  );
+                },
+                child: _CatCollectionCard(
+                  key: ValueKey('catdex_card_${entry.species.id}'),
+                  entry: entry,
+                  onTap: () => _openEntry(context, entry),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      if (end < entries.length) {
+        slivers.add(
+          const SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              AppSpacing.lg,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: CatDexBannerAdWidget(
+                placementLog: 'CATDEX_AD_BANNER_PLACEMENT_INFEED_CATDEX',
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return slivers;
   }
 
   void _openEntry(BuildContext context, CatDexCollectionEntry entry) {
@@ -164,11 +232,13 @@ class CatDexDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = CatDexLocalizations.of(context);
     final discovery = entry.discovery;
     final rarity = _entryRarity(entry);
     final displayData = _displayDataForEntry(entry);
-    final speciesLabel =
-        displayData?.displaySpecies ?? entry.species.displayName;
+    final speciesLabel = l10n.localizeDisplayValue(
+      displayData?.displaySpecies ?? entry.species.displayName,
+    );
     final name = displayData?.displayName ?? entry.displayName ?? speciesLabel;
     final resolvedImage = CatDexImageResolver.resolveBestImagePath(
       discovery: discovery,
@@ -186,6 +256,7 @@ class CatDexDetailPage extends StatelessWidget {
         title: Text(name),
         backgroundColor: AppColors.backgroundGray,
         surfaceTintColor: Colors.transparent,
+        foregroundColor: const Color(0xFF1E243B),
       ),
       body: ListView(
         padding: EdgeInsets.fromLTRB(
@@ -208,53 +279,123 @@ class CatDexDetailPage extends StatelessWidget {
             name: name,
             species: speciesLabel,
             rarity: rarity,
-            personality: displayData?.displayPersonality ?? '-',
+            personality: l10n.localizeDisplayValue(
+              displayData?.displayPersonality ?? '-',
+            ),
           ),
           const SizedBox(height: AppSpacing.lg),
           _CatDetailSection(
-            title: 'Dettagli',
+            title: l10n.detailsLabel,
             rows: [
               _CatDetailRow(
-                label: 'Mantello',
-                value: displayData?.displayCoatColor ?? '-',
+                label: l10n.furLabel,
+                value: l10n.localizeDisplayValue(
+                  displayData?.displayCoatColor ?? '-',
+                ),
               ),
               _CatDetailRow(
-                label: 'Pattern',
-                value: displayData?.displayCoatPattern ?? '-',
+                label: l10n.coatPatternLabel,
+                value: l10n.localizeDisplayValue(
+                  displayData?.displayCoatPattern ?? '-',
+                ),
               ),
               _CatDetailRow(
-                label: 'Occhi',
-                value: displayData?.displayEyeColor ?? '-',
+                label: l10n.eyesLabel,
+                value: l10n.localizeDisplayValue(
+                  displayData?.displayEyeColor ?? '-',
+                ),
               ),
               _CatDetailRow(
-                label: 'Pelo',
-                value: displayData?.displayHairLength ?? '-',
+                label: l10n.hairLengthLabel,
+                value: l10n.localizeDisplayValue(
+                  displayData?.displayHairLength ?? '-',
+                ),
               ),
               _CatDetailRow(
-                label: 'Età',
-                value: displayData?.displayAge ?? '-',
+                label: l10n.estimatedAgeLabel,
+                value: l10n.localizeDisplayValue(
+                  displayData?.displayAge ?? '-',
+                ),
               ),
               _CatDetailRow(
-                label: 'Scoperto il',
+                label: l10n.discoveredOnLabel,
                 value: _formatDate(discovery?.discoveredAt),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
           _CatDetailTextCard(
-            title: 'Storia',
+            title: l10n.storyLabel,
             value:
                 displayData?.displayStory ??
                 'Una nuova storia CatDex sta prendendo forma.',
           ),
           const SizedBox(height: AppSpacing.md),
           _CatDetailTextCard(
-            title: 'Curiosità',
+            title: l10n.curiosityLabel,
             value:
                 displayData?.displayFunFact ??
                 'Continua a esplorare per scoprire altri dettagli.',
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CatDexEmptyState extends StatelessWidget {
+  const _CatDexEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = CatDexLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      child: Center(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 22,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.search_off_rounded,
+                  size: 54,
+                  color: AppColors.primaryPurple,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  l10n.noCatsFound,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  l10n.noCatsFoundHint,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.ink.withValues(alpha: 0.68),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -499,6 +640,7 @@ class _PlayerCollectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = CatDexLocalizations.of(context);
     final completionPercent = (completion * 100).round();
 
     return DecoratedBox(
@@ -543,7 +685,7 @@ class _PlayerCollectionHeader extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Level $level',
+                        '${l10n.levelLabel} $level',
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(
                               color: AppColors.white,
@@ -551,7 +693,7 @@ class _PlayerCollectionHeader extends StatelessWidget {
                             ),
                       ),
                       Text(
-                        '$totalXp XP totali',
+                        '$totalXp ${l10n.totalXpLabel}',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppColors.white.withValues(alpha: 0.86),
                           fontWeight: FontWeight.w700,
@@ -588,15 +730,15 @@ class _PlayerCollectionHeader extends StatelessWidget {
               children: [
                 Expanded(
                   child: _HeaderStat(
-                    label: 'Trovati',
-                    value: '$found / $total Gatti',
+                    label: l10n.foundLabel,
+                    value: '$found / $total',
                     icon: Icons.style_rounded,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: _HeaderStat(
-                    label: 'Completato',
+                    label: l10n.completedLabelShort,
                     value: '$completionPercent%',
                     icon: Icons.emoji_events_rounded,
                   ),
@@ -707,13 +849,14 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = CatDexLocalizations.of(context);
     return TextField(
       key: const Key('catdex_search_field'),
       onChanged: onChanged,
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
         prefixIcon: const Icon(Icons.search_rounded),
-        hintText: 'Cerca per nome',
+        hintText: l10n.searchByName,
         filled: true,
         fillColor: AppColors.white,
         border: OutlineInputBorder(
@@ -740,39 +883,40 @@ class _CollectionFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = CatDexLocalizations.of(context);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
           _FilterChipButton(
-            label: 'Tutti',
+            label: l10n.allLabel,
             selected:
                 state.selectedRarity == null &&
                 state.discoveryFilter == CatDexDiscoveryFilter.all,
             onTap: onAll,
           ),
           _FilterChipButton(
-            label: 'Comune',
+            label: l10n.localizeDisplayValue('common'),
             selected: state.selectedRarity == CatRarity.common,
             onTap: () => onRarity(CatRarity.common),
           ),
           _FilterChipButton(
-            label: 'Raro',
+            label: l10n.localizeDisplayValue('rare'),
             selected: state.selectedRarity == CatRarity.rare,
             onTap: () => onRarity(CatRarity.rare),
           ),
           _FilterChipButton(
-            label: 'Epico',
+            label: l10n.localizeDisplayValue('epic'),
             selected: state.selectedRarity == CatRarity.epic,
             onTap: () => onRarity(CatRarity.epic),
           ),
           _FilterChipButton(
-            label: 'Leggendario',
+            label: l10n.localizeDisplayValue('legendary'),
             selected: state.selectedRarity == CatRarity.legendary,
             onTap: () => onRarity(CatRarity.legendary),
           ),
           _FilterChipButton(
-            label: 'Preferiti',
+            label: l10n.favoritesLabel,
             selected: state.discoveryFilter == CatDexDiscoveryFilter.favorites,
             onTap: onFavorites,
           ),
@@ -801,10 +945,15 @@ class _FilterChipButton extends StatelessWidget {
         label: Text(label),
         selected: selected,
         onSelected: (_) => onTap(),
-        selectedColor: AppColors.primaryPurple.withValues(alpha: 0.18),
+        backgroundColor: const Color(0xFFF3F6FB),
+        selectedColor: const Color(0xFF2F245D),
+        checkmarkColor: Colors.white,
+        side: BorderSide(
+          color: selected ? const Color(0xFF7C3AED) : const Color(0xFFD7DEE8),
+        ),
         labelStyle: TextStyle(
-          color: selected ? AppColors.primaryPurple : AppColors.ink,
-          fontWeight: FontWeight.w900,
+          color: selected ? Colors.white : const Color(0xFF1E243B),
+          fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       ),
@@ -907,9 +1056,11 @@ class _DiscoveredCardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = CatDexLocalizations.of(context);
     final rarity = _entryRarity(entry);
-    final speciesLabel =
-        displayData?.displaySpecies ?? entry.species.displayName;
+    final speciesLabel = l10n.localizeDisplayValue(
+      displayData?.displaySpecies ?? entry.species.displayName,
+    );
     final resolvedImage = CatDexImageResolver.resolveForEntry(entry);
     final hasPhoto = !resolvedImage.usesPlaceholder;
     debugPrint('CATDEX_GRID_DISCOVERY_ID ${entry.discovery?.id ?? '-'}');
@@ -1184,7 +1335,9 @@ class _RarityBadge extends StatelessWidget {
           vertical: 4,
         ),
         child: Text(
-          _rarityLabel(rarity),
+          CatDexLocalizations.of(
+            context,
+          ).localizeDisplayValue(_rarityLabel(rarity)),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(

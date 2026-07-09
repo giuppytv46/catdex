@@ -44,4 +44,40 @@ class CatAnalysisResult {
   String get displayRarity => backendRarity ?? 'Unknown';
   String get displayVariant => backendVariant ?? 'Unknown';
   String get displayPersonality => backendPersonality ?? 'Unknown';
+
+  CatAnalysisResult copyWith({
+    CatBreedCandidate? primaryBreed,
+    List<CatBreedCandidate>? breedCandidates,
+    CatVisualTraits? visualTraits,
+    CatAnalysisConfidence? confidence,
+    CatRarity? rarity,
+    CatVariant? variant,
+    CatPersonality? personality,
+    String? story,
+    DateTime? analyzedAt,
+    String? backendBreed,
+    String? backendRarity,
+    String? backendVariant,
+    String? backendPersonality,
+    String? estimatedAge,
+    String? funFact,
+  }) {
+    return CatAnalysisResult(
+      primaryBreed: primaryBreed ?? this.primaryBreed,
+      breedCandidates: breedCandidates ?? this.breedCandidates,
+      visualTraits: visualTraits ?? this.visualTraits,
+      confidence: confidence ?? this.confidence,
+      rarity: rarity ?? this.rarity,
+      variant: variant ?? this.variant,
+      personality: personality ?? this.personality,
+      story: story ?? this.story,
+      analyzedAt: analyzedAt ?? this.analyzedAt,
+      backendBreed: backendBreed ?? this.backendBreed,
+      backendRarity: backendRarity ?? this.backendRarity,
+      backendVariant: backendVariant ?? this.backendVariant,
+      backendPersonality: backendPersonality ?? this.backendPersonality,
+      estimatedAge: estimatedAge ?? this.estimatedAge,
+      funFact: funFact ?? this.funFact,
+    );
+  }
 }

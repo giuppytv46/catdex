@@ -1,3 +1,4 @@
+import 'package:catdex/core/localization/catdex_localizations.dart';
 import 'package:catdex/features/analysis/presentation/cat_display_data.dart';
 import 'package:catdex/features/cards/application/card_composer_service.dart';
 import 'package:catdex/features/cards/presentation/cards_binder_page.dart';
@@ -93,6 +94,9 @@ Widget _testApp(
       ),
     ],
     child: MaterialApp(
+      locale: const Locale('it'),
+      localizationsDelegates: CatDexLocalizations.localizationsDelegates,
+      supportedLocales: CatDexLocalizations.supportedLocales,
       home: CardsBinderPage(
         autoGenerateMissingCards: autoGenerateMissingCards,
       ),

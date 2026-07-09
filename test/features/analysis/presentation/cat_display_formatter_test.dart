@@ -7,19 +7,21 @@ import 'package:test/test.dart';
 void main() {
   const formatter = CatDisplayFormatter();
 
-  test('normalizes black and white bicolor display values', () {
+  test('normalizes gray and white bicolor display values', () {
     final displayData = formatter.fromDiscovery(
       _discovery(
         speciesId: 'domestic_gray_cat',
-        coatColor: 'marrone/grigio',
+        coatColor: 'grigio/bianco',
         coatPattern: 'bicolore',
+        eyeColor: 'amber',
       ),
     );
 
     expect(displayData.displaySpecies, 'Gatto domestico bicolore');
-    expect(displayData.displayCoatColor, 'Nero/bianco');
+    expect(displayData.displayCoatColor, 'Grigio/bianco');
     expect(displayData.displayCoatPattern, 'Bicolore');
-    expect(displayData.displayStory, contains('nero e bianco'));
+    expect(displayData.displayEyeColor, 'occhi ambrati');
+    expect(displayData.displayStory, contains('grigio e bianco'));
     expect(displayData.displayStory, isNot(contains('marrone/grigio')));
     expect(displayData.displayStory, isNot(contains('tigrato')));
     expect(displayData.displayFunFact, contains('gatti bicolore'));
@@ -38,12 +40,27 @@ void main() {
     expect(displayData.displayCoatColor, 'Marrone/grigio tigrato');
     expect(displayData.displayCoatPattern, 'Tigrato mackerel');
   });
+
+  test('normalizes orange tabby display values', () {
+    final displayData = formatter.fromDiscovery(
+      _discovery(
+        speciesId: 'domestic_tabby_cat',
+        coatColor: 'arancione',
+        coatPattern: 'tigrato',
+      ),
+    );
+
+    expect(displayData.displaySpecies, 'Gatto domestico arancione tigrato');
+    expect(displayData.displayCoatColor, 'Arancione tigrato');
+    expect(displayData.displayCoatPattern, 'Tigrato');
+  });
 }
 
 CatDiscovery _discovery({
   required String speciesId,
   required String coatColor,
   required String coatPattern,
+  String eyeColor = 'occhi gialli',
 }) {
   return CatDiscovery(
     id: 'display-test',
@@ -59,7 +76,7 @@ CatDiscovery _discovery({
     suggestedName: 'Luna',
     coatColor: coatColor,
     coatPattern: coatPattern,
-    eyeColor: 'occhi gialli',
+    eyeColor: eyeColor,
     hairLength: 'pelo corto',
     estimatedAge: 'adulto',
     story: 'Un gatto marrone/grigio tigrato entra nel CatDex.',

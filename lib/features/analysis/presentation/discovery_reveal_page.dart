@@ -30,6 +30,7 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
   late final AnimationController _controller;
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _scaleAnimation;
+  bool _saveFlowActive = false;
 
   @override
   void initState() {
@@ -153,7 +154,11 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
   }
 
   Future<void> _saveDiscovery(BuildContext context) async {
-    final suggestedName = CatDexLocalizations.of(context).catNamePlaceholder;
+    if (_saveFlowActive) {
+      return;
+    }
+    setState(() => _saveFlowActive = true);
+    final suggestedName = widget.args.suggestedName;
     final catName = await showDialog<String>(
       context: context,
       builder: (_) {
@@ -163,20 +168,43 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
       },
     );
     if (catName == null || !context.mounted) {
+      if (mounted) {
+        setState(() => _saveFlowActive = false);
+      }
       return;
     }
 
     final notifier = ref.read(localDiscoverySaveControllerProvider.notifier);
-
+    final displayData = const CatDisplayFormatter().fromAnalysis(
+      widget.args.result,
+    );
+    debugPrint(
+      'CATDEX_SAVE_USES_EDITED_DETAILS ${widget.args.usesEditedDetails}',
+    );
+    debugPrint('CATDEX_SAVE_FINAL_SPECIES ${displayData.displaySpecies}');
+    debugPrint('CATDEX_SAVE_FINAL_COAT_COLOR ${displayData.displayCoatColor}');
+    debugPrint('CATDEX_SAVE_FINAL_PATTERN ${displayData.displayCoatPattern}');
+    debugPrint('CATDEX_SAVE_FINAL_EYE_COLOR ${displayData.displayEyeColor}');
+    debugPrint(
+      'CATDEX_SAVE_FINAL_HAIR_LENGTH ${displayData.displayHairLength}',
+    );
+    debugPrint(
+      'CATDEX_SAVE_FINAL_PERSONALITY ${displayData.displayPersonality}',
+    );
+    debugPrint('CATDEX_SAVE_FINAL_RARITY ${displayData.displayRarity}');
     await notifier.save(
       widget.args.result,
       photoPath: widget.args.photo.path,
       customName: catName,
       suggestedName: suggestedName,
+      usesEditedDetails: widget.args.usesEditedDetails,
     );
 
     final state = ref.read(localDiscoverySaveControllerProvider).value;
     if (!context.mounted || state?.status != LocalDiscoverySaveStatus.saved) {
+      if (mounted) {
+        setState(() => _saveFlowActive = false);
+      }
       return;
     }
 
@@ -263,7 +291,7 @@ class _RevealCard extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        l10n.catNamePlaceholder,
+                        args.suggestedName,
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(
@@ -278,7 +306,7 @@ class _RevealCard extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Text(
-                        displayData.displaySpecies,
+                        l10n.localizeDisplayValue(displayData.displaySpecies),
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(
@@ -293,13 +321,19 @@ class _RevealCard extends StatelessWidget {
                         runSpacing: AppSpacing.sm,
                         children: [
                           _RevealBadge(
-                            label: displayData.displayRarity,
+                            label: l10n.localizeDisplayValue(
+                              displayData.displayRarity,
+                            ),
                           ),
                           _RevealBadge(
-                            label: displayData.displayVariant,
+                            label: l10n.localizeDisplayValue(
+                              displayData.displayVariant,
+                            ),
                           ),
                           _RevealBadge(
-                            label: displayData.displayPersonality,
+                            label: l10n.localizeDisplayValue(
+                              displayData.displayPersonality,
+                            ),
                           ),
                         ],
                       ),
@@ -327,6 +361,7 @@ class _NameCatDialog extends StatefulWidget {
 
 class _NameCatDialogState extends State<_NameCatDialog> {
   late final TextEditingController _controller;
+  bool _submitted = false;
 
   @override
   void initState() {
@@ -342,6 +377,7 @@ class _NameCatDialogState extends State<_NameCatDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = CatDexLocalizations.of(context);
     return Dialog(
       insetPadding: const EdgeInsets.all(AppSpacing.lg),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
@@ -365,19 +401,19 @@ class _NameCatDialogState extends State<_NameCatDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                '🐈 Name your discovery',
+                '🐈 ${l10n.nameDiscoveryTitle}',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.ink,
+                  color: const Color(0xFF1C2340),
                   fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Choose a name for this cat or keep the suggested one.',
+                l10n.nameDiscoverySubtitle,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.ink.withValues(alpha: 0.72),
+                  color: const Color(0xFF3E4A66),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -386,16 +422,28 @@ class _NameCatDialogState extends State<_NameCatDialog> {
                 controller: _controller,
                 autofocus: true,
                 textCapitalization: TextCapitalization.words,
+                cursorColor: const Color(0xFF6D3BFF),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: const Color(0xFF1E243B),
+                ),
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: AppColors.white.withValues(alpha: 0.82),
+                  fillColor: Colors.white,
+                  hintStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: const Color(0xFF9AA3B2),
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(22),
+                    borderSide: const BorderSide(color: Color(0xFF7C4DFF)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: const BorderSide(color: Color(0xFF7C4DFF)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(22),
                     borderSide: const BorderSide(
-                      color: AppColors.primaryPurple,
+                      color: Color(0xFF6D3BFF),
                       width: 2,
                     ),
                   ),
@@ -407,16 +455,31 @@ class _NameCatDialogState extends State<_NameCatDialog> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+                      onPressed: _submitted
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF66D9B5),
+                        side: const BorderSide(color: Color(0xFF8F95A3)),
+                      ),
+                      child: Text(l10n.cancelAction),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () => _save(context),
-                      icon: const Icon(Icons.pets_rounded),
-                      label: const Text('Save to CatDex'),
+                      onPressed: _submitted ? null : () => _save(context),
+                      style: FilledButton.styleFrom(
+                        foregroundColor: const Color(0xFF2A2352),
+                      ),
+                      icon: const Icon(
+                        Icons.pets_rounded,
+                        color: Color(0xFF2A2352),
+                      ),
+                      label: Text(
+                        l10n.saveToCatDexAction,
+                        style: const TextStyle(color: Color(0xFF2A2352)),
+                      ),
                     ),
                   ),
                 ],
@@ -429,6 +492,10 @@ class _NameCatDialogState extends State<_NameCatDialog> {
   }
 
   void _save(BuildContext context) {
+    if (_submitted) {
+      return;
+    }
+    setState(() => _submitted = true);
     final trimmed = _controller.text.trim();
     Navigator.of(context).pop(trimmed.isEmpty ? widget.initialName : trimmed);
   }
@@ -643,9 +710,9 @@ class _ResultDetails extends StatelessWidget {
     final result = args.result;
     final displayData = const CatDisplayFormatter().fromAnalysis(result);
     final traits =
-        '${displayData.displayCoatColor}, '
-        '${displayData.displayCoatPattern}, '
-        '${displayData.displayEyeColor}';
+        '${l10n.localizeDisplayValue(displayData.displayCoatColor)}, '
+        '${l10n.localizeDisplayValue(displayData.displayCoatPattern)}, '
+        '${l10n.localizeDisplayValue(displayData.displayEyeColor)}';
 
     return DecoratedBox(
       decoration: BoxDecoration(

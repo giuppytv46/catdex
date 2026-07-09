@@ -11,6 +11,7 @@ void main() {
   testWidgets('app launches and Home page renders', (tester) async {
     SharedPreferences.setMockInitialValues({
       'catdex.onboarding.completed': true,
+      'catdex_selected_locale': 'it',
     });
 
     final container = ProviderContainer(
@@ -39,6 +40,7 @@ void main() {
   ) async {
     SharedPreferences.setMockInitialValues({
       'catdex.onboarding.completed': true,
+      'catdex_selected_locale': 'it',
     });
 
     final container = ProviderContainer(
@@ -59,8 +61,31 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('CatDex'), findsWidgets);
-    expect(find.text('Camera'), findsOneWidget);
+    expect(find.text('Cattura'), findsOneWidget);
     expect(find.text('Carte'), findsOneWidget);
     expect(find.text('Profilo'), findsOneWidget);
+  });
+
+  testWidgets('first launch requires language selection', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+
+    final container = ProviderContainer(
+      overrides: [
+        onboardingRepositoryProvider.overrideWithValue(
+          const SharedPreferencesOnboardingRepository(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: const CatDexApp()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose your language'), findsOneWidget);
+    expect(find.text('Italiano'), findsOneWidget);
+    expect(find.text('中文简体'), findsOneWidget);
+    expect(find.text('Português (Portugal)'), findsOneWidget);
   });
 }

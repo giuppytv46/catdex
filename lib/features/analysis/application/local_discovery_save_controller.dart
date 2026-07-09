@@ -40,6 +40,7 @@ class LocalDiscoverySaveController
     String customName = 'Mochi',
     String suggestedName = 'Mochi',
     String? nickname,
+    bool usesEditedDetails = false,
   }) async {
     state = const AsyncData(
       LocalDiscoverySaveState(status: LocalDiscoverySaveStatus.saving),
@@ -88,6 +89,16 @@ class LocalDiscoverySaveController
         suggestedName: suggestedName,
         originalPhotoPath: stablePhotoPath,
         displayPhotoPath: stablePhotoPath,
+      );
+      debugPrint(
+        'CATDEX_CARD_METADATA_USES_EDITED_DETAILS $usesEditedDetails',
+      );
+      debugPrint('CATDEX_SAVED_COAT_COLOR ${discovery.coatColor ?? '-'}');
+      debugPrint(
+        'CATDEX_DISCOVERY_SAVE_PERSONALITY ${discovery.personality.name}',
+      );
+      debugPrint(
+        'CATDEX_CARD_METADATA_PERSONALITY ${discovery.personality.name}',
       );
       final uploadedOriginalPath = await _uploadStableOriginalPhoto(
         discoveryId: discoveryId,

@@ -2,35 +2,35 @@
   "finalCardUrl": "/generated/cards/3375afae-2985-41b4-b8e6-36ce2cc83af8/final-card.png",
   "illustratedCatUrl": "/generated/cards/3375afae-2985-41b4-b8e6-36ce2cc83af8/illustrated-cat.png",
   "analysisJson": {
-    "customName": "",
-    "suggestedName": "CAT-3AF8",
-    "displaySpecies": "Gatto domestico",
-    "coatColor": "unknown",
-    "coatPattern": "unknown",
-    "eyeColor": "unknown",
-    "hairLength": "unknown",
+    "customName": "Mochi",
+    "suggestedName": "Mochi",
+    "displaySpecies": "Gatto domestico bicolore",
+    "coatColor": "Grigio/bianco",
+    "coatPattern": "Bicolore",
+    "eyeColor": "occhi gialli",
+    "hairLength": "pelo lungo",
     "estimatedAge": "unknown",
-    "personality": "curious",
+    "personality": "Rilassato",
     "rarity": "common",
     "variant": "standard",
     "shortDescription": "A newly discovered CatDex companion.",
-    "story": "This cat joined the CatDex from a captured photo and awaits a richer AI analysis.",
-    "funFact": "Every CatDex card is composed with deterministic layout slots."
+    "story": "Un gatto domestico bicolore dal mantello grigio e bianco entra nel tuo CatDex con uno sguardo curioso e attento.",
+    "funFact": "I gatti bicolore hanno spesso macchie uniche: ogni mantello è diverso dagli altri."
   },
   "selectedTemplateKey": "default/common",
   "discoveryId": "3375afae-2985-41b4-b8e6-36ce2cc83af8",
   "originalPhotoUrl": "http://localhost:3000/cards/test_illustrated_cat.png",
   "cardText": {
-    "cardTitle": "CAT-3AF8",
-    "speciesLine": "Gatto domestico",
-    "abilityName": "curious Instinct",
+    "cardTitle": "MOCHI",
+    "speciesLine": "Gatto domestico bicolore",
+    "abilityName": "Rilassato Instinct",
     "abilityDescription": "A newly discovered CatDex companion.",
-    "flavorText": "This cat joined the CatDex from a captured photo and awaits a richer AI analysis.",
-    "funFact": "Every CatDex card is composed with deterministic layout slots."
+    "flavorText": "Un gatto domestico bicolore dal mantello grigio e bianco entra nel tuo CatDex con uno sguardo curioso e attento.",
+    "funFact": "I gatti bicolore hanno spesso macchie uniche: ogni mantello è diverso dagli altri."
   },
   "finalCardPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/3375afae-2985-41b4-b8e6-36ce2cc83af8/final-card.png",
   "illustratedCatPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/3375afae-2985-41b4-b8e6-36ce2cc83af8/illustrated-cat.png",
   "analysisPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/3375afae-2985-41b4-b8e6-36ce2cc83af8/analysis.json",
   "metadataPath": "/generated/cards/3375afae-2985-41b4-b8e6-36ce2cc83af8/metadata.json",
-  "createdAt": "2026-07-02T17:46:28.400Z"
+  "createdAt": "2026-07-06T18:56:00.120Z"
 }

@@ -27,6 +27,7 @@ export type CardTextJson = {
 };
 
 export type TextBlockLayout = {
+  enabled?: boolean;
   x: number;
   y: number;
   width: number;
@@ -34,6 +35,7 @@ export type TextBlockLayout = {
   fontSize: number;
   fontFamily: string;
   color: string;
+  shadowColor?: string;
   align: 'left' | 'center' | 'right';
   letterSpacing: number;
 };
@@ -76,6 +78,7 @@ export type GenerateCardInput = {
   discoveryId: string;
   photoUrl: string;
   rarity: CatRarity;
+  publicBaseUrl?: string;
   eventKey?: string;
   displayName?: string;
   displaySpecies?: string;

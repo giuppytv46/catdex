@@ -1,5 +1,5 @@
 import { analyzeCatPhoto } from './catAnalysisService';
-import { createCatIllustration, fallbackCatIllustration } from './catIllustrationService';
+import { createCatIllustration } from './catIllustrationService';
 import { createCardText, fallbackCardText } from './cardTextService';
 import { renderProgrammaticCard } from './programmaticCardRenderer';
 import {
@@ -23,16 +23,37 @@ const starCountByRarity = {
   legendary: 5,
 };
 
+export class AIIllustrationFailedError extends Error {
+  constructor(message = 'AI illustration generation failed. Card was not generated.') {
+    super(message);
+    this.name = 'AIIllustrationFailedError';
+  }
+}
+
 function cardNumberFromDiscovery(discoveryId: string): string {
   const numeric = discoveryId.replace(/\D/g, '').slice(-4).padStart(4, '0');
   return `#${numeric || '0000'}`;
+}
+
+function isBillingOrLimitError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('billing') ||
+    normalized.includes('quota') ||
+    normalized.includes('hard limit') ||
+    normalized.includes('insufficient_quota') ||
+    normalized.includes('insufficient quota') ||
+    normalized.includes('rate limit') ||
+    normalized.includes('rate_limit')
+  );
 }
 
 export async function generateCatDexCard(input: GenerateCardInput): Promise<GenerateCardOutput> {
   console.log('CATDEX_GENERATE_CARD_STARTED', input.discoveryId);
   console.log('CATDEX_GENERATE_CARD_ORIGINAL_PHOTO_URL', input.photoUrl);
   await saveOriginalPhotoReference(input.discoveryId, input.photoUrl);
-  await saveImageFromUrl(input.discoveryId, 'original-photo.png', input.photoUrl);
+  await saveImageFromUrl(input.discoveryId, 'original-photo.png', input.photoUrl, input.publicBaseUrl);
 
   const analysisJson = await analyzeCatPhoto(input);
   const analysisPath = await saveAnalysis(input.discoveryId, analysisJson);
@@ -58,18 +79,33 @@ export async function generateCatDexCard(input: GenerateCardInput): Promise<Gene
       photoUrl: input.photoUrl,
       analysis: analysisJson,
       cardStyle: selectedTemplate.key,
+      publicBaseUrl: input.publicBaseUrl,
     });
   } catch (error) {
-    console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_SOURCE', 'original_photo_fallback');
     console.log(
       'CATDEX_GENERATE_CARD_ILLUSTRATION_ERROR',
       error instanceof Error ? error.message : String(error),
     );
-    illustratedCatUrl = fallbackCatIllustration(input.photoUrl);
+    if (isBillingOrLimitError(error)) {
+      console.log('CATDEX_GENERATE_CARD_OPENAI_BILLING_OR_LIMIT_ERROR');
+    }
+    console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_FAILED_NO_FALLBACK');
+    console.log('CATDEX_GENERATE_CARD_ABORTED_AI_ILLUSTRATION_FAILED');
+    console.log('CATDEX_GENERATE_CARD_FINAL_CARD_NOT_CREATED');
+    console.log('CATDEX_GENERATE_CARD_SUCCESS', false);
+    throw new AIIllustrationFailedError();
   }
   console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_URL', illustratedCatUrl);
 
-  const savedIllustration = await saveImageFromUrl(input.discoveryId, 'illustrated-cat.png', illustratedCatUrl);
+  const starCount = starCountByRarity[input.rarity];
+  console.log('CATDEX_STAR_COUNT_SELECTED', starCount);
+
+  const savedIllustration = await saveImageFromUrl(
+    input.discoveryId,
+    'illustrated-cat.png',
+    illustratedCatUrl,
+    input.publicBaseUrl,
+  );
   const illustrationReference = savedIllustration ?? (await saveIllustrationReference(input.discoveryId, illustratedCatUrl));
   const artworkImageUrl = savedIllustration
     ? await fileToDataUrl(savedIllustration.path, savedIllustration.contentType)
@@ -79,13 +115,13 @@ export async function generateCatDexCard(input: GenerateCardInput): Promise<Gene
     layout: selectedTemplate.layout,
     artworkImageUrl,
     cardNumber: cardNumberFromDiscovery(input.discoveryId),
-    starCount: starCountByRarity[input.rarity],
+    starCount,
     text: cardText,
   });
   const finalCardPath = await savePngArtifact(input.discoveryId, 'final-card.png', await cardImageResponse.arrayBuffer());
 
   const output: GenerateCardOutput = {
-    finalCardUrl: publicCardUrl(input.discoveryId, 'final-card.png'),
+    finalCardUrl: publicCardUrl(input.discoveryId, 'final-card.png', input.publicBaseUrl),
     illustratedCatUrl: savedIllustration?.url ?? illustratedCatUrl,
     analysisJson,
     selectedTemplateKey: selectedTemplate.key,
@@ -100,7 +136,7 @@ export async function generateCatDexCard(input: GenerateCardInput): Promise<Gene
     finalCardPath,
     illustratedCatPath: illustrationReference.path,
     analysisPath,
-    metadataPath: publicCardUrl(input.discoveryId, 'metadata.json'),
+    metadataPath: publicCardUrl(input.discoveryId, 'metadata.json', input.publicBaseUrl),
     createdAt: new Date().toISOString(),
   };
   const metadataPath = await saveMetadata(metadata);

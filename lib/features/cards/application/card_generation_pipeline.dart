@@ -1,5 +1,6 @@
 import 'package:catdex/features/analysis/presentation/cat_display_data.dart';
 import 'package:catdex/features/cards/application/remote_card_generation_service.dart';
+import 'package:catdex/features/cards/presentation/card_image_cache_buster.dart';
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:catdex/features/catdex/application/local_discovery_session_controller.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
@@ -48,6 +49,7 @@ class CardGenerationPipeline {
     required CatDiscovery discovery,
     required CatDisplayData displayData,
     required int collectionNumber,
+    String? debugRarityOverride,
     ValueChanged<CardGenerationStage>? onStageChanged,
   }) async {
     debugPrint('CATDEX_CARD_REGENERATE_STARTED ${discovery.id}');
@@ -60,13 +62,25 @@ class CardGenerationPipeline {
       discovery: discovery,
       displayData: displayData,
       collectionNumber: collectionNumber,
+      debugRarityOverride: debugRarityOverride,
     );
 
     if (generated == null) {
+      debugPrint('CATDEX_CARD_GENERATION_FAILED_KEEP_EXISTING_IMAGE');
       return CardGenerationResult(
         generatedCardPathOrUrl: null,
         discovery: discovery,
         failureReason: _remoteCardGenerationService.lastFailureReason,
+      );
+    }
+
+    if (!isFinalGeneratedCardImageSource(generated.finalCardUrl)) {
+      debugPrint('CATDEX_CARD_IMAGE_REJECTED_ORIGINAL_PHOTO_PATH');
+      debugPrint('CATDEX_CARD_GENERATION_FAILED_KEEP_EXISTING_IMAGE');
+      return CardGenerationResult(
+        generatedCardPathOrUrl: null,
+        discovery: discovery,
+        failureReason: RemoteCardGenerationFailureReason.remoteApiFailure,
       );
     }
 
@@ -76,6 +90,7 @@ class CardGenerationPipeline {
       generated: generated,
     );
     await _saveAndRefreshDiscovery(updatedDiscovery);
+    debugPrint('CATDEX_CARD_IMAGE_SAVED_FINAL_URL ${generated.finalCardUrl}');
 
     return CardGenerationResult(
       generatedCardPathOrUrl: generated.finalCardUrl,
@@ -106,7 +121,6 @@ class CardGenerationPipeline {
       generatedAt: DateTime.now(),
       eventThemeId: previousCard?.eventThemeId,
       cardImageUrl: generated.finalCardUrl,
-      cardImagePath: previousCard?.cardImagePath,
       aiIllustrationUrl:
           generated.illustratedCatUrl ?? previousCard?.aiIllustrationUrl,
       aiIllustrationPath: previousCard?.aiIllustrationPath,

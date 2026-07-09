@@ -10,12 +10,40 @@ class CatDexLocalizations {
   static const appName = 'CatDex';
 
   static const supportedLocales = <Locale>[
-    Locale('en'),
     Locale('it'),
+    Locale('en', 'US'),
     Locale('es'),
     Locale('fr'),
     Locale('de'),
     Locale('ja'),
+    Locale('zh', 'CN'),
+    Locale('ko'),
+    Locale('hi', 'IN'),
+    Locale('pt', 'BR'),
+    Locale('pt', 'PT'),
+  ];
+
+  static const languageOptions = <AppLanguageOption>[
+    AppLanguageOption(locale: Locale('it'), nativeName: 'Italiano'),
+    AppLanguageOption(
+      locale: Locale('en', 'US'),
+      nativeName: 'English (US)',
+    ),
+    AppLanguageOption(locale: Locale('es'), nativeName: 'Español'),
+    AppLanguageOption(locale: Locale('fr'), nativeName: 'Français'),
+    AppLanguageOption(locale: Locale('de'), nativeName: 'Deutsch'),
+    AppLanguageOption(locale: Locale('ja'), nativeName: '日本語'),
+    AppLanguageOption(locale: Locale('zh', 'CN'), nativeName: '中文简体'),
+    AppLanguageOption(locale: Locale('ko'), nativeName: '한국어'),
+    AppLanguageOption(locale: Locale('hi', 'IN'), nativeName: 'हिन्दी'),
+    AppLanguageOption(
+      locale: Locale('pt', 'BR'),
+      nativeName: 'Português (Brasil)',
+    ),
+    AppLanguageOption(
+      locale: Locale('pt', 'PT'),
+      nativeName: 'Português (Portugal)',
+    ),
   ];
 
   static const localizationsDelegates = <LocalizationsDelegate<dynamic>>[
@@ -28,6 +56,1213 @@ class CatDexLocalizations {
   static CatDexLocalizations of(BuildContext context) {
     return Localizations.of<CatDexLocalizations>(context, CatDexLocalizations)!;
   }
+
+  static Locale bestSupportedLocale(Locale deviceLocale) {
+    for (final locale in supportedLocales) {
+      if (locale.languageCode == deviceLocale.languageCode &&
+          (locale.countryCode == null ||
+              locale.countryCode == deviceLocale.countryCode)) {
+        return locale;
+      }
+    }
+    return const Locale('en', 'US');
+  }
+
+  String get cardsTitle => _coreValue('cardsTitle');
+  String get albumTitle => _coreValue('albumTitle');
+  String get bottomCatdex => catDexTitle;
+  String get bottomCapture => captureTitle;
+  String get bottomCards => cardsTitle;
+  String get bottomProfile => profileTitle;
+  String get captureChooseCatPhoto => captureHeading;
+  String get captureChooseCatPhotoSubtitle => captureEmptyMessage;
+  String get captureTakePhoto => takePhotoAction;
+  String get captureImportFromGallery => importFromGalleryAction;
+  String get settingsLanguage => _coreValue('settingsLanguage');
+  String get editDetails => _coreValue('editDetails');
+  String get detailsLabel => _coreValue('details');
+  String get editDetailsSubtitle => _coreValue('editDetailsSubtitle');
+  String get saveChangesAction => _coreValue('saveChanges');
+  String get cancelAction => _coreValue('cancel');
+  String get nameDiscoveryTitle => _coreValue('nameDiscoveryTitle');
+  String get nameDiscoverySubtitle => _coreValue('nameDiscoverySubtitle');
+  String get speciesLabel => _coreValue('species');
+  String get personalityLabel => _coreValue('personality');
+  String get rarityLabel => _coreValue('rarity');
+  String get furLabel => _coreValue('fur');
+  String get eyesLabel => _coreValue('eyes');
+  String get notDetectedLabel => _coreValue('notDetected');
+  String get unknownLabel => _coreValue('unknown');
+
+  String get alphaInfoTitle => _localizedValue(
+    en: 'Alpha tester info',
+    it: 'Info alpha tester',
+    es: 'Alpha tester info',
+    fr: 'Alpha tester info',
+    de: 'Alpha tester info',
+    ja: 'Alpha tester info',
+  );
+
+  String get alphaBuildLabel => _localizedValue(
+    en: 'Build',
+    it: 'Versione',
+    es: 'Build',
+    fr: 'Build',
+    de: 'Build',
+    ja: 'Build',
+  );
+
+  String get alphaCurrentLanguageLabel => _localizedValue(
+    en: 'Current language',
+    it: 'Lingua attuale',
+    es: 'Current language',
+    fr: 'Current language',
+    de: 'Current language',
+    ja: 'Current language',
+  );
+
+  String get alphaPremiumDebugLabel => _localizedValue(
+    en: 'Premium debug',
+    it: 'Debug Premium',
+    es: 'Premium debug',
+    fr: 'Premium debug',
+    de: 'Premium debug',
+    ja: 'Premium debug',
+  );
+
+  String get alphaTesterMessage => _localizedValue(
+    en:
+        'This is an alpha version. If you find bugs, take a screenshot '
+        'and report what you were doing.',
+    it:
+        'Questa è una versione alpha. Se trovi bug, fai uno screenshot '
+        'e segnala cosa stavi facendo.',
+    es:
+        'This is an alpha version. If you find bugs, take a screenshot '
+        'and report what you were doing.',
+    fr:
+        'This is an alpha version. If you find bugs, take a screenshot '
+        'and report what you were doing.',
+    de:
+        'This is an alpha version. If you find bugs, take a screenshot '
+        'and report what you were doing.',
+    ja:
+        'This is an alpha version. If you find bugs, take a screenshot '
+        'and report what you were doing.',
+  );
+
+  String get noCatsFound => _localizedValue(
+    en: 'No cats found.',
+    it: 'Nessun gatto trovato.',
+    es: 'No cats found.',
+    fr: 'No cats found.',
+    de: 'No cats found.',
+    ja: 'No cats found.',
+  );
+
+  String get noCatsFoundHint => _localizedValue(
+    en: 'Try another search or keep exploring to discover new cats.',
+    it:
+        'Prova un’altra ricerca o continua a esplorare per scoprire '
+        'nuovi gatti.',
+    es: 'Try another search or keep exploring to discover new cats.',
+    fr: 'Try another search or keep exploring to discover new cats.',
+    de: 'Try another search or keep exploring to discover new cats.',
+    ja: 'Try another search or keep exploring to discover new cats.',
+  );
+
+  String get noGeneratedCards => _localizedValue(
+    en: 'No generated cards yet.',
+    it: 'Nessuna carta generata.',
+    es: 'No generated cards yet.',
+    fr: 'No generated cards yet.',
+    de: 'No generated cards yet.',
+    ja: 'No generated cards yet.',
+  );
+
+  String get cardsSubtitle => _localizedValue(
+    en: 'Your deck of discovered cats',
+    it: 'Il tuo mazzo di gatti scoperti',
+    es: 'Tu mazo de gatos descubiertos',
+    fr: 'Ton jeu de chats découverts',
+    de: 'Dein Deck entdeckter Katzen',
+    ja: '発見した猫のカードデッキ',
+    zh: '你发现的猫咪卡组',
+    ko: '발견한 고양이 카드 덱',
+    hi: 'खोजी गई बिल्लियों का आपका डेक',
+    ptBr: 'Seu baralho de gatos descobertos',
+    ptPt: 'O teu baralho de gatos descobertos',
+  );
+
+  String get cardsFound => _localizedValue(
+    en: 'Cards found',
+    it: 'Carte trovate',
+    es: 'Cartas encontradas',
+    fr: 'Cartes trouvées',
+    de: 'Gefundene Karten',
+    ja: '見つけたカード',
+    zh: '已找到卡牌',
+    ko: '발견한 카드',
+    hi: 'मिले कार्ड',
+    ptBr: 'Cartas encontradas',
+    ptPt: 'Cartas encontradas',
+  );
+
+  String get openAlbum => _localizedValue(
+    en: 'Open album',
+    it: 'Apri album',
+    es: 'Abrir álbum',
+    fr: 'Ouvrir l’album',
+    de: 'Album öffnen',
+    ja: 'アルバムを開く',
+    zh: '打开图鉴',
+    ko: '앨범 열기',
+    hi: 'एल्बम खोलें',
+    ptBr: 'Abrir álbum',
+    ptPt: 'Abrir álbum',
+  );
+
+  String get regenerateCards => _localizedValue(
+    en: 'Regenerate cards',
+    it: 'Rigenera carte',
+    es: 'Regenerar cartas',
+    fr: 'Régénérer les cartes',
+    de: 'Karten neu erstellen',
+    ja: 'カードを再生成',
+    zh: '重新生成卡牌',
+    ko: '카드 다시 생성',
+    hi: 'कार्ड फिर बनाएं',
+    ptBr: 'Gerar cartas novamente',
+    ptPt: 'Gerar cartas novamente',
+  );
+
+  String generatedCardsProgress(int generated, int total) => _localizedValue(
+    en: '$generated generated out of $total cards',
+    it: '$generated generate su $total carte',
+    es: '$generated generadas de $total cartas',
+    fr: '$generated générées sur $total cartes',
+    de: '$generated von $total Karten erstellt',
+    ja: '$total枚中$generated枚生成済み',
+    zh: '已生成 $generated / $total 张卡牌',
+    ko: '$total장 중 $generated장 생성됨',
+    hi: '$total में से $generated कार्ड बने',
+    ptBr: '$generated geradas de $total cartas',
+    ptPt: '$generated geradas de $total cartas',
+  );
+
+  String get emptyRarityAlbum => _localizedValue(
+    en: 'You do not have cards of this rarity yet',
+    it: 'Non hai ancora carte di questa rarità',
+    es: 'Aún no tienes cartas de esta rareza',
+    fr: 'Tu n’as pas encore de cartes de cette rareté',
+    de: 'Du hast noch keine Karten dieser Seltenheit',
+    ja: 'このレア度のカードはまだありません',
+    zh: '你还没有这个稀有度的卡牌',
+    ko: '아직 이 희귀도의 카드가 없습니다',
+    hi: 'इस दुर्लभता का कोई कार्ड अभी नहीं है',
+    ptBr: 'Você ainda não tem cartas desta raridade',
+    ptPt: 'Ainda não tens cartas desta raridade',
+  );
+
+  String get emptyRarityAlbumHint => _localizedValue(
+    en: 'Take or upload new cat photos to find one',
+    it: 'Scatta o carica nuove foto di gatti per trovarne una',
+    es: 'Toma o sube nuevas fotos de gatos para encontrar una',
+    fr: 'Prends ou importe des photos de chats pour en trouver une',
+    de: 'Fotografiere oder lade Katzenfotos hoch, um eine zu finden',
+    ja: '猫の写真を撮影または追加して見つけましょう',
+    zh: '拍摄或上传新的猫咪照片来发现卡牌',
+    ko: '새 고양이 사진을 촬영하거나 업로드해 보세요',
+    hi: 'नई बिल्ली की तस्वीर लेकर या अपलोड करके खोजें',
+    ptBr: 'Tire ou envie novas fotos de gatos para encontrar uma',
+    ptPt: 'Tira ou envia novas fotografias de gatos para encontrar uma',
+  );
+
+  String get levelLabel => _localizedValue(
+    en: 'Level',
+    it: 'Livello',
+    es: 'Nivel',
+    fr: 'Niveau',
+    de: 'Level',
+    ja: 'レベル',
+    zh: '等级',
+    ko: '레벨',
+    hi: 'स्तर',
+    ptBr: 'Nível',
+    ptPt: 'Nível',
+  );
+
+  String get totalXpLabel => _localizedValue(
+    en: 'total XP',
+    it: 'XP totali',
+    es: 'XP totales',
+    fr: 'XP totaux',
+    de: 'XP gesamt',
+    ja: '合計XP',
+    zh: '总 XP',
+    ko: '총 XP',
+    hi: 'कुल XP',
+    ptBr: 'XP total',
+    ptPt: 'XP total',
+  );
+
+  String get foundLabel => _localizedValue(
+    en: 'Found',
+    it: 'Trovati',
+    es: 'Encontrados',
+    fr: 'Trouvés',
+    de: 'Gefunden',
+    ja: '発見',
+    zh: '已发现',
+    ko: '발견',
+    hi: 'मिले',
+    ptBr: 'Encontrados',
+    ptPt: 'Encontrados',
+  );
+
+  String get completedLabelShort => _localizedValue(
+    en: 'Completed',
+    it: 'Completato',
+    es: 'Completado',
+    fr: 'Terminé',
+    de: 'Abgeschlossen',
+    ja: '完成',
+    zh: '完成度',
+    ko: '완료',
+    hi: 'पूरा',
+    ptBr: 'Concluído',
+    ptPt: 'Concluído',
+  );
+
+  String get searchByName => _localizedValue(
+    en: 'Search by name',
+    it: 'Cerca per nome',
+    es: 'Buscar por nombre',
+    fr: 'Rechercher par nom',
+    de: 'Nach Namen suchen',
+    ja: '名前で検索',
+    zh: '按名字搜索',
+    ko: '이름으로 검색',
+    hi: 'नाम से खोजें',
+    ptBr: 'Buscar por nome',
+    ptPt: 'Pesquisar por nome',
+  );
+
+  String get allLabel => _localizedValue(
+    en: 'All',
+    it: 'Tutti',
+    es: 'Todos',
+    fr: 'Tous',
+    de: 'Alle',
+    ja: 'すべて',
+    zh: '全部',
+    ko: '전체',
+    hi: 'सभी',
+    ptBr: 'Todos',
+    ptPt: 'Todos',
+  );
+
+  String get favoritesLabel => _localizedValue(
+    en: 'Favorites',
+    it: 'Preferiti',
+    es: 'Favoritos',
+    fr: 'Favoris',
+    de: 'Favoriten',
+    ja: 'お気に入り',
+    zh: '收藏',
+    ko: '즐겨찾기',
+    hi: 'पसंदीदा',
+    ptBr: 'Favoritos',
+    ptPt: 'Favoritos',
+  );
+
+  String get discoveredOnLabel => _localizedValue(
+    en: 'Discovered on',
+    it: 'Scoperto il',
+    es: 'Descubierto el',
+    fr: 'Découvert le',
+    de: 'Entdeckt am',
+    ja: '発見日',
+    zh: '发现日期',
+    ko: '발견일',
+    hi: 'खोज की तारीख',
+    ptBr: 'Descoberto em',
+    ptPt: 'Descoberto em',
+  );
+
+  String get curiosityLabel => _localizedValue(
+    en: 'Fun fact',
+    it: 'Curiosità',
+    es: 'Curiosidad',
+    fr: 'Le saviez-vous',
+    de: 'Wissenswertes',
+    ja: '豆知識',
+    zh: '趣味知识',
+    ko: '재미있는 사실',
+    hi: 'रोचक तथ्य',
+    ptBr: 'Curiosidade',
+    ptPt: 'Curiosidade',
+  );
+
+  String analysesRemainingToday(int remaining, int maximum, int credits) {
+    final base = _localizedValue(
+      en: 'Analyses left today: $remaining/$maximum',
+      it: 'Analisi rimaste oggi: $remaining/$maximum',
+      es: 'Análisis restantes hoy: $remaining/$maximum',
+      fr: 'Analyses restantes aujourd’hui : $remaining/$maximum',
+      de: 'Verbleibende Analysen heute: $remaining/$maximum',
+      ja: '本日の残り分析回数：$remaining/$maximum',
+      zh: '今日剩余分析次数：$remaining/$maximum',
+      ko: '오늘 남은 분석: $remaining/$maximum',
+      hi: 'आज शेष विश्लेषण: $remaining/$maximum',
+      ptBr: 'Análises restantes hoje: $remaining/$maximum',
+      ptPt: 'Análises restantes hoje: $remaining/$maximum',
+    );
+    return credits > 0 ? '$base · ${extraCreditsLabel(credits)}' : base;
+  }
+
+  String cardGenerationsRemainingToday(
+    int remaining,
+    int maximum,
+    int credits,
+  ) {
+    final base = _localizedValue(
+      en: 'Card generations left today: $remaining/$maximum',
+      it: 'Generazioni carte rimaste oggi: $remaining/$maximum',
+      es: 'Generaciones de cartas restantes hoy: $remaining/$maximum',
+      fr: 'Générations de cartes restantes : $remaining/$maximum',
+      de: 'Verbleibende Kartenerstellungen: $remaining/$maximum',
+      ja: '本日の残りカード生成回数：$remaining/$maximum',
+      zh: '今日剩余卡牌生成次数：$remaining/$maximum',
+      ko: '오늘 남은 카드 생성: $remaining/$maximum',
+      hi: 'आज शेष कार्ड निर्माण: $remaining/$maximum',
+      ptBr: 'Gerações de cartas restantes hoje: $remaining/$maximum',
+      ptPt: 'Gerações de cartas restantes hoje: $remaining/$maximum',
+    );
+    return credits > 0 ? '$base · ${extraCreditsLabel(credits)}' : base;
+  }
+
+  String extraCreditsLabel(int credits) => _localizedValue(
+    en: 'Extra credits: $credits',
+    it: 'Crediti extra: $credits',
+    es: 'Créditos extra: $credits',
+    fr: 'Crédits supplémentaires : $credits',
+    de: 'Extra-Credits: $credits',
+    ja: '追加クレジット：$credits',
+    zh: '额外次数：$credits',
+    ko: '추가 크레딧: $credits',
+    hi: 'अतिरिक्त क्रेडिट: $credits',
+    ptBr: 'Créditos extras: $credits',
+    ptPt: 'Créditos extra: $credits',
+  );
+
+  String get premiumAnalysesUnlimited => _localizedValue(
+    en: 'Premium active · Unlimited analyses',
+    it: 'Premium attivo · Analisi illimitate',
+    es: 'Premium activo · Análisis ilimitados',
+    fr: 'Premium actif · Analyses illimitées',
+    de: 'Premium aktiv · Unbegrenzte Analysen',
+    ja: 'Premium有効 · 分析無制限',
+    zh: 'Premium 已启用 · 无限分析',
+    ko: 'Premium 활성 · 분석 무제한',
+    hi: 'Premium सक्रिय · असीमित विश्लेषण',
+    ptBr: 'Premium ativo · Análises ilimitadas',
+    ptPt: 'Premium ativo · Análises ilimitadas',
+  );
+
+  String get premiumCardsUnlimited => _localizedValue(
+    en: 'Premium active · Unlimited cards',
+    it: 'Premium attivo · Carte illimitate',
+    es: 'Premium activo · Cartas ilimitadas',
+    fr: 'Premium actif · Cartes illimitées',
+    de: 'Premium aktiv · Unbegrenzte Karten',
+    ja: 'Premium有効 · カード無制限',
+    zh: 'Premium 已启用 · 无限卡牌',
+    ko: 'Premium 활성 · 카드 무제한',
+    hi: 'Premium सक्रिय · असीमित कार्ड',
+    ptBr: 'Premium ativo · Cartas ilimitadas',
+    ptPt: 'Premium ativo · Cartas ilimitadas',
+  );
+
+  String get cardsUpdatedMessage => _localizedValue(
+    en: 'Cards updated',
+    it: 'Carte aggiornate',
+    es: 'Cartas actualizadas',
+    fr: 'Cartes mises à jour',
+    de: 'Karten aktualisiert',
+    ja: 'カードを更新しました',
+    zh: '卡牌已更新',
+    ko: '카드가 업데이트되었습니다',
+    hi: 'कार्ड अपडेट हुए',
+    ptBr: 'Cartas atualizadas',
+    ptPt: 'Cartas atualizadas',
+  );
+
+  String get cardUpdatedMessage => _localizedValue(
+    en: 'Card updated',
+    it: 'Carta aggiornata',
+    es: 'Carta actualizada',
+    fr: 'Carte mise à jour',
+    de: 'Karte aktualisiert',
+    ja: 'カードを更新しました',
+    zh: '卡牌已更新',
+    ko: '카드가 업데이트되었습니다',
+    hi: 'कार्ड अपडेट हुआ',
+    ptBr: 'Carta atualizada',
+    ptPt: 'Carta atualizada',
+  );
+
+  String get cardGenerationError => _localizedValue(
+    en: 'Card generation error',
+    it: 'Errore generazione carta',
+    es: 'Error al generar la carta',
+    fr: 'Erreur de génération de la carte',
+    de: 'Fehler bei der Kartenerstellung',
+    ja: 'カード生成エラー',
+    zh: '卡牌生成错误',
+    ko: '카드 생성 오류',
+    hi: 'कार्ड बनाने में त्रुटि',
+    ptBr: 'Erro ao gerar carta',
+    ptPt: 'Erro ao gerar carta',
+  );
+
+  String get generatingIllustration => _localizedValue(
+    en: 'Creating illustration...',
+    it: 'Creo illustrazione...',
+    es: 'Creando ilustración...',
+    fr: 'Création de l’illustration...',
+    de: 'Illustration wird erstellt...',
+    ja: 'イラストを作成中...',
+    zh: '正在生成插画...',
+    ko: '일러스트 생성 중...',
+    hi: 'चित्रण बनाया जा रहा है...',
+    ptBr: 'Criando ilustração...',
+    ptPt: 'A criar ilustração...',
+  );
+
+  String get generateCard => _localizedValue(
+    en: 'Generate card',
+    it: 'Genera carta',
+    es: 'Generar carta',
+    fr: 'Générer la carte',
+    de: 'Karte erstellen',
+    ja: 'カードを生成',
+    zh: '生成卡牌',
+    ko: '카드 생성',
+    hi: 'कार्ड बनाएं',
+    ptBr: 'Gerar carta',
+    ptPt: 'Gerar carta',
+  );
+
+  String get regenerateCard => _localizedValue(
+    en: 'Regenerate',
+    it: 'Rigenera',
+    es: 'Regenerar',
+    fr: 'Régénérer',
+    de: 'Neu erstellen',
+    ja: '再生成',
+    zh: '重新生成',
+    ko: '다시 생성',
+    hi: 'फिर बनाएं',
+    ptBr: 'Gerar novamente',
+    ptPt: 'Gerar novamente',
+  );
+
+  String get cardNotGenerated => _localizedValue(
+    en: 'Card not generated',
+    it: 'Carta non generata',
+    es: 'Carta no generada',
+    fr: 'Carte non générée',
+    de: 'Karte nicht erstellt',
+    ja: 'カード未生成',
+    zh: '卡牌尚未生成',
+    ko: '카드가 생성되지 않음',
+    hi: 'कार्ड नहीं बना',
+    ptBr: 'Carta não gerada',
+    ptPt: 'Carta não gerada',
+  );
+
+  String get createFinalCardHint => _localizedValue(
+    en: 'Create the final card to add it to your binder.',
+    it: 'Crea la carta finale per aggiungerla al tuo raccoglitore.',
+    es: 'Crea la carta final para añadirla a tu álbum.',
+    fr: 'Crée la carte finale pour l’ajouter à ton album.',
+    de: 'Erstelle die finale Karte für dein Album.',
+    ja: '最終カードを作成してアルバムに追加しましょう。',
+    zh: '生成最终卡牌并添加到图鉴。',
+    ko: '최종 카드를 만들어 앨범에 추가하세요.',
+    hi: 'अंतिम कार्ड बनाकर अपने एल्बम में जोड़ें।',
+    ptBr: 'Crie a carta final para adicioná-la ao álbum.',
+    ptPt: 'Cria a carta final para a adicionar ao álbum.',
+  );
+
+  String get retryAction => _localizedValue(
+    en: 'Retry',
+    it: 'Riprova',
+    es: 'Reintentar',
+    fr: 'Réessayer',
+    de: 'Erneut versuchen',
+    ja: '再試行',
+    zh: '重试',
+    ko: '다시 시도',
+    hi: 'फिर कोशिश करें',
+    ptBr: 'Tentar novamente',
+    ptPt: 'Tentar novamente',
+  );
+
+  String get cardLabel => _localizedValue(
+    en: 'Card',
+    it: 'Carta',
+    es: 'Carta',
+    fr: 'Carte',
+    de: 'Karte',
+    ja: 'カード',
+    zh: '卡牌',
+    ko: '카드',
+    hi: 'कार्ड',
+    ptBr: 'Carta',
+    ptPt: 'Carta',
+  );
+
+  String get discoveryLabel => _localizedValue(
+    en: 'Discovery',
+    it: 'Scoperta',
+    es: 'Descubrimiento',
+    fr: 'Découverte',
+    de: 'Entdeckung',
+    ja: '発見',
+    zh: '发现',
+    ko: '발견',
+    hi: 'खोज',
+    ptBr: 'Descoberta',
+    ptPt: 'Descoberta',
+  );
+
+  String get shareAction => _localizedValue(
+    en: 'Share',
+    it: 'Condividi',
+    es: 'Compartir',
+    fr: 'Partager',
+    de: 'Teilen',
+    ja: '共有',
+    zh: '分享',
+    ko: '공유',
+    hi: 'साझा करें',
+    ptBr: 'Compartilhar',
+    ptPt: 'Partilhar',
+  );
+
+  String get saveImageAction => _localizedValue(
+    en: 'Save image',
+    it: 'Salva immagine',
+    es: 'Guardar imagen',
+    fr: 'Enregistrer l’image',
+    de: 'Bild speichern',
+    ja: '画像を保存',
+    zh: '保存图片',
+    ko: '이미지 저장',
+    hi: 'चित्र सहेजें',
+    ptBr: 'Salvar imagem',
+    ptPt: 'Guardar imagem',
+  );
+
+  String get coinsLabel => _localizedValue(
+    en: 'Coins',
+    it: 'Monete',
+    es: 'Monedas',
+    fr: 'Pièces',
+    de: 'Münzen',
+    ja: 'コイン',
+    zh: '金币',
+    ko: '코인',
+    hi: 'सिक्के',
+    ptBr: 'Moedas',
+    ptPt: 'Moedas',
+  );
+
+  String get revealDiscoveryAction => _localizedValue(
+    en: 'Reveal discovery',
+    it: 'Rivela scoperta',
+    es: 'Revelar descubrimiento',
+    fr: 'Révéler la découverte',
+    de: 'Entdeckung enthüllen',
+    ja: '発見を公開',
+    zh: '揭晓发现',
+    ko: '발견 공개',
+    hi: 'खोज दिखाएं',
+    ptBr: 'Revelar descoberta',
+    ptPt: 'Revelar descoberta',
+  );
+
+  String get backAction => _localizedValue(
+    en: 'Back',
+    it: 'Indietro',
+    es: 'Atrás',
+    fr: 'Retour',
+    de: 'Zurück',
+    ja: '戻る',
+    zh: '返回',
+    ko: '뒤로',
+    hi: 'वापस',
+    ptBr: 'Voltar',
+    ptPt: 'Voltar',
+  );
+
+  String localizeDisplayValue(String value) {
+    final key = value.trim().toLowerCase().replaceAll('_', ' ');
+    const aliases = <String, String>{
+      'common': 'common',
+      'comune': 'common',
+      'uncommon': 'uncommon',
+      'non comune': 'uncommon',
+      'rare': 'rare',
+      'rara': 'rare',
+      'epic': 'epic',
+      'epica': 'epic',
+      'epico': 'epic',
+      'legendary': 'legendary',
+      'leggendaria': 'legendary',
+      'leggendario': 'legendary',
+      'curious': 'curious',
+      'curioso': 'curious',
+      'sweet': 'sweet',
+      'dolce': 'sweet',
+      'shy': 'shy',
+      'timido': 'shy',
+      'playful': 'playful',
+      'giocherellone': 'playful',
+      'elegant': 'elegant',
+      'elegante': 'elegant',
+      'mysterious': 'mysterious',
+      'misterioso': 'mysterious',
+      'energetic': 'energetic',
+      'energico': 'energetic',
+      'calm': 'calm',
+      'calmo': 'calm',
+      'relaxed': 'relaxed',
+      'tranquillo': 'relaxed',
+      'lazy': 'lazy',
+      'pigro': 'lazy',
+      'normal': 'normal',
+      'normale': 'normal',
+      'unknown': 'unknown',
+      'sconosciuto': 'unknown',
+      'non rilevato': 'notDetected',
+      'domestic cat': 'catDomestic',
+      'gatto domestico': 'catDomestic',
+      'domestic tabby cat': 'catDomesticTabby',
+      'gatto domestico tigrato': 'catDomesticTabby',
+      'domestic bicolor cat': 'catDomesticBicolor',
+      'gatto domestico bicolore': 'catDomesticBicolor',
+      'european shorthair': 'catEuropeanShorthair',
+      'gatto europeo': 'catEuropeanShorthair',
+      'siamese': 'catSiamese',
+      'persian': 'catPersian',
+      'persiano': 'catPersian',
+      'maine coon': 'catMaineCoon',
+      'british shorthair': 'catBritishShorthair',
+    };
+    final translationKey = aliases[key];
+    if (translationKey != null) {
+      return _coreValue(translationKey);
+    }
+    final visualKey = _visualAliases[key];
+    final translations = visualKey == null
+        ? null
+        : _visualTranslations[visualKey];
+    return translations == null ? value : translations[_translationIndex];
+  }
+
+  int get _translationIndex {
+    return switch (_localeKey) {
+      'it' => 1,
+      'es' => 2,
+      'fr' => 3,
+      'de' => 4,
+      'ja' => 5,
+      'zh_CN' => 6,
+      'ko' => 7,
+      'hi_IN' => 8,
+      'pt_BR' => 9,
+      'pt_PT' => 10,
+      _ => 0,
+    };
+  }
+
+  static const _visualAliases = <String, String>{
+    'nero': 'black',
+    'black': 'black',
+    'bianco': 'white',
+    'white': 'white',
+    'grigio': 'gray',
+    'gray': 'gray',
+    'grey': 'gray',
+    'marrone': 'brown',
+    'brown': 'brown',
+    'arancione': 'orange',
+    'orange': 'orange',
+    'nero/bianco': 'blackWhite',
+    'black white': 'blackWhite',
+    'grigio/bianco': 'grayWhite',
+    'gray white': 'grayWhite',
+    'grey white': 'grayWhite',
+    'marrone/bianco': 'brownWhite',
+    'brown white': 'brownWhite',
+    'arancione/bianco': 'orangeWhite',
+    'orange white': 'orangeWhite',
+    'arancione tigrato': 'orangeTabby',
+    'orange tabby': 'orangeTabby',
+    'marrone tigrato': 'brownTabby',
+    'brown tabby': 'brownTabby',
+    'grigio tigrato': 'grayTabby',
+    'gray tabby': 'grayTabby',
+    'calico': 'calico',
+    'tricolore': 'tricolor',
+    'tartarugato': 'tortoiseshell',
+    'bicolore': 'bicolor',
+    'solido': 'solid',
+    'solid': 'solid',
+    'tigrato': 'tabby',
+    'tabby': 'tabby',
+    'pezzato': 'patched',
+    'colorpoint': 'colorpoint',
+    'gialli': 'yellowEyes',
+    'yellow': 'yellowEyes',
+    'occhi gialli': 'yellowEyes',
+    'verdi': 'greenEyes',
+    'green': 'greenEyes',
+    'occhi verdi': 'greenEyes',
+    'azzurri': 'blueEyes',
+    'blue': 'blueEyes',
+    'occhi azzurri': 'blueEyes',
+    'ambrati': 'amberEyes',
+    'amber': 'amberEyes',
+    'occhi ambrati': 'amberEyes',
+    'eterocromia': 'heterochromia',
+    'occhi eterocromi': 'heterochromia',
+    'corto': 'short',
+    'short': 'short',
+    'pelo corto': 'short',
+    'medio': 'medium',
+    'medium': 'medium',
+    'pelo medio': 'medium',
+    'lungo': 'long',
+    'long': 'long',
+    'pelo lungo': 'long',
+    'adult': 'adult',
+    'adulto': 'adult',
+    'kitten': 'kitten',
+    'cucciolo': 'kitten',
+    'senior': 'senior',
+    'anziano': 'senior',
+  };
+
+  // Order: en, it, es, fr, de, ja, zh-CN, ko, hi-IN, pt-BR, pt-PT.
+  static const _visualTranslations = <String, List<String>>{
+    'black': [
+      'Black',
+      'Nero',
+      'Negro',
+      'Noir',
+      'Schwarz',
+      '黒',
+      '黑色',
+      '검정',
+      'काला',
+      'Preto',
+      'Preto',
+    ],
+    'white': [
+      'White',
+      'Bianco',
+      'Blanco',
+      'Blanc',
+      'Weiß',
+      '白',
+      '白色',
+      '흰색',
+      'सफेद',
+      'Branco',
+      'Branco',
+    ],
+    'gray': [
+      'Gray',
+      'Grigio',
+      'Gris',
+      'Gris',
+      'Grau',
+      'グレー',
+      '灰色',
+      '회색',
+      'स्लेटी',
+      'Cinza',
+      'Cinzento',
+    ],
+    'brown': [
+      'Brown',
+      'Marrone',
+      'Marrón',
+      'Brun',
+      'Braun',
+      '茶色',
+      '棕色',
+      '갈색',
+      'भूरा',
+      'Marrom',
+      'Castanho',
+    ],
+    'orange': [
+      'Orange',
+      'Arancione',
+      'Naranja',
+      'Roux',
+      'Orange',
+      'オレンジ',
+      '橙色',
+      '주황색',
+      'नारंगी',
+      'Laranja',
+      'Laranja',
+    ],
+    'blackWhite': [
+      'Black/white',
+      'Nero/bianco',
+      'Negro/blanco',
+      'Noir/blanc',
+      'Schwarz/weiß',
+      '黒白',
+      '黑白',
+      '검정/흰색',
+      'काला/सफेद',
+      'Preto/branco',
+      'Preto/branco',
+    ],
+    'grayWhite': [
+      'Gray/white',
+      'Grigio/bianco',
+      'Gris/blanco',
+      'Gris/blanc',
+      'Grau/weiß',
+      'グレー/白',
+      '灰白',
+      '회색/흰색',
+      'स्लेटी/सफेद',
+      'Cinza/branco',
+      'Cinzento/branco',
+    ],
+    'brownWhite': [
+      'Brown/white',
+      'Marrone/bianco',
+      'Marrón/blanco',
+      'Brun/blanc',
+      'Braun/weiß',
+      '茶色/白',
+      '棕白',
+      '갈색/흰색',
+      'भूरा/सफेद',
+      'Marrom/branco',
+      'Castanho/branco',
+    ],
+    'orangeWhite': [
+      'Orange/white',
+      'Arancione/bianco',
+      'Naranja/blanco',
+      'Roux/blanc',
+      'Orange/weiß',
+      'オレンジ/白',
+      '橙白',
+      '주황/흰색',
+      'नारंगी/सफेद',
+      'Laranja/branco',
+      'Laranja/branco',
+    ],
+    'orangeTabby': [
+      'Orange tabby',
+      'Arancione tigrato',
+      'Naranja atigrado',
+      'Roux tigré',
+      'Orange getigert',
+      '茶トラ',
+      '橙色虎斑',
+      '주황 태비',
+      'नारंगी धारीदार',
+      'Laranja tigrado',
+      'Laranja tigrado',
+    ],
+    'brownTabby': [
+      'Brown tabby',
+      'Marrone tigrato',
+      'Marrón atigrado',
+      'Brun tigré',
+      'Braun getigert',
+      '茶色のトラ柄',
+      '棕色虎斑',
+      '갈색 태비',
+      'भूरा धारीदार',
+      'Marrom tigrado',
+      'Castanho tigrado',
+    ],
+    'grayTabby': [
+      'Gray tabby',
+      'Grigio tigrato',
+      'Gris atigrado',
+      'Gris tigré',
+      'Grau getigert',
+      'グレーのトラ柄',
+      '灰色虎斑',
+      '회색 태비',
+      'स्लेटी धारीदार',
+      'Cinza tigrado',
+      'Cinzento tigrado',
+    ],
+    'calico': [
+      'Calico',
+      'Calico',
+      'Calicó',
+      'Calico',
+      'Calico',
+      '三毛',
+      '三花',
+      '삼색',
+      'कैलिको',
+      'Calico',
+      'Calico',
+    ],
+    'tricolor': [
+      'Tricolor',
+      'Tricolore',
+      'Tricolor',
+      'Tricolore',
+      'Dreifarbig',
+      '三色',
+      '三色',
+      '삼색',
+      'तिरंगा',
+      'Tricolor',
+      'Tricolor',
+    ],
+    'tortoiseshell': [
+      'Tortoiseshell',
+      'Tartarugato',
+      'Carey',
+      'Écaille de tortue',
+      'Schildpatt',
+      'サビ柄',
+      '玳瑁',
+      '카오스',
+      'कछुआ-खोल',
+      'Escama de tartaruga',
+      'Escama de tartaruga',
+    ],
+    'bicolor': [
+      'Bicolor',
+      'Bicolore',
+      'Bicolor',
+      'Bicolore',
+      'Zweifarbig',
+      '二色',
+      '双色',
+      '바이컬러',
+      'दो रंग',
+      'Bicolor',
+      'Bicolor',
+    ],
+    'solid': [
+      'Solid',
+      'Solido',
+      'Sólido',
+      'Uni',
+      'Einfarbig',
+      '単色',
+      '纯色',
+      '단색',
+      'ठोस रंग',
+      'Sólido',
+      'Sólido',
+    ],
+    'tabby': [
+      'Tabby',
+      'Tigrato',
+      'Atigrado',
+      'Tigré',
+      'Getigert',
+      'トラ柄',
+      '虎斑',
+      '태비',
+      'धारीदार',
+      'Tigrado',
+      'Tigrado',
+    ],
+    'patched': [
+      'Patched',
+      'Pezzato',
+      'Manchado',
+      'Tacheté',
+      'Gefleckt',
+      '斑模様',
+      '斑块',
+      '얼룩',
+      'चितकबरा',
+      'Malhado',
+      'Malhado',
+    ],
+    'colorpoint': [
+      'Colorpoint',
+      'Colorpoint',
+      'Colorpoint',
+      'Colourpoint',
+      'Colourpoint',
+      'ポイント柄',
+      '重点色',
+      '포인트',
+      'कलरपॉइंट',
+      'Colorpoint',
+      'Colorpoint',
+    ],
+    'yellowEyes': [
+      'Yellow',
+      'Gialli',
+      'Amarillos',
+      'Jaunes',
+      'Gelb',
+      '黄色',
+      '黄色',
+      '노란색',
+      'पीली',
+      'Amarelos',
+      'Amarelos',
+    ],
+    'greenEyes': [
+      'Green',
+      'Verdi',
+      'Verdes',
+      'Verts',
+      'Grün',
+      '緑',
+      '绿色',
+      '초록색',
+      'हरी',
+      'Verdes',
+      'Verdes',
+    ],
+    'blueEyes': [
+      'Blue',
+      'Azzurri',
+      'Azules',
+      'Bleus',
+      'Blau',
+      '青',
+      '蓝色',
+      '파란색',
+      'नीली',
+      'Azuis',
+      'Azuis',
+    ],
+    'amberEyes': [
+      'Amber',
+      'Ambrati',
+      'Ámbar',
+      'Ambrés',
+      'Bernstein',
+      '琥珀色',
+      '琥珀色',
+      '호박색',
+      'अंबर',
+      'Âmbar',
+      'Âmbar',
+    ],
+    'heterochromia': [
+      'Heterochromia',
+      'Eterocromia',
+      'Heterocromía',
+      'Hétérochromie',
+      'Heterochromie',
+      'オッドアイ',
+      '异色瞳',
+      '오드아이',
+      'विषमवर्णता',
+      'Heterocromia',
+      'Heterocromia',
+    ],
+    'short': [
+      'Short',
+      'Corto',
+      'Corto',
+      'Court',
+      'Kurz',
+      '短毛',
+      '短毛',
+      '단모',
+      'छोटे',
+      'Curto',
+      'Curto',
+    ],
+    'medium': [
+      'Medium',
+      'Medio',
+      'Medio',
+      'Mi-long',
+      'Mittellang',
+      '中毛',
+      '中长毛',
+      '중모',
+      'मध्यम',
+      'Médio',
+      'Médio',
+    ],
+    'long': [
+      'Long',
+      'Lungo',
+      'Largo',
+      'Long',
+      'Lang',
+      '長毛',
+      '长毛',
+      '장모',
+      'लंबे',
+      'Longo',
+      'Comprido',
+    ],
+    'adult': [
+      'Adult',
+      'Adulto',
+      'Adulto',
+      'Adulte',
+      'Erwachsen',
+      '成猫',
+      '成年',
+      '성묘',
+      'वयस्क',
+      'Adulto',
+      'Adulto',
+    ],
+    'kitten': [
+      'Kitten',
+      'Cucciolo',
+      'Gatito',
+      'Chaton',
+      'Jungtier',
+      '子猫',
+      '幼猫',
+      '아기 고양이',
+      'बिल्ली का बच्चा',
+      'Filhote',
+      'Gatinho',
+    ],
+    'senior': [
+      'Senior',
+      'Anziano',
+      'Mayor',
+      'Âgé',
+      'Senior',
+      'シニア猫',
+      '老年',
+      '노령묘',
+      'वरिष्ठ',
+      'Idoso',
+      'Sénior',
+    ],
+  };
 
   String get splashTitle => _localizedValue(
     en: 'Splash',
@@ -521,7 +1756,12 @@ class CatDexLocalizations {
     es: 'Captura',
     fr: 'Capture',
     de: 'Fangen',
-    ja: 'Capture',
+    ja: '撮影',
+    zh: '拍摄',
+    ko: '촬영',
+    hi: 'कैप्चर',
+    ptBr: 'Capturar',
+    ptPt: 'Capturar',
   );
 
   String get captureHeading => _localizedValue(
@@ -530,7 +1770,12 @@ class CatDexLocalizations {
     es: 'Elige una foto de gato',
     fr: 'Choisis une photo de chat',
     de: 'Wahle ein Katzenfoto',
-    ja: 'Choose a cat photo',
+    ja: '猫の写真を選択',
+    zh: '选择一张猫咪照片',
+    ko: '고양이 사진을 선택하세요',
+    hi: 'बिल्ली की तस्वीर चुनें',
+    ptBr: 'Escolha uma foto de gato',
+    ptPt: 'Escolhe uma fotografia de gato',
   );
 
   String get captureEmptyMessage => _localizedValue(
@@ -539,7 +1784,12 @@ class CatDexLocalizations {
     es: 'Toma una foto nueva o importala desde tu galeria.',
     fr: 'Prends une nouvelle photo ou importe-en une.',
     de: 'Mach ein neues Foto oder importiere eines.',
-    ja: 'Take a new photo or import one from your gallery.',
+    ja: '新しい写真を撮るか、ギャラリーからインポートしてください。',
+    zh: '拍摄新照片或从相册导入。',
+    ko: '새 사진을 찍거나 갤러리에서 가져오세요.',
+    hi: 'नई तस्वीर लें या गैलरी से चुनें।',
+    ptBr: 'Tire uma foto ou importe da galeria.',
+    ptPt: 'Tira uma fotografia ou importa da galeria.',
   );
 
   String get takePhotoAction => _localizedValue(
@@ -548,7 +1798,12 @@ class CatDexLocalizations {
     es: 'Tomar Foto',
     fr: 'Prendre Photo',
     de: 'Foto Machen',
-    ja: 'Take Photo',
+    ja: '写真を撮る',
+    zh: '拍照',
+    ko: '사진 촬영',
+    hi: 'तस्वीर लें',
+    ptBr: 'Tirar foto',
+    ptPt: 'Tirar fotografia',
   );
 
   String get importFromGalleryAction => _localizedValue(
@@ -557,7 +1812,12 @@ class CatDexLocalizations {
     es: 'Importar de Galeria',
     fr: 'Importer de la Galerie',
     de: 'Aus Galerie Importieren',
-    ja: 'Import from Gallery',
+    ja: 'ギャラリーからインポート',
+    zh: '从相册导入',
+    ko: '갤러리에서 가져오기',
+    hi: 'गैलरी से चुनें',
+    ptBr: 'Importar da galeria',
+    ptPt: 'Importar da galeria',
   );
 
   String get removeSelectedImageAction => _localizedValue(
@@ -576,6 +1836,11 @@ class CatDexLocalizations {
     fr: 'Continuer',
     de: 'Weiter',
     ja: 'Continue',
+    zh: '继续',
+    ko: '계속',
+    hi: 'जारी रखें',
+    ptBr: 'Continuar',
+    ptPt: 'Continuar',
   );
 
   String get analysisTitle => _localizedValue(
@@ -584,7 +1849,12 @@ class CatDexLocalizations {
     es: 'Analisis',
     fr: 'Analyse',
     de: 'Analyse',
-    ja: 'Analysis',
+    ja: '分析',
+    zh: '分析',
+    ko: '분석',
+    hi: 'विश्लेषण',
+    ptBr: 'Análise',
+    ptPt: 'Análise',
   );
 
   String get analysisPreparingTitle => _localizedValue(
@@ -612,6 +1882,11 @@ class CatDexLocalizations {
     fr: 'Nouvelle decouverte!',
     de: 'Neue Entdeckung!',
     ja: 'New discovery!',
+    zh: '新发现！',
+    ko: '새로운 발견!',
+    hi: 'नई खोज!',
+    ptBr: 'Nova descoberta!',
+    ptPt: 'Nova descoberta!',
   );
 
   String get breedLabel => _localizedValue(
@@ -665,7 +1940,12 @@ class CatDexLocalizations {
     es: 'Patron del pelaje',
     fr: 'Motif du pelage',
     de: 'Fellmuster',
-    ja: 'Coat pattern',
+    ja: '毛柄',
+    zh: '花纹',
+    ko: '무늬',
+    hi: 'पैटर्न',
+    ptBr: 'Padrão da pelagem',
+    ptPt: 'Padrão da pelagem',
   );
 
   String get eyeColorLabel => _localizedValue(
@@ -683,7 +1963,12 @@ class CatDexLocalizations {
     es: 'Longitud del pelo',
     fr: 'Longueur du poil',
     de: 'Felllange',
-    ja: 'Hair length',
+    ja: '毛の長さ',
+    zh: '毛发长度',
+    ko: '털 길이',
+    hi: 'बालों की लंबाई',
+    ptBr: 'Comprimento do pelo',
+    ptPt: 'Comprimento do pelo',
   );
 
   String get estimatedAgeLabel => _localizedValue(
@@ -692,7 +1977,12 @@ class CatDexLocalizations {
     es: 'Edad estimada',
     fr: 'Age estime',
     de: 'Geschatztes Alter',
-    ja: 'Estimated age',
+    ja: '推定年齢',
+    zh: '估计年龄',
+    ko: '추정 나이',
+    hi: 'अनुमानित आयु',
+    ptBr: 'Idade estimada',
+    ptPt: 'Idade estimada',
   );
 
   String get funFactLabel => _localizedValue(
@@ -719,7 +2009,12 @@ class CatDexLocalizations {
     es: 'Historia',
     fr: 'Histoire',
     de: 'Geschichte',
-    ja: 'Story',
+    ja: '物語',
+    zh: '故事',
+    ko: '이야기',
+    hi: 'कहानी',
+    ptBr: 'História',
+    ptPt: 'História',
   );
 
   String get moodLabel => _localizedValue(
@@ -747,6 +2042,11 @@ class CatDexLocalizations {
     fr: 'Enregistrer dans CatDex',
     de: 'In CatDex Speichern',
     ja: 'Save to CatDex',
+    zh: '保存到 CatDex',
+    ko: 'CatDex에 저장',
+    hi: 'CatDex में सहेजें',
+    ptBr: 'Salvar no CatDex',
+    ptPt: 'Guardar no CatDex',
   );
 
   String get addToCatDexAction => _localizedValue(
@@ -756,15 +2056,11 @@ class CatDexLocalizations {
     fr: 'Ajouter au CatDex',
     de: 'Zu CatDex Hinzufugen',
     ja: 'Add to CatDex',
-  );
-
-  String get revealDiscoveryAction => _localizedValue(
-    en: 'Reveal Discovery',
-    it: 'Rivela Scoperta',
-    es: 'Revelar Descubrimiento',
-    fr: 'Reveler la Decouverte',
-    de: 'Entdeckung Anzeigen',
-    ja: 'Reveal Discovery',
+    zh: '添加到 CatDex',
+    ko: 'CatDex에 추가',
+    hi: 'CatDex में जोड़ें',
+    ptBr: 'Adicionar ao CatDex',
+    ptPt: 'Adicionar ao CatDex',
   );
 
   String get discoveryRevealTitle => _localizedValue(
@@ -836,7 +2132,12 @@ class CatDexLocalizations {
     es: 'Vista previa de imagen seleccionada',
     fr: 'Apercu de image selectionnee',
     de: 'Vorschau des ausgewahlten Bildes',
-    ja: 'Selected image preview',
+    ja: '選択した画像のプレビュー',
+    zh: '所选图片预览',
+    ko: '선택한 이미지 미리보기',
+    hi: 'चुनी गई तस्वीर का पूर्वावलोकन',
+    ptBr: 'Prévia da imagem selecionada',
+    ptPt: 'Pré-visualização da imagem selecionada',
   );
 
   String get detectLocationAction => _localizedValue(
@@ -882,6 +2183,11 @@ class CatDexLocalizations {
     fr: 'CatDex',
     de: 'CatDex',
     ja: 'CatDex',
+    zh: 'CatDex',
+    ko: 'CatDex',
+    hi: 'CatDex',
+    ptBr: 'CatDex',
+    ptPt: 'CatDex',
   );
 
   String get collectionProgressTitle => _localizedValue(
@@ -1084,7 +2390,12 @@ class CatDexLocalizations {
     es: 'Perfil',
     fr: 'Profil',
     de: 'Profil',
-    ja: 'Profile',
+    ja: 'プロフィール',
+    zh: '个人资料',
+    ko: '프로필',
+    hi: 'प्रोफ़ाइल',
+    ptBr: 'Perfil',
+    ptPt: 'Perfil',
   );
 
   String get settingsTitle => _localizedValue(
@@ -1190,6 +2501,11 @@ class CatDexLocalizations {
     required String fr,
     required String de,
     required String ja,
+    String? zh,
+    String? ko,
+    String? hi,
+    String? ptBr,
+    String? ptPt,
   }) {
     return switch (locale.languageCode) {
       'it' => it,
@@ -1197,9 +2513,472 @@ class CatDexLocalizations {
       'fr' => fr,
       'de' => de,
       'ja' => ja,
+      'zh' => zh ?? en,
+      'ko' => ko ?? en,
+      'hi' => hi ?? en,
+      'pt' when locale.countryCode == 'PT' => ptPt ?? ptBr ?? en,
+      'pt' => ptBr ?? ptPt ?? en,
       _ => en,
     };
   }
+
+  String _coreValue(String key) {
+    final translations =
+        _coreTranslations[_localeKey] ?? _coreTranslations['en_US']!;
+    return translations[key] ?? _coreTranslations['en_US']![key] ?? key;
+  }
+
+  String get _localeKey {
+    final countryCode = locale.countryCode;
+    return countryCode == null || countryCode.isEmpty
+        ? locale.languageCode
+        : '${locale.languageCode}_$countryCode';
+  }
+
+  static const _coreTranslations = <String, Map<String, String>>{
+    'en_US': {
+      'cardsTitle': 'Cards',
+      'albumTitle': 'Album',
+      'settingsLanguage': 'Language',
+      'editDetails': 'Edit details',
+      'details': 'Details',
+      'editDetailsSubtitle': 'Correct the details before saving to CatDex.',
+      'saveChanges': 'Save changes',
+      'cancel': 'Cancel',
+      'nameDiscoveryTitle': 'Name your discovery',
+      'nameDiscoverySubtitle':
+          'Choose a name for this cat or keep the suggested one.',
+      'species': 'Species',
+      'personality': 'Personality',
+      'rarity': 'Rarity',
+      'fur': 'Coat',
+      'eyes': 'Eyes',
+      'unknown': 'Unknown',
+      'notDetected': 'Not detected',
+      'common': 'Common',
+      'uncommon': 'Uncommon',
+      'rare': 'Rare',
+      'epic': 'Epic',
+      'legendary': 'Legendary',
+      'curious': 'Curious',
+      'sweet': 'Sweet',
+      'shy': 'Shy',
+      'playful': 'Playful',
+      'elegant': 'Elegant',
+      'mysterious': 'Mysterious',
+      'energetic': 'Energetic',
+      'relaxed': 'Calm',
+      'calm': 'Calm',
+      'lazy': 'Lazy',
+      'normal': 'Normal',
+      'catDomestic': 'Domestic cat',
+      'catDomesticTabby': 'Domestic tabby cat',
+      'catDomesticBicolor': 'Domestic bicolor cat',
+      'catEuropeanShorthair': 'European Shorthair',
+      'catSiamese': 'Siamese',
+      'catPersian': 'Persian',
+      'catMaineCoon': 'Maine Coon',
+      'catBritishShorthair': 'British Shorthair',
+    },
+    'it': {
+      'cardsTitle': 'Carte',
+      'albumTitle': 'Album',
+      'settingsLanguage': 'Lingua',
+      'editDetails': 'Modifica dettagli',
+      'details': 'Dettagli',
+      'editDetailsSubtitle': 'Correggi i dati prima di salvare nel CatDex.',
+      'saveChanges': 'Salva modifiche',
+      'cancel': 'Annulla',
+      'nameDiscoveryTitle': 'Dai un nome alla scoperta',
+      'nameDiscoverySubtitle':
+          'Scegli un nome per questo gatto o mantieni quello suggerito.',
+      'species': 'Specie',
+      'personality': 'Personalità',
+      'rarity': 'Rarità',
+      'fur': 'Mantello',
+      'eyes': 'Occhi',
+      'unknown': 'Sconosciuto',
+      'notDetected': 'Non rilevato',
+      'common': 'Comune',
+      'uncommon': 'Non comune',
+      'rare': 'Rara',
+      'epic': 'Epica',
+      'legendary': 'Leggendaria',
+      'curious': 'Curioso',
+      'sweet': 'Dolce',
+      'shy': 'Timido',
+      'playful': 'Giocherellone',
+      'elegant': 'Elegante',
+      'mysterious': 'Misterioso',
+      'energetic': 'Energico',
+      'relaxed': 'Tranquillo',
+      'calm': 'Tranquillo',
+      'lazy': 'Pigro',
+      'normal': 'Normale',
+      'catDomestic': 'Gatto domestico',
+      'catDomesticTabby': 'Gatto domestico tigrato',
+      'catDomesticBicolor': 'Gatto domestico bicolore',
+      'catEuropeanShorthair': 'Gatto europeo',
+      'catSiamese': 'Siamese',
+      'catPersian': 'Persiano',
+      'catMaineCoon': 'Maine Coon',
+      'catBritishShorthair': 'British Shorthair',
+    },
+    'es': {
+      'cardsTitle': 'Cartas',
+      'albumTitle': 'Álbum',
+      'settingsLanguage': 'Idioma',
+      'editDetails': 'Editar detalles',
+      'details': 'Detalles',
+      'editDetailsSubtitle': 'Corrige los datos antes de guardar en CatDex.',
+      'saveChanges': 'Guardar cambios',
+      'cancel': 'Cancelar',
+      'nameDiscoveryTitle': 'Pon nombre a tu descubrimiento',
+      'nameDiscoverySubtitle': 'Elige un nombre o conserva el nombre sugerido.',
+      'species': 'Especie',
+      'personality': 'Personalidad',
+      'rarity': 'Rareza',
+      'fur': 'Pelaje',
+      'eyes': 'Ojos',
+      'unknown': 'Desconocido',
+      'notDetected': 'No detectado',
+      'common': 'Común',
+      'uncommon': 'Poco común',
+      'rare': 'Rara',
+      'epic': 'Épica',
+      'legendary': 'Legendaria',
+      'curious': 'Curioso',
+      'sweet': 'Dulce',
+      'shy': 'Tímido',
+      'playful': 'Juguetón',
+      'elegant': 'Elegante',
+      'mysterious': 'Misterioso',
+      'energetic': 'Enérgico',
+      'relaxed': 'Tranquilo',
+      'calm': 'Tranquilo',
+      'lazy': 'Perezoso',
+      'normal': 'Normal',
+      'catDomestic': 'Gato doméstico',
+      'catDomesticTabby': 'Gato doméstico atigrado',
+      'catDomesticBicolor': 'Gato doméstico bicolor',
+    },
+    'fr': {
+      'cardsTitle': 'Cartes',
+      'albumTitle': 'Album',
+      'settingsLanguage': 'Langue',
+      'editDetails': 'Modifier les détails',
+      'details': 'Détails',
+      'editDetailsSubtitle':
+          'Corrige les données avant de les enregistrer dans CatDex.',
+      'saveChanges': 'Enregistrer',
+      'cancel': 'Annuler',
+      'nameDiscoveryTitle': 'Nomme ta découverte',
+      'nameDiscoverySubtitle': 'Choisis un nom ou garde celui proposé.',
+      'species': 'Espèce',
+      'personality': 'Personnalité',
+      'rarity': 'Rareté',
+      'fur': 'Pelage',
+      'eyes': 'Yeux',
+      'unknown': 'Inconnu',
+      'notDetected': 'Non détecté',
+      'common': 'Commune',
+      'uncommon': 'Peu commune',
+      'rare': 'Rare',
+      'epic': 'Épique',
+      'legendary': 'Légendaire',
+      'curious': 'Curieux',
+      'sweet': 'Doux',
+      'shy': 'Timide',
+      'playful': 'Joueur',
+      'elegant': 'Élégant',
+      'mysterious': 'Mystérieux',
+      'energetic': 'Énergique',
+      'relaxed': 'Calme',
+      'calm': 'Calme',
+      'lazy': 'Paresseux',
+      'normal': 'Normal',
+      'catDomestic': 'Chat domestique',
+      'catDomesticTabby': 'Chat domestique tigré',
+      'catDomesticBicolor': 'Chat domestique bicolore',
+    },
+    'de': {
+      'cardsTitle': 'Karten',
+      'albumTitle': 'Album',
+      'settingsLanguage': 'Sprache',
+      'editDetails': 'Details bearbeiten',
+      'details': 'Details',
+      'editDetailsSubtitle':
+          'Korrigiere die Daten vor dem Speichern im CatDex.',
+      'saveChanges': 'Änderungen speichern',
+      'cancel': 'Abbrechen',
+      'nameDiscoveryTitle': 'Benenne deine Entdeckung',
+      'nameDiscoverySubtitle': 'Wähle einen Namen oder behalte den Vorschlag.',
+      'species': 'Art',
+      'personality': 'Persönlichkeit',
+      'rarity': 'Seltenheit',
+      'fur': 'Fell',
+      'eyes': 'Augen',
+      'unknown': 'Unbekannt',
+      'notDetected': 'Nicht erkannt',
+      'common': 'Gewöhnlich',
+      'uncommon': 'Ungewöhnlich',
+      'rare': 'Selten',
+      'epic': 'Episch',
+      'legendary': 'Legendär',
+      'curious': 'Neugierig',
+      'sweet': 'Lieb',
+      'shy': 'Schüchtern',
+      'playful': 'Verspielt',
+      'elegant': 'Elegant',
+      'mysterious': 'Geheimnisvoll',
+      'energetic': 'Energiegeladen',
+      'relaxed': 'Ruhig',
+      'calm': 'Ruhig',
+      'lazy': 'Faul',
+      'normal': 'Normal',
+      'catDomestic': 'Hauskatze',
+      'catDomesticTabby': 'Getigerte Hauskatze',
+      'catDomesticBicolor': 'Zweifarbige Hauskatze',
+    },
+    'ja': {
+      'cardsTitle': 'カード',
+      'albumTitle': 'アルバム',
+      'settingsLanguage': '言語',
+      'editDetails': '詳細を編集',
+      'details': '詳細',
+      'editDetailsSubtitle': 'CatDexに保存する前に内容を修正できます。',
+      'saveChanges': '変更を保存',
+      'cancel': 'キャンセル',
+      'nameDiscoveryTitle': '発見した猫に名前をつける',
+      'nameDiscoverySubtitle': '名前を選ぶか、候補の名前をそのまま使えます。',
+      'species': '種類',
+      'personality': '性格',
+      'rarity': 'レア度',
+      'fur': '毛色',
+      'eyes': '目',
+      'unknown': '不明',
+      'notDetected': '検出されませんでした',
+      'common': 'コモン',
+      'uncommon': 'アンコモン',
+      'rare': 'レア',
+      'epic': 'エピック',
+      'legendary': 'レジェンダリー',
+      'curious': '好奇心旺盛',
+      'sweet': '優しい',
+      'shy': '恥ずかしがり',
+      'playful': '遊び好き',
+      'elegant': '上品',
+      'mysterious': 'ミステリアス',
+      'energetic': '元気',
+      'relaxed': '穏やか',
+      'calm': '穏やか',
+      'lazy': 'のんびり',
+      'normal': 'ノーマル',
+      'catDomestic': 'イエネコ',
+      'catDomesticTabby': 'トラ柄のイエネコ',
+      'catDomesticBicolor': '二色柄のイエネコ',
+    },
+    'zh_CN': {
+      'cardsTitle': '卡牌',
+      'albumTitle': '图鉴',
+      'settingsLanguage': '语言',
+      'editDetails': '编辑详情',
+      'details': '详情',
+      'editDetailsSubtitle': '保存到 CatDex 前可以更正信息。',
+      'saveChanges': '保存修改',
+      'cancel': '取消',
+      'nameDiscoveryTitle': '为新发现命名',
+      'nameDiscoverySubtitle': '选择一个名字，或保留建议的名字。',
+      'species': '种类',
+      'personality': '性格',
+      'rarity': '稀有度',
+      'fur': '毛色',
+      'eyes': '眼睛',
+      'unknown': '未知',
+      'notDetected': '未检测到',
+      'common': '普通',
+      'uncommon': '不常见',
+      'rare': '稀有',
+      'epic': '史诗',
+      'legendary': '传说',
+      'curious': '好奇',
+      'sweet': '温柔',
+      'shy': '害羞',
+      'playful': '爱玩',
+      'elegant': '优雅',
+      'mysterious': '神秘',
+      'energetic': '活泼',
+      'relaxed': '平静',
+      'calm': '平静',
+      'lazy': '慵懒',
+      'normal': '普通',
+      'catDomestic': '家猫',
+      'catDomesticTabby': '虎斑家猫',
+      'catDomesticBicolor': '双色家猫',
+    },
+    'ko': {
+      'cardsTitle': '카드',
+      'albumTitle': '앨범',
+      'settingsLanguage': '언어',
+      'editDetails': '세부 정보 수정',
+      'details': '세부 정보',
+      'editDetailsSubtitle': 'CatDex에 저장하기 전에 정보를 수정하세요.',
+      'saveChanges': '변경 저장',
+      'cancel': '취소',
+      'nameDiscoveryTitle': '새로운 발견에 이름 짓기',
+      'nameDiscoverySubtitle': '이름을 선택하거나 추천 이름을 유지하세요.',
+      'species': '종류',
+      'personality': '성격',
+      'rarity': '희귀도',
+      'fur': '털색',
+      'eyes': '눈',
+      'unknown': '알 수 없음',
+      'notDetected': '감지되지 않음',
+      'common': '일반',
+      'uncommon': '고급',
+      'rare': '희귀',
+      'epic': '영웅',
+      'legendary': '전설',
+      'curious': '호기심 많음',
+      'sweet': '다정함',
+      'shy': '수줍음',
+      'playful': '장난꾸러기',
+      'elegant': '우아함',
+      'mysterious': '신비로움',
+      'energetic': '활기참',
+      'relaxed': '차분함',
+      'calm': '차분함',
+      'lazy': '느긋함',
+      'normal': '일반',
+      'catDomestic': '집고양이',
+      'catDomesticTabby': '태비 집고양이',
+      'catDomesticBicolor': '바이컬러 집고양이',
+    },
+    'hi_IN': {
+      'cardsTitle': 'कार्ड',
+      'albumTitle': 'एल्बम',
+      'settingsLanguage': 'भाषा',
+      'editDetails': 'विवरण बदलें',
+      'details': 'विवरण',
+      'editDetailsSubtitle': 'CatDex में सहेजने से पहले जानकारी सुधारें।',
+      'saveChanges': 'बदलाव सहेजें',
+      'cancel': 'रद्द करें',
+      'nameDiscoveryTitle': 'अपनी खोज को नाम दें',
+      'nameDiscoverySubtitle': 'नाम चुनें या सुझाया गया नाम रखें।',
+      'species': 'प्रजाति',
+      'personality': 'स्वभाव',
+      'rarity': 'दुर्लभता',
+      'fur': 'रोम',
+      'eyes': 'आँखें',
+      'unknown': 'अज्ञात',
+      'notDetected': 'पता नहीं चला',
+      'common': 'सामान्य',
+      'uncommon': 'असामान्य',
+      'rare': 'दुर्लभ',
+      'epic': 'महाकाव्य',
+      'legendary': 'पौराणिक',
+      'curious': 'जिज्ञासु',
+      'sweet': 'प्यारा',
+      'shy': 'शर्मीला',
+      'playful': 'खेलप्रिय',
+      'elegant': 'शानदार',
+      'mysterious': 'रहस्यमय',
+      'energetic': 'ऊर्जावान',
+      'relaxed': 'शांत',
+      'calm': 'शांत',
+      'lazy': 'आलसी',
+      'normal': 'सामान्य',
+      'catDomestic': 'घरेलू बिल्ली',
+      'catDomesticTabby': 'धारीदार घरेलू बिल्ली',
+      'catDomesticBicolor': 'दो रंगों वाली घरेलू बिल्ली',
+    },
+    'pt_BR': {
+      'cardsTitle': 'Cartas',
+      'albumTitle': 'Álbum',
+      'settingsLanguage': 'Idioma',
+      'editDetails': 'Editar detalhes',
+      'details': 'Detalhes',
+      'editDetailsSubtitle': 'Corrija os dados antes de salvar no CatDex.',
+      'saveChanges': 'Salvar alterações',
+      'cancel': 'Cancelar',
+      'nameDiscoveryTitle': 'Dê um nome à descoberta',
+      'nameDiscoverySubtitle': 'Escolha um nome ou mantenha o sugerido.',
+      'species': 'Espécie',
+      'personality': 'Personalidade',
+      'rarity': 'Raridade',
+      'fur': 'Pelagem',
+      'eyes': 'Olhos',
+      'unknown': 'Desconhecido',
+      'notDetected': 'Não detectado',
+      'common': 'Comum',
+      'uncommon': 'Incomum',
+      'rare': 'Rara',
+      'epic': 'Épica',
+      'legendary': 'Lendária',
+      'curious': 'Curioso',
+      'sweet': 'Doce',
+      'shy': 'Tímido',
+      'playful': 'Brincalhão',
+      'elegant': 'Elegante',
+      'mysterious': 'Misterioso',
+      'energetic': 'Enérgico',
+      'relaxed': 'Tranquilo',
+      'calm': 'Tranquilo',
+      'lazy': 'Preguiçoso',
+      'normal': 'Normal',
+      'catDomestic': 'Gato doméstico',
+      'catDomesticTabby': 'Gato doméstico tigrado',
+      'catDomesticBicolor': 'Gato doméstico bicolor',
+    },
+    'pt_PT': {
+      'cardsTitle': 'Cartas',
+      'albumTitle': 'Álbum',
+      'settingsLanguage': 'Idioma',
+      'editDetails': 'Editar detalhes',
+      'details': 'Detalhes',
+      'editDetailsSubtitle': 'Corrige os dados antes de guardar no CatDex.',
+      'saveChanges': 'Guardar alterações',
+      'cancel': 'Cancelar',
+      'nameDiscoveryTitle': 'Dá um nome à descoberta',
+      'nameDiscoverySubtitle': 'Escolhe um nome ou mantém o sugerido.',
+      'species': 'Espécie',
+      'personality': 'Personalidade',
+      'rarity': 'Raridade',
+      'fur': 'Pelagem',
+      'eyes': 'Olhos',
+      'unknown': 'Desconhecido',
+      'notDetected': 'Não detetado',
+      'common': 'Comum',
+      'uncommon': 'Incomum',
+      'rare': 'Rara',
+      'epic': 'Épica',
+      'legendary': 'Lendária',
+      'curious': 'Curioso',
+      'sweet': 'Doce',
+      'shy': 'Tímido',
+      'playful': 'Brincalhão',
+      'elegant': 'Elegante',
+      'mysterious': 'Misterioso',
+      'energetic': 'Energético',
+      'relaxed': 'Tranquilo',
+      'calm': 'Tranquilo',
+      'lazy': 'Preguiçoso',
+      'normal': 'Normal',
+      'catDomestic': 'Gato doméstico',
+      'catDomesticTabby': 'Gato doméstico tigrado',
+      'catDomesticBicolor': 'Gato doméstico bicolor',
+    },
+  };
+}
+
+class AppLanguageOption {
+  const AppLanguageOption({
+    required this.locale,
+    required this.nativeName,
+  });
+
+  final Locale locale;
+  final String nativeName;
 }
 
 class _CatDexLocalizationsDelegate
@@ -1209,7 +2988,11 @@ class _CatDexLocalizationsDelegate
   @override
   bool isSupported(Locale locale) {
     return CatDexLocalizations.supportedLocales.any(
-      (supportedLocale) => supportedLocale.languageCode == locale.languageCode,
+      (supportedLocale) =>
+          supportedLocale.languageCode == locale.languageCode &&
+          (supportedLocale.countryCode == null ||
+              locale.countryCode == null ||
+              supportedLocale.countryCode == locale.countryCode),
     );
   }
 

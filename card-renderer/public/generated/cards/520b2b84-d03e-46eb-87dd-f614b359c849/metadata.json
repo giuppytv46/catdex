@@ -1,0 +1,36 @@
+{
+  "finalCardUrl": "/generated/cards/520b2b84-d03e-46eb-87dd-f614b359c849/final-card.png",
+  "illustratedCatUrl": "/generated/cards/520b2b84-d03e-46eb-87dd-f614b359c849/illustrated-cat.png",
+  "analysisJson": {
+    "customName": "Mochi",
+    "suggestedName": "Mochi",
+    "displaySpecies": "Gatto calico domestico",
+    "coatColor": "Calico",
+    "coatPattern": "Calico",
+    "eyeColor": "occhi gialli",
+    "hairLength": "pelo corto",
+    "estimatedAge": "unknown",
+    "personality": "Curioso",
+    "rarity": "common",
+    "variant": "standard",
+    "shortDescription": "A newly discovered CatDex companion.",
+    "story": "Un gatto calico domestico dal mantello calico calico in piedi con espressione curiosa in strada entra nel tuo CatDex con un'aria curiosa e attenta.",
+    "funFact": "Molti gatti domestici hanno origini miste: CatDex privilegia una classificazione prudente quando la razza non e chiara."
+  },
+  "selectedTemplateKey": "default/common",
+  "discoveryId": "520b2b84-d03e-46eb-87dd-f614b359c849",
+  "originalPhotoUrl": "https://ymdwnohcnjcijgbqnriy.supabase.co/storage/v1/object/sign/cat-photos/catdex/originals/local-explorer/520b2b84-d03e-46eb-87dd-f614b359c849.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV81Yjg1NWU4Yi03NTFkLTRjZjYtOWU1My0xOWZmNjk3OGI2MTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjYXQtcGhvdG9zL2NhdGRleC9vcmlnaW5hbHMvbG9jYWwtZXhwbG9yZXIvNTIwYjJiODQtZDAzZS00NmViLTg3ZGQtZjYxNGIzNTljODQ5LmpwZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODM1NTA2NjUsImV4cCI6MTc4MzYzNzA2NX0.x3uv4ePU9sM_FXm7Kd9QVkyfmBwcvWopRB27C7yToYU",
+  "cardText": {
+    "cardTitle": "MOCHI",
+    "speciesLine": "Gatto calico domestico",
+    "abilityName": "Curioso Instinct",
+    "abilityDescription": "A newly discovered CatDex companion.",
+    "flavorText": "Un gatto calico domestico dal mantello calico calico in piedi con espressione curiosa in strada entra nel tuo CatDex con un'aria curiosa e attenta.",
+    "funFact": "Molti gatti domestici hanno origini miste: CatDex privilegia una classificazione prudente quando la razza non e chiara."
+  },
+  "finalCardPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/520b2b84-d03e-46eb-87dd-f614b359c849/final-card.png",
+  "illustratedCatPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/520b2b84-d03e-46eb-87dd-f614b359c849/illustrated-cat.png",
+  "analysisPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/520b2b84-d03e-46eb-87dd-f614b359c849/analysis.json",
+  "metadataPath": "/generated/cards/520b2b84-d03e-46eb-87dd-f614b359c849/metadata.json",
+  "createdAt": "2026-07-08T22:44:27.978Z"
+}

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:catdex/features/analysis/presentation/cat_display_data.dart';
 import 'package:catdex/features/capture/data/supabase_cat_photo_storage_repository.dart';
+import 'package:catdex/features/cards/presentation/card_image_cache_buster.dart';
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:flutter/foundation.dart';
@@ -62,6 +63,7 @@ class RemoteCardGenerationService {
     required CatDiscovery discovery,
     required CatDisplayData displayData,
     required int collectionNumber,
+    String? debugRarityOverride,
   }) async {
     _lastFailureReason = null;
     debugPrint('CATDEX_REMOTE_GENERATE_CARD_STARTED ${discovery.id}');
@@ -94,10 +96,31 @@ class RemoteCardGenerationService {
         return null;
       }
 
+      final rarity = _rarity(discovery, debugRarityOverride);
+      if (debugRarityOverride != null) {
+        debugPrint('CATDEX_DEBUG_RARITY_OVERRIDE_ENABLED true');
+        debugPrint(
+          'CATDEX_DEBUG_RARITY_OVERRIDE_SELECTED_VALUE $rarity',
+        );
+      }
+      debugPrint('CATDEX_REMOTE_GENERATE_CARD_PAYLOAD_RARITY $rarity');
+      debugPrint('CATDEX_REMOTE_CARD_GENERATION_REQUEST_STARTED');
+      debugPrint(
+        'CATDEX_REMOTE_CARD_GENERATION_DISCOVERY_ID ${discovery.id}',
+      );
+      debugPrint(
+        'CATDEX_REMOTE_CARD_GENERATION_ORIGINAL_PHOTO '
+        '${_logValue(discovery.originalPhotoPath ?? discovery.photoPath)}',
+      );
+      debugPrint('CATDEX_REMOTE_CARD_GENERATION_RARITY $rarity');
+      debugPrint(
+        'CATDEX_REMOTE_CARD_GENERATION_NAME ${displayData.displayName}',
+      );
+
       final payload = <String, Object?>{
         'discoveryId': discovery.id,
         'photoUrl': photoUrl,
-        'rarity': _rarity(discovery),
+        'rarity': rarity,
         'eventKey': null,
         'displayName': displayData.displayName,
         'displaySpecies': displayData.displaySpecies,
@@ -146,10 +169,11 @@ class RemoteCardGenerationService {
       final decoded = Map<String, Object?>.from(
         jsonDecode(utf8.decode(response.bytes)) as Map,
       );
-      final finalCardUrl = _absoluteUrl(
-        decoded['finalCardUrl'] as String?,
-        endpointUri,
+      debugPrint(
+        'CATDEX_REMOTE_CARD_GENERATION_RESPONSE ${jsonEncode(decoded)}',
       );
+      final rawFinalCardUrl = _rawFinalCardUrl(decoded);
+      final finalCardUrl = _absoluteUrl(rawFinalCardUrl, endpointUri);
       final illustratedCatUrl = _absoluteUrl(
         decoded['illustratedCatUrl'] as String?,
         endpointUri,
@@ -161,7 +185,18 @@ class RemoteCardGenerationService {
           : null;
 
       debugPrint(
+        'CATDEX_REMOTE_GENERATE_CARD_FINAL_URL_RAW '
+        '${_logValue(rawFinalCardUrl)}',
+      );
+      debugPrint(
+        'CATDEX_REMOTE_GENERATE_CARD_FINAL_URL_NORMALIZED '
+        '${_logValue(finalCardUrl)}',
+      );
+      debugPrint(
         'CATDEX_REMOTE_GENERATE_CARD_FINAL_URL ${_logValue(finalCardUrl)}',
+      );
+      debugPrint(
+        'CATDEX_REMOTE_CARD_GENERATION_FINAL_URL ${_logValue(finalCardUrl)}',
       );
       debugPrint(
         'CATDEX_REMOTE_GENERATE_CARD_ILLUSTRATED_URL '
@@ -179,9 +214,20 @@ class RemoteCardGenerationService {
         return null;
       }
 
+      if (_looksLikeOriginalPhotoResult(
+        finalCardUrl: finalCardUrl!,
+        photoUrl: photoUrl!,
+        discovery: discovery,
+      )) {
+        _lastFailureReason = RemoteCardGenerationFailureReason.remoteApiFailure;
+        debugPrint('CATDEX_CARD_IMAGE_REJECTED_ORIGINAL_PHOTO_PATH');
+        debugPrint('CATDEX_REMOTE_GENERATE_CARD_SUCCESS false');
+        return null;
+      }
+
       debugPrint('CATDEX_REMOTE_GENERATE_CARD_SUCCESS true');
       return RemoteGeneratedCard(
-        finalCardUrl: finalCardUrl!,
+        finalCardUrl: finalCardUrl,
         illustratedCatUrl: illustratedCatUrl,
         selectedTemplateKey: selectedTemplateKey,
         analysisJson: analysisJson,
@@ -262,6 +308,7 @@ class RemoteCardGenerationService {
     debugPrint(
       'CATDEX_REMOTE_PHOTO_DEBUG_FALLBACK_REASON no_valid_photo_url',
     );
+    debugPrint('CATDEX_CARD_GENERATION_FALLBACK_USED debug_photo_url');
     debugPrint(
       'CATDEX_REMOTE_PHOTO_SOURCE_SELECTED $debugFallbackPhotoUrl',
     );
@@ -434,9 +481,100 @@ class RemoteCardGenerationService {
         (uri.scheme == 'http' || uri.scheme == 'https');
   }
 
-  String _rarity(CatDiscovery discovery) {
-    final rarity = discovery.rarity.name.trim().toLowerCase();
-    return rarity.isEmpty ? 'common' : rarity;
+  String? _rawFinalCardUrl(Map<String, Object?> decoded) {
+    for (final key in ['finalCardUrl', 'finalUrl', 'cardUrl', 'imageUrl']) {
+      final value = decoded[key];
+      if (value is String && value.trim().isNotEmpty && value.trim() != '-') {
+        return value;
+      }
+    }
+
+    return null;
+  }
+
+  bool _looksLikeOriginalPhotoResult({
+    required String finalCardUrl,
+    required String photoUrl,
+    required CatDiscovery discovery,
+  }) {
+    if (looksLikeOriginalPhotoPath(finalCardUrl)) {
+      return true;
+    }
+
+    final normalizedFinal = finalCardUrl.trim();
+    final candidates = [
+      photoUrl,
+      discovery.card?.originalPhotoPath,
+      discovery.displayPhotoPath,
+      discovery.originalPhotoPath,
+      discovery.photoPath,
+    ];
+
+    for (final candidate in candidates) {
+      final value = candidate?.trim();
+      if (value != null &&
+          value.isNotEmpty &&
+          value != '-' &&
+          value == normalizedFinal) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  String _rarity(CatDiscovery discovery, String? debugRarityOverride) {
+    return _rendererRarity(
+      debugRarityOverride,
+      fallback: discovery.rarity.name,
+    );
+  }
+
+  String _rendererRarity(String? value, {required String fallback}) {
+    final normalized = _normalizeRarity(value);
+    if (normalized != null) {
+      return normalized;
+    }
+
+    return _normalizeRarity(fallback) ?? 'common';
+  }
+
+  String? _normalizeRarity(String? value) {
+    final normalized = value
+        ?.trim()
+        .toLowerCase()
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ');
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+
+    if (normalized == 'common' || normalized == 'comune') {
+      return 'common';
+    }
+
+    if (normalized == 'uncommon' || normalized == 'non comune') {
+      return 'uncommon';
+    }
+
+    if (normalized == 'rare' || normalized == 'rara' || normalized == 'raro') {
+      return 'rare';
+    }
+
+    if (normalized == 'epic' ||
+        normalized == 'epica' ||
+        normalized == 'epico') {
+      return 'epic';
+    }
+
+    if (normalized == 'legendary' ||
+        normalized == 'leggendaria' ||
+        normalized == 'leggendario' ||
+        normalized == 'mythic') {
+      return 'legendary';
+    }
+
+    return null;
   }
 
   String _logValue(String? value) {

@@ -1,0 +1,36 @@
+{
+  "finalCardUrl": "/generated/cards/52dfef7e-7dc4-4c08-aa9b-0825ec9351cd/final-card.png",
+  "illustratedCatUrl": "/generated/cards/52dfef7e-7dc4-4c08-aa9b-0825ec9351cd/illustrated-cat.png",
+  "analysisJson": {
+    "customName": "Luna",
+    "suggestedName": "Luna",
+    "displaySpecies": "Gatto domestico bicolore",
+    "coatColor": "Nero/bianco",
+    "coatPattern": "Bicolore",
+    "eyeColor": "occhi gialli",
+    "hairLength": "pelo medio",
+    "estimatedAge": "unknown",
+    "personality": "Rilassato",
+    "rarity": "common",
+    "variant": "standard",
+    "shortDescription": "A newly discovered CatDex companion.",
+    "story": "Un gatto domestico bicolore dal mantello nero e bianco entra nel tuo CatDex con uno sguardo curioso e attento.",
+    "funFact": "I gatti bicolore hanno spesso macchie uniche: ogni mantello è diverso dagli altri."
+  },
+  "selectedTemplateKey": "default/common",
+  "discoveryId": "52dfef7e-7dc4-4c08-aa9b-0825ec9351cd",
+  "originalPhotoUrl": "https://ymdwnohcnjcijgbqnriy.supabase.co/storage/v1/object/sign/cat-photos/catdex/originals/local-explorer/52dfef7e-7dc4-4c08-aa9b-0825ec9351cd.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV81Yjg1NWU4Yi03NTFkLTRjZjYtOWU1My0xOWZmNjk3OGI2MTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjYXQtcGhvdG9zL2NhdGRleC9vcmlnaW5hbHMvbG9jYWwtZXhwbG9yZXIvNTJkZmVmN2UtN2RjNC00YzA4LWFhOWItMDgyNWVjOTM1MWNkLmpwZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODMzNjQxMDksImV4cCI6MTc4MzQ1MDUwOX0.SFkyhMgHP-pNDy2Bfc4begY6wvzcdC3zRIfRnS9X-P4",
+  "cardText": {
+    "cardTitle": "LUNA",
+    "speciesLine": "Gatto domestico bicolore",
+    "abilityName": "Rilassato Instinct",
+    "abilityDescription": "A newly discovered CatDex companion.",
+    "flavorText": "Un gatto domestico bicolore dal mantello nero e bianco entra nel tuo CatDex con uno sguardo curioso e attento.",
+    "funFact": "I gatti bicolore hanno spesso macchie uniche: ogni mantello è diverso dagli altri."
+  },
+  "finalCardPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/52dfef7e-7dc4-4c08-aa9b-0825ec9351cd/final-card.png",
+  "illustratedCatPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/52dfef7e-7dc4-4c08-aa9b-0825ec9351cd/illustrated-cat.png",
+  "analysisPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/52dfef7e-7dc4-4c08-aa9b-0825ec9351cd/analysis.json",
+  "metadataPath": "/generated/cards/52dfef7e-7dc4-4c08-aa9b-0825ec9351cd/metadata.json",
+  "createdAt": "2026-07-06T18:55:11.626Z"
+}

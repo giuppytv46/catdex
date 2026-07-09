@@ -53,7 +53,7 @@ void main() {
     );
   });
 
-  test('defensively formats black and white bicolor display values', () {
+  test('defensively formats bicolor display values without forcing black', () {
     expect(
       formatter.speciesLabel(
         speciesId: 'domestic_gray_cat',
@@ -68,7 +68,7 @@ void main() {
         coatColor: 'brown/gray',
         coatPattern: 'bicolor',
       ),
-      'Nero/bianco',
+      'Grigio/bianco',
     );
     expect(
       formatter.coatPatternLabel(
@@ -120,6 +120,25 @@ void main() {
         coatPattern: 'tigrato mackerel',
       ),
       'Tigrato mackerel',
+    );
+  });
+
+  test('formats orange tabby as orange tabby', () {
+    expect(
+      formatter.speciesLabel(
+        speciesId: 'domestic_tabby_cat',
+        coatColor: 'orange',
+        coatPattern: 'tabby',
+      ),
+      'Gatto domestico arancione tigrato',
+    );
+    expect(
+      formatter.coatColorLabel(
+        speciesId: 'domestic_tabby_cat',
+        coatColor: 'arancione',
+        coatPattern: 'tigrato',
+      ),
+      'Arancione tigrato',
     );
   });
 }

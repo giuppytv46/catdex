@@ -1,0 +1,36 @@
+{
+  "finalCardUrl": "/generated/cards/6eda0031-9570-48e3-9793-167f32f08471/final-card.png",
+  "illustratedCatUrl": "/generated/cards/6eda0031-9570-48e3-9793-167f32f08471/illustrated-cat.png",
+  "analysisJson": {
+    "customName": "Rowdy",
+    "suggestedName": "Rowdy",
+    "displaySpecies": "Gatto domestico bicolore",
+    "coatColor": "Grigio/bianco",
+    "coatPattern": "Bicolore",
+    "eyeColor": "-",
+    "hairLength": "pelo corto",
+    "estimatedAge": "unknown",
+    "personality": "Curioso",
+    "rarity": "common",
+    "variant": "standard",
+    "shortDescription": "A newly discovered CatDex companion.",
+    "story": "Un gatto domestico bicolore dal mantello grigio e bianco entra nel tuo CatDex con uno sguardo curioso e attento.",
+    "funFact": "I gatti bicolore hanno spesso macchie uniche: ogni mantello è diverso dagli altri."
+  },
+  "selectedTemplateKey": "default/common",
+  "discoveryId": "6eda0031-9570-48e3-9793-167f32f08471",
+  "originalPhotoUrl": "https://ymdwnohcnjcijgbqnriy.supabase.co/storage/v1/object/sign/cat-photos/catdex/originals/local-explorer/6eda0031-9570-48e3-9793-167f32f08471.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV81Yjg1NWU4Yi03NTFkLTRjZjYtOWU1My0xOWZmNjk3OGI2MTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjYXQtcGhvdG9zL2NhdGRleC9vcmlnaW5hbHMvbG9jYWwtZXhwbG9yZXIvNmVkYTAwMzEtOTU3MC00OGUzLTk3OTMtMTY3ZjMyZjA4NDcxLmpwZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODMzNjQxMTIsImV4cCI6MTc4MzQ1MDUxMn0.VO1XZPcXIT7J556kS-zRcGmRRxwjINt_VFgXwTY_yo4",
+  "cardText": {
+    "cardTitle": "ROWDY",
+    "speciesLine": "Gatto domestico bicolore",
+    "abilityName": "Curioso Instinct",
+    "abilityDescription": "A newly discovered CatDex companion.",
+    "flavorText": "Un gatto domestico bicolore dal mantello grigio e bianco entra nel tuo CatDex con uno sguardo curioso e attento.",
+    "funFact": "I gatti bicolore hanno spesso macchie uniche: ogni mantello è diverso dagli altri."
+  },
+  "finalCardPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/6eda0031-9570-48e3-9793-167f32f08471/final-card.png",
+  "illustratedCatPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/6eda0031-9570-48e3-9793-167f32f08471/illustrated-cat.png",
+  "analysisPath": "/Users/giuppy/Downloads/catdex-main/card-renderer/public/generated/cards/6eda0031-9570-48e3-9793-167f32f08471/analysis.json",
+  "metadataPath": "/generated/cards/6eda0031-9570-48e3-9793-167f32f08471/metadata.json",
+  "createdAt": "2026-07-06T18:55:14.803Z"
+}

@@ -41,10 +41,10 @@ class _CatDexBottomNavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
     final labels = [
-      l10n.catDexTitle,
-      'Camera',
-      'Carte',
-      'Profilo',
+      l10n.bottomCatdex,
+      l10n.bottomCapture,
+      l10n.bottomCards,
+      l10n.bottomProfile,
     ];
     const icons = [
       Icons.style_rounded,
