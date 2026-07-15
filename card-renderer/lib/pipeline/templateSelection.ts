@@ -1,6 +1,7 @@
-import { access, readFile } from 'node:fs/promises';
+import { access } from 'node:fs/promises';
 import path from 'node:path';
-import type { CardTemplateLayout, CatRarity, SelectedTemplate } from './types';
+import { loadCachedLayout } from './compositionAssetCache';
+import type { CatRarity, SelectedTemplate } from './types';
 
 const templatesRoot = path.join(process.cwd(), 'assets/cards/templates');
 const legacyTemplatePath = path.join(process.cwd(), 'public/cards/catdex_template_v2.png');
@@ -58,7 +59,7 @@ function templatePaths(templateKey: string) {
 }
 
 async function loadSelectedTemplate(key: string, templatePath: string, layoutPath: string): Promise<SelectedTemplate> {
-  const layout = JSON.parse(await readFile(layoutPath, 'utf8')) as CardTemplateLayout;
+  const layout = await loadCachedLayout(key, layoutPath);
   console.log('CATDEX_TEMPLATE_SELECTED_KEY', key);
   console.log('CATDEX_TEMPLATE_SELECTED_PATH', templatePath);
   console.log('CATDEX_TEMPLATE_LAYOUT_PATH', layoutPath);

@@ -1,15 +1,16 @@
-import { ImageResponse } from '@vercel/og';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
+import satori from 'satori';
+import sharp from 'sharp';
+import React from 'react';
 import { CARD_HEIGHT, CARD_WIDTH, STAR_TOTAL } from '../cardLayout';
 import { StarRating } from '../StarRating';
-import { fileToDataUrl } from './storage';
+import { loadCachedFont, loadCachedTemplate } from './compositionAssetCache';
 import type { CardTemplateLayout, CardTextJson } from './types';
 
-type RenderProgrammaticCardInput = {
+export type RenderProgrammaticCardInput = {
+  templateKey: string;
   templatePath: string;
   layout: CardTemplateLayout;
-  artworkImageUrl: string;
+  artworkBuffer: Buffer;
   cardNumber: string;
   starCount: number;
   text: CardTextJson;
@@ -278,130 +279,99 @@ function DebugBox({ slot }: { slot: { x: number; y: number; width: number; heigh
   );
 }
 
-async function loadFont(fontName: string): Promise<Buffer | undefined> {
-  const fontMap: Record<string, string> = {
-    CinzelDecorative: 'public/fonts/CinzelDecorative-Bold.ttf',
-    Fredoka: 'public/fonts/Fredoka-Bold.ttf',
-  };
-  const fontPath = fontMap[fontName];
-  if (!fontPath) {
-    return undefined;
-  }
-
+export async function renderProgrammaticCard(input: RenderProgrammaticCardInput): Promise<Buffer> {
+  const totalStartedAt = performance.now();
   try {
-    return await readFile(path.join(process.cwd(), fontPath));
-  } catch {
-    return undefined;
-  }
-}
-
-export async function renderProgrammaticCard(input: RenderProgrammaticCardInput): Promise<ImageResponse> {
-  const templateDataUrl = await fileToDataUrl(input.templatePath);
-  const showLayoutDebugBoxes = process.env.SHOW_LAYOUT_DEBUG_BOXES === 'true';
-  console.log('CATDEX_TEXT_LAYOUT_VERSION', 'v6_box_centered_metadata');
-  console.log('CATDEX_RENDER_ARTWORK_ALPHA_PRESERVED', true);
-  console.log('CATDEX_LAYOUT_DEBUG_BOXES_ENABLED', showLayoutDebugBoxes);
-  const fittedStars = fittedStarsLayout(input.layout.stars, input.starCount);
-  console.log('CATDEX_SPECIES_TEXT_RENDERED', false);
-  console.log(
-    'CATDEX_ARTWORK_LAYOUT',
-    JSON.stringify({
-      x: input.layout.artwork.x,
-      y: input.layout.artwork.y,
-      width: input.layout.artwork.width,
-      height: input.layout.artwork.height,
-      offsetY: input.layout.artwork.offsetY,
-    }),
-  );
-  const fonts = (
-    await Promise.all(
-      Array.from(
-        new Set([
-          input.layout.cardNumber.fontFamily,
-          input.layout.catName.fontFamily,
-          input.layout.species.fontFamily,
-        ]),
-      ).map(async (fontFamily) => {
-        const data = await loadFont(fontFamily);
-        return data
-          ? {
-              name: fontFamily,
-              data,
-              weight: 700 as const,
-              style: 'normal' as const,
-            }
-          : undefined;
+    console.log('CATDEX_COMPOSITION_ENGINE', 'sharp_native_v1');
+    const showLayoutDebugBoxes = process.env.SHOW_LAYOUT_DEBUG_BOXES === 'true';
+    console.log('CATDEX_TEXT_LAYOUT_VERSION', 'v6_box_centered_metadata');
+    console.log('CATDEX_RENDER_ARTWORK_ALPHA_PRESERVED', true);
+    console.log('CATDEX_LAYOUT_DEBUG_BOXES_ENABLED', showLayoutDebugBoxes);
+    console.log('CATDEX_SPECIES_TEXT_RENDERED', false);
+    console.log(
+      'CATDEX_ARTWORK_LAYOUT',
+      JSON.stringify({
+        x: input.layout.artwork.x,
+        y: input.layout.artwork.y,
+        width: input.layout.artwork.width,
+        height: input.layout.artwork.height,
+        offsetY: input.layout.artwork.offsetY,
       }),
-    )
-  ).filter((font): font is { name: string; data: Buffer; weight: 700; style: 'normal' } => Boolean(font));
+    );
 
-  return new ImageResponse(
-    (
-      <div
-        style={{
-          position: 'relative',
-          display: 'flex',
-          width: CARD_WIDTH,
-          height: CARD_HEIGHT,
-          overflow: 'hidden',
-          backgroundColor: '#172033',
-        }}
-      >
-        <img
-          src={templateDataUrl}
-          alt=""
-          width={CARD_WIDTH}
-          height={CARD_HEIGHT}
-          style={{ position: 'absolute', inset: 0, width: CARD_WIDTH, height: CARD_HEIGHT }}
-        />
+    const template = await loadCachedTemplate(input.templateKey, input.templatePath);
+    const fonts = await measureMs('CATDEX_PERF_COMPOSITION_FONT_LOAD_MS', async () => {
+      const loaded = await Promise.all(
+        Array.from(
+          new Set([
+            input.layout.cardNumber.fontFamily,
+            input.layout.catName.fontFamily,
+            input.layout.species.fontFamily,
+          ]),
+        ).map(async (fontFamily) => {
+          const data = await loadCachedFont(fontFamily);
+          return data
+            ? {
+                name: fontFamily,
+                data,
+                weight: 700 as const,
+                style: 'normal' as const,
+              }
+            : undefined;
+        }),
+      );
+      return loaded.filter(
+        (font): font is { name: string; data: Buffer; weight: 700; style: 'normal' } =>
+          Boolean(font),
+      );
+    });
 
-        {input.artworkImageUrl ? (
-          <div
-            style={{
-              ...slotStyle({
-                ...input.layout.artwork,
-                y: input.layout.artwork.y + input.layout.artwork.offsetY,
-              }),
-              display: 'flex',
-              alignItems:
-                input.layout.artwork.anchor === 'top'
-                  ? 'flex-start'
-                  : input.layout.artwork.anchor === 'bottom'
-                    ? 'flex-end'
-                    : 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-            }}
-          >
-            <img
-              src={input.artworkImageUrl}
-              alt=""
-              style={{
-                width: input.layout.artwork.width,
-                height: input.layout.artwork.height,
-                objectFit: input.layout.artwork.fit,
-                objectPosition: input.layout.artwork.anchor,
-              }}
-            />
-          </div>
-        ) : null}
+    const artworkPipeline = sharp(input.artworkBuffer, { failOn: 'error' });
+    const artworkMetadata = await measureMs(
+      'CATDEX_PERF_COMPOSITION_ARTWORK_DECODE_MS',
+      () => artworkPipeline.metadata(),
+    );
+    console.log(
+      'CATDEX_COMPOSITION_ARTWORK_METADATA',
+      JSON.stringify({
+        width: artworkMetadata.width,
+        height: artworkMetadata.height,
+        format: artworkMetadata.format,
+        hasAlpha: artworkMetadata.hasAlpha,
+      }),
+    );
+    console.log('CATDEX_PERF_COMPOSITION_ARTWORK_TRIM_MS', 0);
+    console.log('CATDEX_COMPOSITION_ARTWORK_TRIM_SKIPPED', true);
 
-        <TextSlot slot={input.layout.cardNumber} slotName="cardNumber" text={input.cardNumber} />
-        <TextSlot slot={input.layout.catName} slotName="catName" text={input.text.cardTitle.toUpperCase()} />
+    const resizedArtwork = await measureMs(
+      'CATDEX_PERF_COMPOSITION_ARTWORK_RESIZE_MS',
+      () =>
+        artworkPipeline
+          .ensureAlpha()
+          .resize(input.layout.artwork.width, input.layout.artwork.height, {
+            fit: input.layout.artwork.fit,
+            position: input.layout.artwork.anchor,
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          })
+          .raw()
+          .toBuffer({ resolveWithObject: true }),
+    );
 
-        <div
-          style={{
-            ...slotStyle(input.layout.stars),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            overflow: 'hidden',
-          }}
-        >
-          <StarRating active={input.starCount} starSize={fittedStars.starSize} gap={fittedStars.gap} />
-        </div>
-
-        {showLayoutDebugBoxes ? (
+    const artworkPosition = measureSync(
+      'CATDEX_PERF_COMPOSITION_ARTWORK_POSITION_MS',
+      () => ({
+        left: input.layout.artwork.x,
+        top: input.layout.artwork.y + input.layout.artwork.offsetY,
+      }),
+    );
+    const fittedStars = measureSync(
+      'CATDEX_PERF_COMPOSITION_STAR_GENERATION_MS',
+      () => fittedStarsLayout(input.layout.stars, input.starCount),
+    );
+    const debugDecorations = measureSync(
+      'CATDEX_PERF_COMPOSITION_METADATA_DECORATIONS_MS',
+      () =>
+        showLayoutDebugBoxes ? (
           <>
             <DebugBox slot={input.layout.catName} />
             <DebugBox slot={input.layout.cardNumber} />
@@ -413,16 +383,134 @@ export async function renderProgrammaticCard(input: RenderProgrammaticCardInput)
               }}
             />
           </>
-        ) : null}
-      </div>
-    ),
-    {
-      width: CARD_WIDTH,
-      height: CARD_HEIGHT,
-      fonts: fonts.length > 0 ? fonts : undefined,
-      headers: {
-        'cache-control': 'public, max-age=31536000, immutable',
-      },
-    },
-  );
+        ) : null,
+    );
+
+    const overlaySvg = await measureMs(
+      'CATDEX_PERF_COMPOSITION_TEXT_RENDER_MS',
+      () =>
+        satori(
+          <div
+            style={{
+              position: 'relative',
+              display: 'flex',
+              width: CARD_WIDTH,
+              height: CARD_HEIGHT,
+              overflow: 'hidden',
+            }}
+          >
+            <TextSlot slot={input.layout.cardNumber} slotName="cardNumber" text={input.cardNumber} />
+            <TextSlot
+              slot={input.layout.catName}
+              slotName="catName"
+              text={input.text.cardTitle.toUpperCase()}
+            />
+            <div
+              style={{
+                ...slotStyle(input.layout.stars),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+              }}
+            >
+              <StarRating
+                active={input.starCount}
+                starSize={fittedStars.starSize}
+                gap={fittedStars.gap}
+              />
+            </div>
+            {debugDecorations}
+          </div>,
+          {
+            width: CARD_WIDTH,
+            height: CARD_HEIGHT,
+            fonts,
+          },
+        ),
+    );
+
+    const compositedRaw = await measureMs(
+      'CATDEX_PERF_COMPOSITION_COMPOSITE_MS',
+      () =>
+        sharp(template.data, {
+          raw: {
+            width: template.width,
+            height: template.height,
+            channels: template.channels,
+          },
+        })
+          .composite([
+            {
+              input: resizedArtwork.data,
+              raw: {
+                width: resizedArtwork.info.width,
+                height: resizedArtwork.info.height,
+                channels: resizedArtwork.info.channels,
+              },
+              left: artworkPosition.left,
+              top: artworkPosition.top,
+              blend: 'over',
+            },
+            {
+              input: Buffer.from(overlaySvg),
+              left: 0,
+              top: 0,
+              density: 72,
+              blend: 'over',
+            },
+          ])
+          .raw()
+          .toBuffer({ resolveWithObject: true }),
+    );
+
+    const encodedPng = await measureMs(
+      'CATDEX_PERF_COMPOSITION_PNG_ENCODE_MS',
+      () =>
+        sharp(compositedRaw.data, {
+          raw: {
+            width: compositedRaw.info.width,
+            height: compositedRaw.info.height,
+            channels: compositedRaw.info.channels,
+          },
+        })
+          .png({
+            compressionLevel: 6,
+            adaptiveFiltering: true,
+            palette: false,
+          })
+          .toBuffer(),
+    );
+
+    return measureSync('CATDEX_PERF_COMPOSITION_OUTPUT_BUFFER_MS', () =>
+      Buffer.from(
+        encodedPng.buffer,
+        encodedPng.byteOffset,
+        encodedPng.byteLength,
+      ),
+    );
+  } finally {
+    console.log(
+      'CATDEX_PERF_COMPOSITION_TOTAL_MS',
+      Math.round(performance.now() - totalStartedAt),
+    );
+  }
+}
+
+async function measureMs<T>(label: string, operation: () => Promise<T>): Promise<T> {
+  const startedAt = performance.now();
+  try {
+    return await operation();
+  } finally {
+    console.log(label, Math.round(performance.now() - startedAt));
+  }
+}
+
+function measureSync<T>(label: string, operation: () => T): T {
+  const startedAt = performance.now();
+  try {
+    return operation();
+  } finally {
+    console.log(label, Math.round(performance.now() - startedAt));
+  }
 }

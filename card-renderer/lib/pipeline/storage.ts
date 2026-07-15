@@ -33,10 +33,18 @@ export async function saveJsonArtifact(discoveryId: string, fileName: string, da
   return filePath;
 }
 
-export async function savePngArtifact(discoveryId: string, fileName: string, data: ArrayBuffer): Promise<string> {
+export async function savePngArtifact(
+  discoveryId: string,
+  fileName: string,
+  data: ArrayBuffer | Uint8Array,
+): Promise<string> {
   const directory = await ensureDiscoveryStorage(discoveryId);
   const filePath = path.join(directory, fileName);
-  const buffer = Buffer.from(data);
+  const buffer = Buffer.isBuffer(data)
+    ? data
+    : data instanceof ArrayBuffer
+      ? Buffer.from(data)
+      : Buffer.from(data.buffer as ArrayBuffer, data.byteOffset, data.byteLength);
   await writeFile(filePath, buffer);
   await uploadArtifactToSupabaseIfEnabled(discoveryId, fileName, buffer);
   return filePath;
@@ -56,7 +64,7 @@ export async function saveImageFromUrl(
   fileName: string,
   imageUrl: string,
   publicBaseUrl?: string,
-): Promise<{ path: string; url: string; contentType: string } | undefined> {
+): Promise<{ path: string; url: string; contentType: string; data: Buffer } | undefined> {
   try {
     const directory = await ensureDiscoveryStorage(discoveryId);
     const filePath = path.join(directory, fileName);
@@ -68,6 +76,7 @@ export async function saveImageFromUrl(
       path: filePath,
       url: publicCardUrl(discoveryId, fileName, publicBaseUrl),
       contentType: image.contentType,
+      data: image.data,
     };
   } catch {
     return undefined;
@@ -195,6 +204,10 @@ async function readImageBytes(imageUrl: string): Promise<{ data: Buffer; content
     contentType: response.headers.get('content-type') ?? contentTypeFromPath(imageUrl),
     data: Buffer.from(await response.arrayBuffer()),
   };
+}
+
+export async function readImageBuffer(imageUrl: string): Promise<Buffer> {
+  return (await readImageBytes(imageUrl)).data;
 }
 
 function contentTypeFromPath(filePath: string): string {

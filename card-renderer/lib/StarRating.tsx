@@ -1,3 +1,4 @@
+import React from 'react';
 import { STAR_TOTAL } from './cardLayout';
 
 type StarRatingProps = {

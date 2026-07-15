@@ -4,8 +4,8 @@ import { createCardText, fallbackCardText } from './cardTextService';
 import { PipelinePerformanceTrace } from './performanceInstrumentation';
 import { renderProgrammaticCard } from './programmaticCardRenderer';
 import {
-  fileToDataUrl,
   publicCardUrl,
+  readImageBuffer,
   saveAnalysis,
   saveImageFromUrl,
   saveIllustrationReference,
@@ -128,24 +128,22 @@ export async function generateCatDexCard(input: GenerateCardInput): Promise<Gene
     const illustrationReference =
       savedIllustration ??
       (await saveIllustrationReference(input.discoveryId, illustratedCatUrl));
-    const artworkImageUrl = savedIllustration
-      ? await fileToDataUrl(savedIllustration.path, savedIllustration.contentType)
-      : illustratedCatUrl;
+    const artworkBuffer = savedIllustration?.data ?? await readImageBuffer(illustratedCatUrl);
     const compositionStartedAt = Date.now();
     console.log('CATDEX_RENDERER_COMPOSITION_STARTED');
     const finalCardBytes = await performanceTrace.measure(
       'CARD_COMPOSITION',
       'Composition',
       async () => {
-        const cardImageResponse = await renderProgrammaticCard({
+        return renderProgrammaticCard({
+          templateKey: selectedTemplate.key,
           templatePath: selectedTemplate.templatePath,
           layout: selectedTemplate.layout,
-          artworkImageUrl,
+          artworkBuffer,
           cardNumber: cardNumberFromDiscovery(input.discoveryId),
           starCount,
           text: cardText,
         });
-        return cardImageResponse.arrayBuffer();
       },
     );
     const finalCardPath = await performanceTrace.measure(
