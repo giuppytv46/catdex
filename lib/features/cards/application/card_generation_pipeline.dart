@@ -1,4 +1,5 @@
 import 'package:catdex/features/analysis/presentation/cat_display_data.dart';
+import 'package:catdex/features/cards/application/card_generation_performance.dart';
 import 'package:catdex/features/cards/application/remote_card_generation_service.dart';
 import 'package:catdex/features/cards/presentation/card_image_cache_buster.dart';
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
@@ -16,6 +17,7 @@ final cardGenerationPipelineProvider = Provider<CardGenerationPipeline>((ref) {
 
 enum CardGenerationStage {
   illustration,
+  recovery,
   render,
 }
 
@@ -52,6 +54,30 @@ class CardGenerationPipeline {
     String? debugRarityOverride,
     ValueChanged<CardGenerationStage>? onStageChanged,
   }) async {
+    final totalTiming = CardGenerationPerformanceSpan.start(
+      'CATDEX_PERF_FLUTTER_PIPELINE_TOTAL',
+      discoveryId: discovery.id,
+    );
+    try {
+      return await _regenerateCardWithAiIllustration(
+        discovery: discovery,
+        displayData: displayData,
+        collectionNumber: collectionNumber,
+        debugRarityOverride: debugRarityOverride,
+        onStageChanged: onStageChanged,
+      );
+    } finally {
+      totalTiming.finish();
+    }
+  }
+
+  Future<CardGenerationResult> _regenerateCardWithAiIllustration({
+    required CatDiscovery discovery,
+    required CatDisplayData displayData,
+    required int collectionNumber,
+    String? debugRarityOverride,
+    ValueChanged<CardGenerationStage>? onStageChanged,
+  }) async {
     debugPrint('CATDEX_CARD_REGENERATE_STARTED ${discovery.id}');
     debugPrint(
       'CATDEX_CARD_REGENERATE_DISCOVERY_NAME ${displayData.displayName}',
@@ -63,6 +89,9 @@ class CardGenerationPipeline {
       displayData: displayData,
       collectionNumber: collectionNumber,
       debugRarityOverride: debugRarityOverride,
+      onPending: (_) {
+        onStageChanged?.call(CardGenerationStage.recovery);
+      },
     );
 
     if (generated == null) {
@@ -89,20 +118,77 @@ class CardGenerationPipeline {
       discovery: discovery,
       generated: generated,
     );
-    await _saveAndRefreshDiscovery(updatedDiscovery);
-    debugPrint('CATDEX_CARD_IMAGE_SAVED_FINAL_URL ${generated.finalCardUrl}');
+    final persistedDiscovery = await _saveAndRefreshDiscovery(
+      updatedDiscovery,
+    );
+    if (persistedDiscovery == null) {
+      debugPrint('CATDEX_CARD_GENERATION_FAILED_KEEP_EXISTING_IMAGE');
+      return CardGenerationResult(
+        generatedCardPathOrUrl: null,
+        discovery: discovery,
+        failureReason: RemoteCardGenerationFailureReason.remoteApiFailure,
+      );
+    }
+    final persistedUrl = canonicalGeneratedCardUrl(persistedDiscovery)!;
+    debugPrint('CATDEX_CARD_IMAGE_SAVED_FINAL_URL $persistedUrl');
 
     return CardGenerationResult(
-      generatedCardPathOrUrl: generated.finalCardUrl,
-      discovery: updatedDiscovery,
+      generatedCardPathOrUrl: persistedUrl,
+      discovery: persistedDiscovery,
     );
   }
 
-  Future<void> _saveAndRefreshDiscovery(CatDiscovery discovery) async {
-    await _ref.read(discoveryRepositoryProvider).saveDiscovery(discovery);
-    _ref
-        .read(localDiscoverySessionProvider.notifier)
-        .replaceDiscovery(discovery);
+  Future<CatDiscovery?> _saveAndRefreshDiscovery(
+    CatDiscovery discovery,
+  ) async {
+    final persistenceTiming = CardGenerationPerformanceSpan.start(
+      'CATDEX_PERF_FLUTTER_PERSISTENCE',
+      discoveryId: discovery.id,
+    );
+    final expectedUrl = canonicalGeneratedCardUrl(discovery);
+    debugPrint('CATDEX_CARD_RESULT_SAVE_STARTED');
+    debugPrint('CATDEX_CARD_RESULT_SAVE_DISCOVERY_ID ${discovery.id}');
+    debugPrint('CATDEX_CARD_RESULT_SAVE_FINAL_URL ${expectedUrl ?? '-'}');
+
+    final repository = _ref.read(discoveryRepositoryProvider);
+    try {
+      await repository.saveDiscovery(discovery);
+      debugPrint('CATDEX_CARD_RESULT_SAVE_PERSISTED true');
+    } on Object catch (error) {
+      debugPrint('CATDEX_CARD_RESULT_SAVE_PERSISTED false error=$error');
+    }
+
+    try {
+      final readBack = await repository.getDiscoveryById(discovery.id);
+      final readBackUrl = canonicalGeneratedCardUrl(readBack);
+      debugPrint('CATDEX_CARD_RESULT_READBACK_URL ${readBackUrl ?? '-'}');
+      if (readBack == null ||
+          readBackUrl == null ||
+          readBackUrl != expectedUrl) {
+        debugPrint('CATDEX_CARD_RESULT_READBACK_FAILED');
+        return null;
+      }
+
+      persistenceTiming.finish();
+      final uiRefreshTiming = CardGenerationPerformanceSpan.start(
+        'CATDEX_PERF_FLUTTER_UI_REFRESH',
+        discoveryId: discovery.id,
+      );
+      try {
+        _ref
+            .read(localDiscoverySessionProvider.notifier)
+            .replaceDiscovery(readBack);
+      } finally {
+        uiRefreshTiming.finish();
+      }
+      debugPrint('CATDEX_CARD_RESULT_READBACK_SUCCESS');
+      return readBack;
+    } on Object catch (error) {
+      debugPrint('CATDEX_CARD_RESULT_READBACK_FAILED error=$error');
+      return null;
+    } finally {
+      persistenceTiming.finish();
+    }
   }
 
   CatDiscovery _discoveryWithRemoteGeneratedCard({
@@ -137,42 +223,6 @@ class CardGenerationPipeline {
       cardVersion: (previousCard?.cardVersion ?? 0) + 1,
     );
 
-    return _copyDiscoveryWithCard(discovery: discovery, card: card);
-  }
-
-  CatDiscovery _copyDiscoveryWithCard({
-    required CatDiscovery discovery,
-    required CatDiscoveryCard card,
-  }) {
-    return CatDiscovery(
-      id: discovery.id,
-      playerId: discovery.playerId,
-      speciesId: discovery.speciesId,
-      variantId: discovery.variantId,
-      rarity: discovery.rarity,
-      personality: discovery.personality,
-      traits: discovery.traits,
-      discoveredAt: discovery.discoveredAt,
-      friendshipPoints: discovery.friendshipPoints,
-      customName: discovery.customName,
-      suggestedName: discovery.suggestedName,
-      city: discovery.city,
-      country: discovery.country,
-      photoPath: discovery.photoPath,
-      originalPhotoPath: discovery.originalPhotoPath,
-      displayPhotoPath: discovery.displayPhotoPath,
-      story: discovery.story,
-      funFact: discovery.funFact,
-      coatColor: discovery.coatColor,
-      coatPattern: discovery.coatPattern,
-      eyeColor: discovery.eyeColor,
-      hairLength: discovery.hairLength,
-      estimatedAge: discovery.estimatedAge,
-      xpEarned: discovery.xpEarned,
-      coinsEarned: discovery.coinsEarned,
-      confidenceScore: discovery.confidenceScore,
-      card: card,
-      favorite: discovery.favorite,
-    );
+    return discovery.copyWithCard(card);
   }
 }

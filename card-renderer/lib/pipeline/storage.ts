@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { isSupabaseStorageConfigured, storageMode } from './config';
 import type { CatAnalysisJson, StoredGeneratedCard } from './types';
@@ -135,6 +135,29 @@ export async function saveAnalysis(discoveryId: string, analysis: CatAnalysisJso
 
 export async function saveMetadata(metadata: StoredGeneratedCard): Promise<string> {
   return saveJsonArtifact(metadata.discoveryId, 'metadata.json', metadata);
+}
+
+export async function readStoredGeneratedCard(discoveryId: string): Promise<StoredGeneratedCard | undefined> {
+  try {
+    const filePath = path.join(discoveryStorageDirectory(discoveryId), 'metadata.json');
+    const data = JSON.parse(await readFile(filePath, 'utf8')) as StoredGeneratedCard;
+    if (!data.finalCardUrl || !data.illustratedCatUrl || !data.selectedTemplateKey) {
+      return undefined;
+    }
+    return data;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function hasFinalCardArtifact(discoveryId: string): Promise<boolean> {
+  try {
+    const filePath = path.join(discoveryStorageDirectory(discoveryId), 'final-card.png');
+    const info = await stat(filePath);
+    return info.isFile() && info.size > 0;
+  } catch {
+    return false;
+  }
 }
 
 export async function fileToDataUrl(filePath: string, contentType = 'image/png'): Promise<string> {

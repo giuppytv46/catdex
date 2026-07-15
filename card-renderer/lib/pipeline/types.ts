@@ -76,6 +76,7 @@ export type SelectedTemplate = {
 
 export type GenerateCardInput = {
   discoveryId: string;
+  idempotencyKey?: string;
   photoUrl: string;
   rarity: CatRarity;
   publicBaseUrl?: string;

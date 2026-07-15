@@ -3,12 +3,37 @@ import 'dart:io';
 
 import 'package:catdex/features/analysis/presentation/cat_display_data.dart';
 import 'package:catdex/features/capture/data/supabase_cat_photo_storage_repository.dart';
+import 'package:catdex/features/cards/application/card_generation_performance.dart';
 import 'package:catdex/features/cards/presentation/card_image_cache_buster.dart';
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+typedef CardPhotoSignedUrlProvider =
+    Future<String?> Function(
+      String storagePath,
+    );
+
+typedef CardPhotoLocalUploadProvider =
+    Future<String?> Function({
+      required CatDiscovery discovery,
+      required String sourcePath,
+    });
+
+typedef RemoteCardPostJson =
+    Future<RemoteCardGenerationHttpResponse> Function({
+      required Uri uri,
+      required Map<String, Object?> payload,
+    });
+
+typedef CardGenerationRecoveryDelay = Future<void> Function(Duration delay);
+
+enum RemoteCardGenerationPendingReason {
+  renderInProgress,
+  generationTimeout,
+}
 
 final remoteCardGenerationServiceProvider =
     Provider<RemoteCardGenerationService>((ref) {
@@ -44,16 +69,33 @@ class RemoteCardGenerationService {
   RemoteCardGenerationService({
     SupabaseClient? supabaseClient,
     String endpoint = const String.fromEnvironment('CARD_GENERATION_API_URL'),
+    CardPhotoSignedUrlProvider? signedPhotoUrlProvider,
+    CardPhotoLocalUploadProvider? localPhotoUploadProvider,
+    RemoteCardPostJson? postJson,
+    List<Duration> recoveryDelays = const [
+      Duration(seconds: 10),
+      Duration(seconds: 15),
+      Duration(seconds: 20),
+    ],
+    CardGenerationRecoveryDelay? recoveryDelay,
   }) : _endpoint = endpoint,
-       _supabaseClient = supabaseClient;
+       _supabaseClient = supabaseClient,
+       _signedPhotoUrlProvider = signedPhotoUrlProvider,
+       _localPhotoUploadProvider = localPhotoUploadProvider,
+       _postJsonOverride = postJson,
+       _recoveryDelays = List<Duration>.unmodifiable(recoveryDelays),
+       _recoveryDelay = recoveryDelay ?? Future<void>.delayed;
 
-  static const debugFallbackPhotoUrl =
-      'http://localhost:3000/cards/test_illustrated_cat.png';
   static const String _bucketName =
       SupabaseCatPhotoStorageRepository.catPhotosBucketName;
 
   final String _endpoint;
   final SupabaseClient? _supabaseClient;
+  final CardPhotoSignedUrlProvider? _signedPhotoUrlProvider;
+  final CardPhotoLocalUploadProvider? _localPhotoUploadProvider;
+  final RemoteCardPostJson? _postJsonOverride;
+  final List<Duration> _recoveryDelays;
+  final CardGenerationRecoveryDelay _recoveryDelay;
   RemoteCardGenerationFailureReason? _lastFailureReason;
 
   RemoteCardGenerationFailureReason? get lastFailureReason =>
@@ -64,6 +106,7 @@ class RemoteCardGenerationService {
     required CatDisplayData displayData,
     required int collectionNumber,
     String? debugRarityOverride,
+    ValueChanged<RemoteCardGenerationPendingReason>? onPending,
   }) async {
     _lastFailureReason = null;
     debugPrint('CATDEX_REMOTE_GENERATE_CARD_STARTED ${discovery.id}');
@@ -81,7 +124,7 @@ class RemoteCardGenerationService {
     try {
       final endpointUri = Uri.parse(_endpoint);
       final photoUrl = await resolveRendererAccessiblePhotoUrl(discovery);
-      final photoUrlValid = _isAccessibleUrl(photoUrl);
+      final photoUrlValid = _isValidRendererPhotoUrl(photoUrl);
       debugPrint(
         'CATDEX_REMOTE_GENERATE_CARD_PHOTO_URL ${_logValue(photoUrl)}',
       );
@@ -91,7 +134,11 @@ class RemoteCardGenerationService {
 
       if (!photoUrlValid) {
         _lastFailureReason = RemoteCardGenerationFailureReason.invalidPhotoUrl;
-        debugPrint('CATDEX_REMOTE_GENERATE_CARD_ERROR invalid_photo_url');
+        debugPrint('CATDEX_REMOTE_GENERATE_CARD_ERROR missingPhoto');
+        debugPrint(
+          'CATDEX_CARD_RENDERER_REQUEST_BLOCKED_NO_REMOTE_PHOTO '
+          'reason=no_valid_https_photo',
+        );
         debugPrint('CATDEX_REMOTE_GENERATE_CARD_SUCCESS false');
         return null;
       }
@@ -153,18 +200,15 @@ class RemoteCardGenerationService {
         'CATDEX_REMOTE_GENERATE_CARD_PAYLOAD ${jsonEncode(payload)}',
       );
 
-      final response = await _postJson(uri: endpointUri, payload: payload);
-      debugPrint('CATDEX_REMOTE_GENERATE_CARD_STATUS ${response.statusCode}');
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        _lastFailureReason = RemoteCardGenerationFailureReason.remoteApiFailure;
-        debugPrint(
-          'CATDEX_REMOTE_GENERATE_CARD_ERROR HTTP ${response.statusCode}: '
-          '${utf8.decode(response.bytes, allowMalformed: true)}',
-        );
-        debugPrint('CATDEX_REMOTE_GENERATE_CARD_SUCCESS false');
+      final recoveredResponse = await _postJsonWithRecovery(
+        uri: endpointUri,
+        payload: payload,
+        onPending: onPending,
+      );
+      if (recoveredResponse == null) {
         return null;
       }
+      final response = recoveredResponse.response;
 
       final decoded = Map<String, Object?>.from(
         jsonDecode(utf8.decode(response.bytes)) as Map,
@@ -225,6 +269,9 @@ class RemoteCardGenerationService {
         return null;
       }
 
+      if (recoveredResponse.recovered) {
+        debugPrint('CATDEX_CARD_GENERATION_RECOVERY_SUCCESS');
+      }
       debugPrint('CATDEX_REMOTE_GENERATE_CARD_SUCCESS true');
       return RemoteGeneratedCard(
         finalCardUrl: finalCardUrl,
@@ -247,6 +294,7 @@ class RemoteCardGenerationService {
     final display = discovery.displayPhotoPath;
     final original = discovery.originalPhotoPath;
     final photoPath = discovery.photoPath;
+    final originalStoragePath = discovery.originalPhotoStoragePath;
 
     debugPrint(
       'CATDEX_REMOTE_PHOTO_SOURCE_CARD_ORIGINAL '
@@ -261,6 +309,9 @@ class RemoteCardGenerationService {
     debugPrint(
       'CATDEX_REMOTE_PHOTO_SOURCE_PHOTO_PATH ${_logValue(photoPath)}',
     );
+    debugPrint(
+      'CATDEX_CARD_PHOTO_STORAGE_PATH ${_logValue(originalStoragePath)}',
+    );
 
     final directCandidates = [
       _PhotoSourceCandidate('card_original', cardOriginal),
@@ -271,21 +322,29 @@ class RemoteCardGenerationService {
 
     for (final candidate in directCandidates) {
       final value = candidate.value;
-      if (_isAccessibleUrl(value)) {
+      if (_isValidRendererPhotoUrl(value)) {
         final selected = value!.trim();
-        debugPrint('CATDEX_REMOTE_PHOTO_SOURCE_SELECTED $selected');
-        debugPrint(
-          'CATDEX_REMOTE_PHOTO_SOURCE_SELECTED_KIND ${candidate.kind}',
-        );
+        _logSelectedPhoto(selected, source: candidate.kind);
         return selected;
       }
     }
 
-    for (final candidate in directCandidates) {
-      final signedUrl = await _tryCreateSignedPhotoUrl(candidate.value);
-      if (_isAccessibleUrl(signedUrl)) {
-        debugPrint('CATDEX_REMOTE_PHOTO_SOURCE_SELECTED $signedUrl');
-        debugPrint('CATDEX_REMOTE_PHOTO_SOURCE_SELECTED_KIND signed_url');
+    final storageCandidates = <String?>[
+      originalStoragePath,
+      ...directCandidates.map((candidate) => candidate.value),
+    ];
+    final attemptedStoragePaths = <String>{};
+    for (final storagePath in storageCandidates) {
+      final normalized = storagePath?.trim();
+      if (normalized == null ||
+          !attemptedStoragePaths.add(normalized) ||
+          !_isSupabaseStorageObjectPath(normalized)) {
+        continue;
+      }
+      debugPrint('CATDEX_CARD_PHOTO_STORAGE_PATH $normalized');
+      final signedUrl = await _tryCreateSignedPhotoUrl(normalized);
+      if (_isValidRendererPhotoUrl(signedUrl)) {
+        _logSelectedPhoto(signedUrl!, source: 'signed_url');
         return signedUrl;
       }
     }
@@ -295,55 +354,59 @@ class RemoteCardGenerationService {
         discovery: discovery,
         sourcePath: candidate.value,
       );
-      if (_isAccessibleUrl(uploadedUrl)) {
-        debugPrint('CATDEX_REMOTE_PHOTO_SOURCE_SELECTED $uploadedUrl');
-        debugPrint(
-          'CATDEX_REMOTE_PHOTO_SOURCE_SELECTED_KIND uploaded_local_file',
-        );
+      if (_isValidRendererPhotoUrl(uploadedUrl)) {
+        _logSelectedPhoto(uploadedUrl!, source: 'uploaded_local_file');
         return uploadedUrl;
       }
     }
 
-    debugPrint('CATDEX_REMOTE_PHOTO_USING_DEBUG_FALLBACK true');
-    debugPrint(
-      'CATDEX_REMOTE_PHOTO_DEBUG_FALLBACK_REASON no_valid_photo_url',
-    );
-    debugPrint('CATDEX_CARD_GENERATION_FALLBACK_USED debug_photo_url');
-    debugPrint(
-      'CATDEX_REMOTE_PHOTO_SOURCE_SELECTED $debugFallbackPhotoUrl',
-    );
-    debugPrint('CATDEX_REMOTE_PHOTO_SOURCE_SELECTED_KIND debug_fallback');
-    return debugFallbackPhotoUrl;
+    debugPrint('CATDEX_CARD_PHOTO_SELECTED -');
+    debugPrint('CATDEX_CARD_PHOTO_SELECTED_VALID false');
+    return null;
   }
 
   Future<String?> _tryCreateSignedPhotoUrl(String? storagePath) async {
-    final client = _supabaseClient;
-    if (client == null || storagePath == null || storagePath.trim().isEmpty) {
+    if (storagePath == null || storagePath.trim().isEmpty) {
       return null;
     }
     final normalized = storagePath.trim();
-    if (normalized == '-' ||
-        normalized.startsWith('/') ||
-        normalized.startsWith('file://') ||
-        normalized.startsWith('assets/') ||
-        normalized.startsWith('asset:')) {
+    if (!_isSupabaseStorageObjectPath(normalized)) {
       return null;
     }
 
+    debugPrint('CATDEX_CARD_PHOTO_SIGNED_URL_STARTED $normalized');
     debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL_STARTED $normalized');
+    final signedUrlTiming = CardGenerationPerformanceSpan.start(
+      'CATDEX_PERF_FLUTTER_SIGNED_URL_CREATION',
+      detail: 'storagePath=$normalized',
+    );
     try {
-      final signedUrl = await client.storage
-          .from(_bucketName)
-          .createSignedUrl(normalized, 60 * 60 * 24);
+      final provider = _signedPhotoUrlProvider;
+      final client = _supabaseClient;
+      final signedUrl = provider != null
+          ? await provider(normalized)
+          : client == null
+          ? null
+          : await client.storage
+                .from(_bucketName)
+                .createSignedUrl(normalized, 60 * 60 * 24);
+      final valid = _isValidRendererPhotoUrl(signedUrl);
+      debugPrint(
+        'CATDEX_CARD_PHOTO_SIGNED_URL_SUCCESS '
+        '${valid ? signedUrl : 'false'}',
+      );
       debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL_SUCCESS true');
       debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL ${_logValue(signedUrl)}');
       debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL_ERROR -');
-      return signedUrl;
+      return valid ? signedUrl : null;
     } on Object catch (error) {
+      debugPrint('CATDEX_CARD_PHOTO_SIGNED_URL_SUCCESS false');
       debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL_SUCCESS false');
       debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL -');
       debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL_ERROR $error');
       return null;
+    } finally {
+      signedUrlTiming.finish();
     }
   }
 
@@ -375,6 +438,21 @@ class RemoteCardGenerationService {
     final storagePath = 'catdex/originals/$playerId/${discovery.id}.jpg';
     debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_STARTED $normalized');
     final client = _supabaseClient;
+    final uploadProvider = _localPhotoUploadProvider;
+    if (uploadProvider != null) {
+      try {
+        return await uploadProvider(
+          discovery: discovery,
+          sourcePath: normalized,
+        );
+      } on Object catch (error) {
+        debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SUCCESS false');
+        debugPrint(
+          'CATDEX_REMOTE_GENERATE_CARD_ERROR local_photo_upload $error',
+        );
+        return null;
+      }
+    }
     if (client == null) {
       debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SUCCESS false');
       debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SIGNED_URL -');
@@ -396,9 +474,19 @@ class RemoteCardGenerationService {
               upsert: true,
             ),
           );
-      final signedUrl = await client.storage
-          .from(_bucketName)
-          .createSignedUrl(storagePath, 60 * 60 * 24);
+      final signedUrlTiming = CardGenerationPerformanceSpan.start(
+        'CATDEX_PERF_FLUTTER_SIGNED_URL_CREATION',
+        discoveryId: discovery.id,
+        detail: 'storagePath=$storagePath',
+      );
+      late final String signedUrl;
+      try {
+        signedUrl = await client.storage
+            .from(_bucketName)
+            .createSignedUrl(storagePath, 60 * 60 * 24);
+      } finally {
+        signedUrlTiming.finish();
+      }
       debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SUCCESS true');
       debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SIGNED_URL $signedUrl');
       return signedUrl;
@@ -429,27 +517,151 @@ class RemoteCardGenerationService {
     return null;
   }
 
-  Future<_RemoteGenerationResponse> _postJson({
+  Future<RemoteCardGenerationHttpResponse> _postJson({
     required Uri uri,
     required Map<String, Object?> payload,
   }) async {
-    final client = HttpClient();
+    final requestTiming = CardGenerationPerformanceSpan.start(
+      'CATDEX_PERF_FLUTTER_REQUEST',
+      detail: 'uri=$uri',
+    );
+    final firstByteTiming = CardGenerationPerformanceSpan.start(
+      'CATDEX_PERF_FLUTTER_FIRST_BYTE',
+      detail: 'uri=$uri',
+    );
+    final responseTiming = CardGenerationPerformanceSpan.start(
+      'CATDEX_PERF_FLUTTER_RESPONSE_RECEIVED',
+      detail: 'uri=$uri',
+    );
+    final override = _postJsonOverride;
     try {
-      final request = await client.postUrl(uri);
-      request.headers.contentType = ContentType.json;
-      request.write(jsonEncode(payload));
-      final response = await request.close();
-      final bytes = await response.fold<List<int>>(
-        <int>[],
-        (previous, element) => previous..addAll(element),
-      );
-      return _RemoteGenerationResponse(
-        statusCode: response.statusCode,
-        bytes: bytes,
-      );
+      if (override != null) {
+        final response = await override(uri: uri, payload: payload);
+        firstByteTiming.finish();
+        responseTiming.finish();
+        return response;
+      }
+
+      final client = HttpClient();
+      try {
+        final request = await client.postUrl(uri);
+        request.headers.contentType = ContentType.json;
+        request.write(jsonEncode(payload));
+        final response = await request.close();
+        firstByteTiming.finish();
+        final bytes = await response.fold<List<int>>(
+          <int>[],
+          (previous, element) => previous..addAll(element),
+        );
+        responseTiming.finish();
+        return RemoteCardGenerationHttpResponse(
+          statusCode: response.statusCode,
+          bytes: bytes,
+        );
+      } finally {
+        client.close(force: true);
+      }
     } finally {
-      client.close(force: true);
+      firstByteTiming.finish();
+      responseTiming.finish();
+      requestTiming.finish();
     }
+  }
+
+  Future<_RecoveredRemoteResponse?> _postJsonWithRecovery({
+    required Uri uri,
+    required Map<String, Object?> payload,
+    required ValueChanged<RemoteCardGenerationPendingReason>? onPending,
+  }) async {
+    var recoveryAttempt = 0;
+    var recovered = false;
+
+    while (true) {
+      final response = await _postJson(uri: uri, payload: payload);
+      debugPrint('CATDEX_REMOTE_GENERATE_CARD_STATUS ${response.statusCode}');
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return _RecoveredRemoteResponse(
+          response: response,
+          recovered: recovered,
+        );
+      }
+
+      final responseBody = utf8.decode(
+        response.bytes,
+        allowMalformed: true,
+      );
+      final errorCode = _responseErrorCode(responseBody);
+      final pendingReason = _pendingReason(
+        statusCode: response.statusCode,
+        errorCode: errorCode,
+      );
+      if (pendingReason == null) {
+        _lastFailureReason = RemoteCardGenerationFailureReason.remoteApiFailure;
+        debugPrint(
+          'CATDEX_REMOTE_GENERATE_CARD_ERROR HTTP ${response.statusCode}: '
+          '$responseBody',
+        );
+        debugPrint('CATDEX_REMOTE_GENERATE_CARD_SUCCESS false');
+        return null;
+      }
+
+      recovered = true;
+      onPending?.call(pendingReason);
+      switch (pendingReason) {
+        case RemoteCardGenerationPendingReason.renderInProgress:
+          debugPrint('CATDEX_CARD_GENERATION_PENDING_409');
+        case RemoteCardGenerationPendingReason.generationTimeout:
+          debugPrint('CATDEX_CARD_GENERATION_PENDING_504');
+      }
+      debugPrint('CATDEX_CARD_CREDIT_NOT_CONSUMED_TRANSIENT_FAILURE');
+
+      if (recoveryAttempt >= _recoveryDelays.length) {
+        _lastFailureReason = RemoteCardGenerationFailureReason.remoteApiFailure;
+        debugPrint('CATDEX_CARD_GENERATION_RECOVERY_EXHAUSTED');
+        debugPrint('CATDEX_REMOTE_GENERATE_CARD_SUCCESS false');
+        return null;
+      }
+
+      final delay = _recoveryDelays[recoveryAttempt];
+      recoveryAttempt += 1;
+      debugPrint(
+        'CATDEX_CARD_GENERATION_RECOVERY_ATTEMPT '
+        '$recoveryAttempt delayMs=${delay.inMilliseconds}',
+      );
+      await _recoveryDelay(delay);
+    }
+  }
+
+  String? _responseErrorCode(String responseBody) {
+    try {
+      final decoded = jsonDecode(responseBody);
+      if (decoded is Map) {
+        final value = decoded['error'];
+        if (value is String && value.trim().isNotEmpty) {
+          return value.trim();
+        }
+      }
+    } on FormatException {
+      return null;
+    }
+
+    return null;
+  }
+
+  RemoteCardGenerationPendingReason? _pendingReason({
+    required int statusCode,
+    required String? errorCode,
+  }) {
+    if (statusCode == HttpStatus.conflict &&
+        errorCode == 'CARD_RENDER_IN_PROGRESS') {
+      return RemoteCardGenerationPendingReason.renderInProgress;
+    }
+    if (statusCode == HttpStatus.gatewayTimeout &&
+        errorCode == 'CARD_GENERATION_TIMEOUT') {
+      return RemoteCardGenerationPendingReason.generationTimeout;
+    }
+
+    return null;
   }
 
   String? _absoluteUrl(String? value, Uri endpointUri) {
@@ -479,6 +691,57 @@ class RemoteCardGenerationService {
     return uri != null &&
         uri.hasAbsolutePath &&
         (uri.scheme == 'http' || uri.scheme == 'https');
+  }
+
+  bool _isValidRendererPhotoUrl(String? value) {
+    if (value == null || value.trim().isEmpty || value.trim() == '-') {
+      return false;
+    }
+    final normalized = value.trim();
+    final uri = Uri.tryParse(normalized);
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+      if (_looksLikeLocalhostUrl(uri) ||
+          normalized.contains('test_illustrated_cat.png')) {
+        debugPrint('CATDEX_CARD_PHOTO_REJECTED_LOCALHOST $normalized');
+      }
+      return false;
+    }
+    if (_looksLikeLocalhostUrl(uri) ||
+        normalized.contains('test_illustrated_cat.png')) {
+      debugPrint('CATDEX_CARD_PHOTO_REJECTED_LOCALHOST $normalized');
+      return false;
+    }
+    return true;
+  }
+
+  bool _looksLikeLocalhostUrl(Uri? uri) {
+    final host = uri?.host.toLowerCase();
+    return host == 'localhost' || host == '127.0.0.1' || host == '::1';
+  }
+
+  bool _isSupabaseStorageObjectPath(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized.isEmpty ||
+        normalized == '-' ||
+        normalized.startsWith('/') ||
+        normalized.startsWith('file://') ||
+        normalized.startsWith('http://') ||
+        normalized.startsWith('https://') ||
+        normalized.startsWith('assets/') ||
+        normalized.startsWith('asset:')) {
+      return false;
+    }
+
+    return normalized.startsWith('catdex/originals/') ||
+        normalized.startsWith('catdex/photos/') ||
+        normalized.startsWith('uploads/');
+  }
+
+  void _logSelectedPhoto(String value, {required String source}) {
+    debugPrint('CATDEX_CARD_PHOTO_SELECTED $value');
+    debugPrint('CATDEX_CARD_PHOTO_SELECTED_VALID true');
+    debugPrint('CATDEX_REMOTE_PHOTO_SOURCE_SELECTED $value');
+    debugPrint('CATDEX_REMOTE_PHOTO_SOURCE_SELECTED_KIND $source');
   }
 
   String? _rawFinalCardUrl(Map<String, Object?> decoded) {
@@ -586,14 +849,24 @@ class RemoteCardGenerationService {
   }
 }
 
-class _RemoteGenerationResponse {
-  const _RemoteGenerationResponse({
+class RemoteCardGenerationHttpResponse {
+  const RemoteCardGenerationHttpResponse({
     required this.statusCode,
     required this.bytes,
   });
 
   final int statusCode;
   final List<int> bytes;
+}
+
+class _RecoveredRemoteResponse {
+  const _RecoveredRemoteResponse({
+    required this.response,
+    required this.recovered,
+  });
+
+  final RemoteCardGenerationHttpResponse response;
+  final bool recovered;
 }
 
 class _PhotoSourceCandidate {

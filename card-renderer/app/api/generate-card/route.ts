@@ -7,12 +7,15 @@ import {
   RequestSafetyError,
   withTimeout,
 } from '../../../lib/pipeline/requestSafety';
-import type { CatRarity, GenerateCardInput } from '../../../lib/pipeline/types';
+import { resolveRenderJob } from '../../../lib/pipeline/renderJobLifecycle';
+import { PerformanceStep } from '../../../lib/pipeline/performanceInstrumentation';
+import { hasFinalCardArtifact, readStoredGeneratedCard } from '../../../lib/pipeline/storage';
+import type { CatRarity, GenerateCardInput, GenerateCardOutput } from '../../../lib/pipeline/types';
 
 export const runtime = 'nodejs';
 
 const rarities: CatRarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
-const activeRenderIds = new Set<string>();
+const activeRenderJobs = new Map<string, Promise<GenerateCardOutput>>();
 const generationTimeoutMs = Number(process.env.CARD_RENDERER_GENERATION_TIMEOUT_MS ?? '120000');
 
 function isRarity(value: unknown): value is CatRarity {
@@ -28,13 +31,18 @@ function cleanOptionalString(value: unknown): string | undefined {
 }
 
 function json(request: NextRequest, body: unknown, init?: ResponseInit): Response {
-  return Response.json(body, {
-    ...init,
-    headers: {
-      ...corsHeaders(request),
-      ...init?.headers,
-    },
-  });
+  const responseTiming = new PerformanceStep('RESPONSE_SENT');
+  try {
+    return Response.json(body, {
+      ...init,
+      headers: {
+        ...corsHeaders(request),
+        ...init?.headers,
+      },
+    });
+  } finally {
+    responseTiming.end();
+  }
 }
 
 export async function OPTIONS(request: NextRequest) {
@@ -45,6 +53,8 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const requestTiming = new PerformanceStep('REQUEST_RECEIVED');
+  requestTiming.end();
   let body: Partial<GenerateCardInput>;
   const publicBaseUrl = resolvePublicBaseUrl(request);
 
@@ -68,6 +78,7 @@ export async function POST(request: NextRequest) {
   const displaySpecies = cleanOptionalString(body.displaySpecies);
   const displayCoatColor = cleanOptionalString(body.displayCoatColor);
   const displayCoatPattern = cleanOptionalString(body.displayCoatPattern);
+  const idempotencyKey = cleanOptionalString(body.idempotencyKey) ?? `card:${discoveryId ?? 'unknown'}:v1`;
 
   if (!discoveryId || !photoUrl || !isRarity(rarity)) {
     console.log('CATDEX_RENDERER_REQUEST_FAILED', 'INVALID_INPUT');
@@ -94,54 +105,102 @@ export async function POST(request: NextRequest) {
     throw error;
   }
 
-  if (activeRenderIds.has(discoveryId)) {
-    console.log('CATDEX_RENDERER_REQUEST_FAILED', 'CARD_RENDER_IN_PROGRESS');
-    return json(
-      request,
-      {
-        success: false,
-        error: 'CARD_RENDER_IN_PROGRESS',
-        message: 'A render is already running for this discovery.',
-      },
-      { status: 409 },
-    );
-  }
-
   try {
-    activeRenderIds.add(discoveryId);
     console.log('CATDEX_RENDERER_REQUEST_STARTED', discoveryId);
+    console.log('CATDEX_RENDERER_IDEMPOTENCY_KEY', idempotencyKey);
     logRendererRuntimeConfig(publicBaseUrl);
     console.log('CATDEX_GENERATE_CARD_REQUEST_DISPLAY_NAME', displayName ?? '-');
     console.log('CATDEX_GENERATE_CARD_REQUEST_DISPLAY_SPECIES', displaySpecies ?? '-');
     console.log('CATDEX_GENERATE_CARD_REQUEST_DISPLAY_COAT', displayCoatColor ?? '-');
     console.log('CATDEX_GENERATE_CARD_REQUEST_DISPLAY_PATTERN', displayCoatPattern ?? '-');
 
-    const result = await withTimeout(
-      generateCatDexCard({
-        discoveryId,
-        photoUrl,
-        rarity,
-        publicBaseUrl,
-        eventKey: cleanOptionalString(body.eventKey),
-        displayName,
-        displaySpecies,
-        displayCoatColor,
-        displayCoatPattern,
-        displayEyeColor: cleanOptionalString(body.displayEyeColor),
-        displayHairLength: cleanOptionalString(body.displayHairLength),
-        displayPersonality: cleanOptionalString(body.displayPersonality),
-        displayRarity: cleanOptionalString(body.displayRarity),
-        displayStory: cleanOptionalString(body.displayStory),
-        displayFunFact: cleanOptionalString(body.displayFunFact),
-      }),
-      generationTimeoutMs,
-      'CARD_GENERATION_TIMEOUT',
-    );
+    const jobResolution = await resolveRenderJob({
+      jobs: activeRenderJobs,
+      key: idempotencyKey,
+      readCompleted: () => readCompletedResult(discoveryId),
+      createJob: () =>
+        generateCatDexCard({
+          discoveryId,
+          idempotencyKey,
+          photoUrl,
+          rarity,
+          publicBaseUrl,
+          eventKey: cleanOptionalString(body.eventKey),
+          displayName,
+          displaySpecies,
+          displayCoatColor,
+          displayCoatPattern,
+          displayEyeColor: cleanOptionalString(body.displayEyeColor),
+          displayHairLength: cleanOptionalString(body.displayHairLength),
+          displayPersonality: cleanOptionalString(body.displayPersonality),
+          displayRarity: cleanOptionalString(body.displayRarity),
+          displayStory: cleanOptionalString(body.displayStory),
+          displayFunFact: cleanOptionalString(body.displayFunFact),
+        }),
+      onExistingResult: () => {
+        console.log(
+          'CATDEX_RENDERER_EXISTING_RESULT_FOUND',
+          `discoveryId=${discoveryId}`,
+          `idempotencyKey=${idempotencyKey}`,
+        );
+      },
+      onCreated: () => {
+        console.log(
+          'CATDEX_RENDERER_JOB_CREATED',
+          `discoveryId=${discoveryId}`,
+          `idempotencyKey=${idempotencyKey}`,
+        );
+      },
+      onReused: () => {
+        console.log(
+          'CATDEX_RENDERER_JOB_REUSED',
+          `discoveryId=${discoveryId}`,
+          `idempotencyKey=${idempotencyKey}`,
+        );
+      },
+      onCompleted: () => {
+        console.log(
+          'CATDEX_RENDERER_JOB_COMPLETED',
+          `discoveryId=${discoveryId}`,
+          `idempotencyKey=${idempotencyKey}`,
+        );
+      },
+      onFailed: (error) => {
+        console.log(
+          'CATDEX_RENDERER_JOB_FAILED',
+          `discoveryId=${discoveryId}`,
+          `idempotencyKey=${idempotencyKey}`,
+          error instanceof Error ? error.message : String(error),
+        );
+      },
+      onRemoved: () => {
+        console.log(
+          'CATDEX_RENDERER_JOB_REMOVED',
+          `discoveryId=${discoveryId}`,
+          `idempotencyKey=${idempotencyKey}`,
+        );
+      },
+    });
+
+    if (jobResolution.kind === 'completed') {
+      console.log('CATDEX_RENDERER_RESPONSE_SENT', discoveryId);
+      return json(request, jobResolution.result);
+    }
+
+    const result = await withTimeout(jobResolution.job, generationTimeoutMs, 'CARD_GENERATION_TIMEOUT');
 
     console.log('CATDEX_RENDERER_OUTPUT_URL', result.finalCardUrl);
     console.log('CATDEX_RENDERER_REQUEST_SUCCEEDED', discoveryId);
+    console.log('CATDEX_RENDERER_RESPONSE_SENT', discoveryId);
     return json(request, result);
   } catch (error) {
+    if (error instanceof RequestSafetyError && error.code === 'CARD_GENERATION_TIMEOUT') {
+      console.log(
+        'CATDEX_RENDERER_REQUEST_TIMEOUT_JOB_CONTINUES',
+        `discoveryId=${discoveryId}`,
+        `idempotencyKey=${idempotencyKey}`,
+      );
+    }
     console.log('CATDEX_RENDERER_REQUEST_FAILED', error instanceof Error ? error.message : String(error));
     console.error('CATDEX_GENERATE_CARD_ERROR', error);
     console.log('CATDEX_GENERATE_CARD_SUCCESS', false);
@@ -166,7 +225,22 @@ export async function POST(request: NextRequest) {
       { success: false, error: 'CARD_GENERATION_FAILED', message: 'Failed to generate CatDex card.' },
       { status: 500 },
     );
-  } finally {
-    activeRenderIds.delete(discoveryId);
   }
+}
+
+async function readCompletedResult(discoveryId: string): Promise<GenerateCardOutput | undefined> {
+  const metadata = await readStoredGeneratedCard(discoveryId);
+  if (!metadata) {
+    return undefined;
+  }
+  if (!(await hasFinalCardArtifact(discoveryId))) {
+    return undefined;
+  }
+
+  return {
+    finalCardUrl: metadata.finalCardUrl,
+    illustratedCatUrl: metadata.illustratedCatUrl,
+    analysisJson: metadata.analysisJson,
+    selectedTemplateKey: metadata.selectedTemplateKey,
+  };
 }

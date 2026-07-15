@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { CatAnalysisJson } from './types';
+import type { PipelinePerformanceTrace } from './performanceInstrumentation';
 import { publicCardUrl, savePngArtifact } from './storage';
 import { removeBackgroundFromPng } from './backgroundRemovalService';
 import { isMockArtworkEnabled } from './config';
@@ -11,13 +12,18 @@ type CreateCatIllustrationInput = {
   analysis: CatAnalysisJson;
   cardStyle: string;
   publicBaseUrl?: string;
+  performanceTrace: PipelinePerformanceTrace;
 };
 
 export async function createCatIllustration(input: CreateCatIllustrationInput): Promise<string> {
   const mockArtworkEnabled = isMockArtworkEnabled();
   console.log('CATDEX_MOCK_AI_ARTWORK_ENABLED', mockArtworkEnabled);
   if (mockArtworkEnabled) {
-    return createMockCatIllustration(input.discoveryId, input.publicBaseUrl);
+    return input.performanceTrace.measure(
+      'AI_ARTWORK_GENERATION',
+      'OpenAI',
+      () => createMockCatIllustration(input.discoveryId, input.publicBaseUrl),
+    );
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
@@ -25,14 +31,25 @@ export async function createCatIllustration(input: CreateCatIllustrationInput): 
     throw new Error('missing_OPENAI_API_KEY');
   }
 
-  const sourceImage = await fetch(input.photoUrl);
-  if (!sourceImage.ok) {
-    throw new Error(`original_photo_fetch_failed_${sourceImage.status}`);
-  }
+  const sourceImage = await input.performanceTrace.measure(
+    'IMAGE_DOWNLOAD',
+    'Download',
+    async () => {
+      const response = await fetch(input.photoUrl);
+      if (!response.ok) {
+        throw new Error(`original_photo_fetch_failed_${response.status}`);
+      }
+      const bytes = await response.arrayBuffer();
+      return {
+        bytes,
+        contentType: response.headers.get('content-type') ?? 'image/png',
+      };
+    },
+  );
 
-  const sourceContentType = sourceImage.headers.get('content-type') ?? 'image/png';
+  const sourceContentType = sourceImage.contentType;
   const sourceExtension = sourceContentType.includes('jpeg') || sourceContentType.includes('jpg') ? 'jpg' : 'png';
-  const sourceBlob = new Blob([await sourceImage.arrayBuffer()], { type: sourceContentType });
+  const sourceBlob = new Blob([sourceImage.bytes], { type: sourceContentType });
   const sourceFile = new File([sourceBlob], `cat-reference.${sourceExtension}`, { type: sourceContentType });
   const prompt = illustrationPrompt(input);
   const form = new FormData();
@@ -48,18 +65,24 @@ export async function createCatIllustration(input: CreateCatIllustrationInput): 
   console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_OUTPUT_FORMAT', 'png');
   console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_BACKGROUND', 'transparent');
 
-  const response = await fetch('https://api.openai.com/v1/images/edits', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
+  const { response, body } = await input.performanceTrace.measure(
+    'AI_ARTWORK_GENERATION',
+    'OpenAI',
+    async () => {
+      const response = await fetch('https://api.openai.com/v1/images/edits', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: form,
+      });
+      const body = (await response.json()) as {
+        data?: Array<{ b64_json?: string; url?: string }>;
+        error?: { message?: string };
+      };
+      return { response, body };
     },
-    body: form,
-  });
-
-  const body = (await response.json()) as {
-    data?: Array<{ b64_json?: string; url?: string }>;
-    error?: { message?: string };
-  };
+  );
 
   if (!response.ok) {
     console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_TRANSPARENT_FAILED', true);
@@ -70,19 +93,39 @@ export async function createCatIllustration(input: CreateCatIllustrationInput): 
   const firstImage = body.data?.[0];
   if (firstImage?.b64_json) {
     const imageBytes = Buffer.from(firstImage.b64_json, 'base64');
-    return saveIllustration(input.discoveryId, imageBytes, input.publicBaseUrl);
+    return saveIllustration(
+      input.discoveryId,
+      imageBytes,
+      input.publicBaseUrl,
+      input.performanceTrace,
+    );
   }
 
   if (firstImage?.url) {
-    const responseImage = await fetch(firstImage.url);
-    if (!responseImage.ok) {
-      const error = `generated_image_fetch_failed_${responseImage.status}`;
-      console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_TRANSPARENT_FAILED', true);
-      console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_ERROR', error);
-      throw new Error(error);
-    }
+    const generatedImageBytes = await input.performanceTrace.measure(
+      'IMAGE_DOWNLOAD',
+      'Download',
+      async () => {
+        const responseImage = await fetch(firstImage.url!);
+        if (!responseImage.ok) {
+          const error = `generated_image_fetch_failed_${responseImage.status}`;
+          console.log(
+            'CATDEX_GENERATE_CARD_ILLUSTRATION_TRANSPARENT_FAILED',
+            true,
+          );
+          console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_ERROR', error);
+          throw new Error(error);
+        }
+        return Buffer.from(await responseImage.arrayBuffer());
+      },
+    );
 
-    return saveIllustration(input.discoveryId, Buffer.from(await responseImage.arrayBuffer()), input.publicBaseUrl);
+    return saveIllustration(
+      input.discoveryId,
+      generatedImageBytes,
+      input.publicBaseUrl,
+      input.performanceTrace,
+    );
   }
 
   console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_TRANSPARENT_FAILED', true);
@@ -121,12 +164,21 @@ function illustrationPrompt(input: CreateCatIllustrationInput): string {
   ].join('\n');
 }
 
-async function saveIllustration(discoveryId: string, imageBytes: Buffer, publicBaseUrl?: string): Promise<string> {
+async function saveIllustration(
+  discoveryId: string,
+  imageBytes: Buffer,
+  publicBaseUrl: string | undefined,
+  performanceTrace: PipelinePerformanceTrace,
+): Promise<string> {
   console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_SOURCE', 'ai');
   await savePngArtifact(discoveryId, 'raw-illustrated-cat.png', bufferToArrayBuffer(imageBytes));
   console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_RAW_SAVED', true);
 
-  const finalImageBytes = await removeBackgroundFromPng(imageBytes);
+  const finalImageBytes = await performanceTrace.measure(
+    'BACKGROUND_REMOVAL',
+    'BackgroundRemoval',
+    () => removeBackgroundFromPng(imageBytes),
+  );
   const hasAlpha = pngHasAlpha(finalImageBytes);
   console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_HAS_ALPHA', hasAlpha);
   console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_FINAL_TRANSPARENT', hasAlpha);

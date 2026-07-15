@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+export 'package:catdex/features/cards/domain/generated_card_state.dart';
+
 String cacheBustedCardImageUrl({
   required String source,
   required int? version,
@@ -22,48 +24,6 @@ String cacheBustedCardImageUrl({
 }
 
 bool isNetworkCardImageUrl(String source) => _isNetworkUrl(source);
-
-bool isFinalGeneratedCardImageSource(String? source) {
-  final value = source?.trim();
-  if (value == null || value.isEmpty || value == '-') {
-    return false;
-  }
-
-  if (!_isNetworkUrl(value)) {
-    return false;
-  }
-
-  return !looksLikeOriginalPhotoPath(value);
-}
-
-bool looksLikeOriginalPhotoPath(String source) {
-  final normalized = source.trim().toLowerCase();
-  if (normalized.isEmpty || normalized == '-') {
-    return false;
-  }
-
-  if (normalized.startsWith('/') || normalized.startsWith('file://')) {
-    return true;
-  }
-
-  const originalPhotoMarkers = [
-    '/catdex/originals/',
-    '/catdex/photos/',
-    '/documents/catdex/photos/',
-    '/tmp/image_picker',
-    '/image_picker_',
-    'image_picker',
-    'originalphotopath',
-    'displayphotopath',
-    'photopath',
-    'original-photo',
-    'original_photo',
-    'raw-photo',
-    'raw_photo',
-  ];
-
-  return originalPhotoMarkers.any(normalized.contains);
-}
 
 bool _isNetworkUrl(String source) {
   return source.startsWith('http://') || source.startsWith('https://');

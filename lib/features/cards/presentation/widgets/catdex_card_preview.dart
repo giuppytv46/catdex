@@ -1,9 +1,8 @@
-import 'dart:io';
-
 import 'package:catdex/core/localization/catdex_localizations.dart';
 import 'package:catdex/features/analysis/presentation/cat_display_formatter.dart';
 import 'package:catdex/features/cards/presentation/card_image_cache_buster.dart';
 import 'package:catdex/features/cards/presentation/rarity_debug_controls.dart';
+import 'package:catdex/features/cards/presentation/widgets/card_generation_status_panel.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/catdex_collection.dart';
 import 'package:catdex/theme/app_colors.dart';
@@ -65,6 +64,15 @@ class CatDexMiniCardPreview extends StatelessWidget {
     debugPrint('CATDEX_BINDER_CARD_ID ${discovery?.id ?? '-'}');
     debugPrint('CATDEX_BINDER_CARD_NAME $name');
     debugPrint('CATDEX_BINDER_CARD_RENDER_MODE external_image');
+    debugPrint('CATDEX_CARD_GRID_FINAL_URL ${imageSource ?? '-'}');
+    debugPrint(
+      'CATDEX_CARD_GRID_STATE '
+      '${generating
+          ? 'loading'
+          : imageSource == null
+          ? 'ungenerated'
+          : 'generated'}',
+    );
 
     return Semantics(
       button: true,
@@ -131,26 +139,59 @@ String? _cardImageSource(
   return null;
 }
 
-class _CardImage extends StatelessWidget {
+class _CardImage extends StatefulWidget {
   const _CardImage({required this.source});
 
   final String source;
 
   @override
-  Widget build(BuildContext context) {
-    if (source.startsWith('http://') || source.startsWith('https://')) {
-      return Image.network(
-        source,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => const _CardImageFallback(),
-      );
-    }
+  State<_CardImage> createState() => _CardImageState();
+}
 
-    return Image.file(
-      File(source),
-      fit: BoxFit.cover,
-      errorBuilder: (_, _, _) => const _CardImageFallback(),
+class _CardImageState extends State<_CardImage> {
+  int? _reloadVersion;
+
+  @override
+  void didUpdateWidget(covariant _CardImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.source != widget.source) {
+      _reloadVersion = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final displaySource = cacheBustedCardImageUrl(
+      source: widget.source,
+      version: _reloadVersion,
     );
+    return Image.network(
+      displaySource,
+      fit: BoxFit.cover,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          return child;
+        }
+        return const ColoredBox(
+          color: Color(0xFF182238),
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.white),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('CATDEX_CARD_GRID_IMAGE_LOAD_ERROR $error');
+        debugPrint('CATDEX_CARD_GRID_STATE image_error');
+        return _CardImageFallback(onRetry: _retry);
+      },
+    );
+  }
+
+  void _retry() {
+    imageCache.evict(NetworkImage(widget.source));
+    setState(() {
+      _reloadVersion = DateTime.now().millisecondsSinceEpoch;
+    });
   }
 }
 
@@ -329,7 +370,6 @@ class _GenerateCardPlaceholder extends StatelessWidget {
         _LockedCardSurface(
           name: name,
           generating: generating,
-          generatingLabel: generatingLabel,
           hasGenerationError: hasGenerationError,
           generateLabel: generateLabel,
           onGenerate: onGenerate,
@@ -356,7 +396,6 @@ class _LockedCardSurface extends StatelessWidget {
   const _LockedCardSurface({
     required this.name,
     required this.generating,
-    required this.generatingLabel,
     required this.hasGenerationError,
     required this.generateLabel,
     required this.onGenerate,
@@ -364,7 +403,6 @@ class _LockedCardSurface extends StatelessWidget {
 
   final String name;
   final bool generating;
-  final String? generatingLabel;
   final bool hasGenerationError;
   final String? generateLabel;
   final VoidCallback onGenerate;
@@ -453,21 +491,20 @@ class _LockedCardSurface extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.lg,
-                      vertical: 8,
+                if (!generating)
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 36),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: 8,
+                      ),
+                      backgroundColor: accent,
+                      foregroundColor: AppColors.ink,
                     ),
-                    backgroundColor: accent,
-                    foregroundColor: AppColors.ink,
+                    onPressed: onGenerate,
+                    child: Text(buttonLabel),
                   ),
-                  onPressed: generating ? null : onGenerate,
-                  child: Text(
-                    generating ? generatingLabel ?? 'Genero...' : buttonLabel,
-                  ),
-                ),
               ],
             ),
           ),
@@ -487,43 +524,26 @@ class _CardLoadingVeil extends StatelessWidget {
     return Positioned.fill(
       child: ColoredBox(
         color: AppColors.ink.withValues(alpha: 0.58),
-        child: Center(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: AppColors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: AppColors.white.withValues(alpha: 0.18),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: Center(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.white.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: AppColors.white.withValues(alpha: 0.18),
+                ),
               ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.4,
-                      color: AppColors.white,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.sm,
+                ),
+                child: CardGenerationStatusContent(
+                  stateLabel: label,
+                  compact: true,
+                ),
               ),
             ),
           ),
@@ -572,17 +592,45 @@ class _LockedCardPatternPainter extends CustomPainter {
 }
 
 class _CardImageFallback extends StatelessWidget {
-  const _CardImageFallback();
+  const _CardImageFallback({required this.onRetry});
+
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: AppColors.ink,
+      color: const Color(0xFF182238),
       child: Center(
-        child: Icon(
-          Icons.image_not_supported_rounded,
-          color: AppColors.white.withValues(alpha: 0.72),
-          size: 34,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.image_not_supported_rounded,
+                color: AppColors.white.withValues(alpha: 0.78),
+                size: 30,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Impossibile caricare l’immagine',
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Ricarica immagine',
+                onPressed: onRetry,
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  color: AppColors.white,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
