@@ -4,6 +4,7 @@ import 'package:catdex/features/analysis/domain/entities/cat_analysis_confidence
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_result.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_breed_candidate.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_visual_traits.dart';
+import 'package:catdex/features/catdex/data/cat_species_catalog.dart';
 import 'package:catdex/features/catdex/data/seeds/catdex_seed_data.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
@@ -46,7 +47,10 @@ class CatAnalysisResultJsonParser {
           _optionalString(map['analyzedAt']) ??
               DateTime.utc(2026, 6, 28).toIso8601String(),
         ),
-        backendBreed: _optionalString(map['breed']),
+        backendBreed:
+            _optionalString(map['breed']) ??
+            _optionalString(map['speciesId']) ??
+            _primaryBreedIdentifier(map),
         backendRarity: backendRarity,
         backendVariant: backendVariant,
         backendPersonality: backendPersonality,
@@ -84,16 +88,21 @@ class CatAnalysisResultJsonParser {
   }
 
   CatBreedCandidate _primaryBreed(Map<String, Object?> map) {
-    if (map.containsKey('primaryBreed')) {
-      return _breedCandidate(map['primaryBreed']);
-    }
-
     return CatBreedCandidate(
-      species: _safeSpecies(
-        _optionalString(map['breed']) ?? 'domestic_shorthair_cat',
+      species: _safeSpecies(_primaryBreedIdentifier(map)),
+      confidence: _confidence(
+        _optionalMap(map['primaryBreed'])?['confidence'] ?? map['confidence'],
       ),
-      confidence: _confidence(map['confidence']),
     );
+  }
+
+  String _primaryBreedIdentifier(Map<String, Object?> map) {
+    final primaryBreed = _optionalMap(map['primaryBreed']);
+    return _optionalString(primaryBreed?['speciesId']) ??
+        _optionalString(primaryBreed?['breed']) ??
+        _optionalString(map['speciesId']) ??
+        _optionalString(map['breed']) ??
+        'domestic_shorthair_cat';
   }
 
   List<CatBreedCandidate> _candidates(
@@ -152,12 +161,9 @@ class CatAnalysisResultJsonParser {
   }
 
   CatSpecies _species(String rawValue) {
-    final normalizedValue = _normalize(rawValue);
-    for (final species in CatDexSeedData.species) {
-      if (species.id == rawValue ||
-          _normalize(species.displayName) == normalizedValue) {
-        return species;
-      }
+    final species = CatSpeciesCatalog.find(rawValue);
+    if (species != null) {
+      return species;
     }
 
     throw FormatException('Unknown species id: $rawValue');

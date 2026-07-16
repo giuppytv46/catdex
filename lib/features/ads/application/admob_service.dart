@@ -98,6 +98,7 @@ class AdMobService {
   static const _successfulCardGenerationsSinceLastInterstitialKey =
       'successfulCardGenerationsSinceLastInterstitial';
   static const _interstitialThreshold = 3;
+  static Future<void>? _initializeFuture;
 
   bool get isRewardedAdLoaded => _rewardedAd != null;
   bool get isRewardedAdLoading => _rewardedState == RewardedAdLoadState.loading;
@@ -105,6 +106,16 @@ class AdMobService {
   String? get lastRewardedAdError => _lastRewardedAdError;
 
   static Future<void> initialize() async {
+    final existing = _initializeFuture;
+    if (existing != null) {
+      return existing;
+    }
+
+    _initializeFuture = _initialize();
+    return _initializeFuture!;
+  }
+
+  static Future<void> _initialize() async {
     debugPrint('CATDEX_SHOW_ADS_FLAG $showAds');
     if (!showAds) {
       debugPrint('CATDEX_ADMOB_DISABLED_SHOW_ADS_FALSE');

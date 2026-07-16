@@ -15,19 +15,70 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await AppConfig.loadDotEnv();
-  await SupabaseInitializer.initialize();
-  await AdMobService.initialize();
-  runApp(
-    ProviderScope(
-      overrides: [
-        onboardingRepositoryProvider.overrideWithValue(
-          const SharedPreferencesOnboardingRepository(),
+  await runZonedGuarded(
+    () async {
+      final startedAt = DateTime.now();
+      debugPrint('CATDEX_STARTUP_BEGIN');
+      WidgetsFlutterBinding.ensureInitialized();
+      await _runStartupStep(
+        name: 'PREFERENCES',
+        action: AppConfig.loadDotEnv,
+        timeout: const Duration(seconds: 2),
+      );
+      await _runStartupStep(
+        name: 'SUPABASE',
+        action: SupabaseInitializer.initialize,
+        timeout: const Duration(seconds: 6),
+      );
+      debugPrint('CATDEX_STARTUP_ADS_DEFERRED');
+      debugPrint('CATDEX_STARTUP_READY');
+      debugPrint(
+        'CATDEX_STARTUP_DURATION_MS '
+        '${DateTime.now().difference(startedAt).inMilliseconds}',
+      );
+      runApp(
+        ProviderScope(
+          overrides: [
+            onboardingRepositoryProvider.overrideWithValue(
+              const SharedPreferencesOnboardingRepository(),
+            ),
+          ],
+          child: const CatDexApp(),
         ),
-      ],
-      child: const CatDexApp(),
-    ),
+      );
+      unawaited(_initializeDeferredStartupServices());
+    },
+    (error, stackTrace) {
+      debugPrint('CATDEX_STARTUP_UNCAUGHT_ASYNC_ERROR $error');
+    },
+  );
+}
+
+Future<void> _runStartupStep({
+  required String name,
+  required Future<void> Function() action,
+  required Duration timeout,
+}) async {
+  try {
+    await action().timeout(timeout);
+    debugPrint('CATDEX_STARTUP_${name}_OK');
+  } on Object catch (error) {
+    if (name == 'SUPABASE') {
+      AppConfig.markSupabaseUnavailable();
+    }
+    debugPrint('CATDEX_STARTUP_${name}_FALLBACK $error');
+    if (name == 'SUPABASE') {
+      debugPrint('CATDEX_STARTUP_SUPABASE_FAILED $error');
+    }
+  }
+}
+
+Future<void> _initializeDeferredStartupServices() async {
+  await AdMobService.initialize().timeout(
+    const Duration(seconds: 6),
+    onTimeout: () {
+      debugPrint('CATDEX_STARTUP_ADS_FAILED timeout');
+    },
   );
 }
 
@@ -86,10 +137,20 @@ class _RewardedAdPreloadScopeState
   void initState() {
     super.initState();
     if (showAds) {
-      final adMobService = ref.read(adMobServiceProvider);
-      unawaited(adMobService.preloadRewardedAd());
-      unawaited(adMobService.preloadInterstitialAd());
+      unawaited(_preloadAdsAfterInitialization());
     }
+  }
+
+  Future<void> _preloadAdsAfterInitialization() async {
+    await AdMobService.initialize().timeout(
+      const Duration(seconds: 6),
+      onTimeout: () {
+        debugPrint('CATDEX_STARTUP_ADS_FAILED timeout');
+      },
+    );
+    final adMobService = ref.read(adMobServiceProvider);
+    unawaited(adMobService.preloadRewardedAd());
+    unawaited(adMobService.preloadInterstitialAd());
   }
 
   @override

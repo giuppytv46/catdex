@@ -213,7 +213,7 @@ class _AlphaTesterInfoCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            _AlphaInfoLine(label: l10n.alphaBuildLabel, value: 'Alpha'),
+            _AlphaInfoLine(label: l10n.alphaBuildLabel, value: 'Alpha 0.1.0'),
             _AlphaInfoLine(
               label: l10n.alphaCurrentLanguageLabel,
               value: languageName,

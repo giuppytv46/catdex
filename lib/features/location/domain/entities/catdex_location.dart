@@ -1,32 +1,5 @@
-class CatDexLocation {
-  const CatDexLocation({
-    required this.latitude,
-    required this.longitude,
-    this.city,
-    this.region,
-    this.country,
-  });
+import 'package:catdex/features/location/domain/entities/cat_discovery_location.dart';
 
-  final double latitude;
-  final double longitude;
-  final String? city;
-  final String? region;
-  final String? country;
+export 'package:catdex/features/location/domain/entities/cat_discovery_location.dart';
 
-  bool get hasPlaceDetails {
-    return city != null || region != null || country != null;
-  }
-
-  String get displayLabel {
-    final parts = [city, region, country]
-        .where((part) => part != null && part.trim().isNotEmpty)
-        .cast<String>()
-        .toList();
-
-    if (parts.isEmpty) {
-      return 'Coordinates only';
-    }
-
-    return parts.join(', ');
-  }
-}
+typedef CatDexLocation = CatDiscoveryLocation;

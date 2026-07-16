@@ -7,6 +7,7 @@ import 'package:catdex/features/ads/presentation/catdex_banner_ad_widget.dart';
 import 'package:catdex/features/analysis/presentation/cat_display_formatter.dart';
 import 'package:catdex/features/cards/application/card_generation_pipeline.dart';
 import 'package:catdex/features/cards/application/card_generation_state_controller.dart';
+import 'package:catdex/features/cards/application/cat_card_repository_providers.dart';
 import 'package:catdex/features/cards/application/remote_card_generation_service.dart';
 import 'package:catdex/features/cards/presentation/card_image_cache_buster.dart';
 import 'package:catdex/features/cards/presentation/catdex_trading_card_page.dart';
@@ -17,6 +18,7 @@ import 'package:catdex/features/catdex/application/local_discovery_session_contr
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/catdex_collection.dart';
+import 'package:catdex/features/events/application/event_providers.dart';
 import 'package:catdex/features/premium/application/local_monetization_service.dart';
 import 'package:catdex/features/premium/presentation/monetization_limit_dialog.dart';
 import 'package:catdex/features/premium/presentation/usage_status_chip.dart';
@@ -295,6 +297,7 @@ class _CardsBinderPageState extends ConsumerState<CardsBinderPage> {
         MaterialPageRoute<void>(
           builder: (_) => CatDexTradingCardPage(
             discoveryId: discovery.id,
+            cardId: entry.cardRecord?.cardId,
             collectionNumber: entry.collectionNumber,
             cacheBustVersion: _cardImageRefreshVersions[discovery.id],
             onGenerate: () {
@@ -342,12 +345,7 @@ class _CardsBinderPageState extends ConsumerState<CardsBinderPage> {
   }
 
   int _generatedSortValue(CatDexCollectionEntry entry) {
-    final discovery = entry.discovery;
-    if (discovery == null) {
-      return 0;
-    }
-
-    return _hasFinalCardImage(discovery) ? 1 : 0;
+    return _entryHasFinalCardImage(entry) ? 1 : 0;
   }
 
   Future<String?> _generateCard(
@@ -414,20 +412,28 @@ class _CardsBinderPageState extends ConsumerState<CardsBinderPage> {
       return null;
     }
 
-    if (!force && _hasFinalCardImage(discovery)) {
+    if (!force && _entryHasFinalCardImage(entry)) {
       ref.read(cardGenerationStateProvider.notifier).reset(discovery.id);
       return null;
     }
 
     final monetization = ref.read(monetizationServiceProvider);
-    final oldDisplayedImageUrl = _networkCardImageSourceForDiscovery(discovery);
+    final oldDisplayedImageUrl = _entryCardImageSource(
+      entry,
+      cacheBustVersion: _cardImageRefreshVersions[discovery.id],
+    );
     ref
         .read(cardGenerationStateProvider.notifier)
         .ensureGenerating(discovery.id, label: l10n.generatingIllustration);
 
-    final reservation = await monetization.reserveCardGenerationCredit(
-      discovery.id,
-    );
+    final eventGeneration =
+        ref
+            .read(eventRuntimeConfigurationProvider)
+            .activeEvent(DateTime.now().toUtc()) !=
+        null;
+    final reservation = eventGeneration
+        ? CardGenerationCreditReservationResult.reserved
+        : await monetization.reserveCardGenerationCredit(discovery.id);
     if (reservation != CardGenerationCreditReservationResult.reserved) {
       ref.read(cardGenerationStateProvider.notifier).reset(discovery.id);
       if (reservation == CardGenerationCreditReservationResult.duplicate) {
@@ -453,7 +459,7 @@ class _CardsBinderPageState extends ConsumerState<CardsBinderPage> {
 
     String? result;
     RemoteCardGenerationFailureReason? failureReason;
-    var reservationOpen = true;
+    var reservationOpen = !eventGeneration;
     try {
       final display = const CatDisplayFormatter().fromDiscovery(
         discovery,
@@ -487,10 +493,14 @@ class _CardsBinderPageState extends ConsumerState<CardsBinderPage> {
       failureReason = generationResult.failureReason;
       if (result == null) {
         debugPrint('CATDEX_CARD_UI_SERVICE_COMPLETED_FAILURE ${discovery.id}');
-        monetization.releaseCardGenerationCredit(discovery.id);
+        if (!eventGeneration) {
+          monetization.releaseCardGenerationCredit(discovery.id);
+        }
         reservationOpen = false;
       } else {
-        await monetization.commitCardGenerationCredit(discovery.id);
+        if (!eventGeneration) {
+          await monetization.commitCardGenerationCredit(discovery.id);
+        }
         debugPrint('CATDEX_CARD_UI_SERVICE_COMPLETED_SUCCESS ${discovery.id}');
         reservationOpen = false;
       }
@@ -600,20 +610,6 @@ class _CardsBinderPageState extends ConsumerState<CardsBinderPage> {
     };
   }
 
-  String? _networkCardImageSourceForDiscovery(CatDiscovery discovery) {
-    final card = discovery.card;
-    final candidates = [card?.cardImageUrl, card?.cardImagePath];
-    for (final candidate in candidates) {
-      final value = candidate?.trim();
-      if (isFinalGeneratedCardImageSource(value)) {
-        final version = _cardImageRefreshVersions[discovery.id];
-        return cacheBustedCardImageUrl(source: value!, version: version);
-      }
-    }
-
-    return null;
-  }
-
   bool _evictCardImage(String? url) {
     if (url == null || !isNetworkCardImageUrl(url)) {
       return false;
@@ -645,6 +641,12 @@ class _CardsBinderPageState extends ConsumerState<CardsBinderPage> {
   }
 
   Future<bool> _canStartCardGeneration() async {
+    if (ref
+            .read(eventRuntimeConfigurationProvider)
+            .activeEvent(DateTime.now().toUtc()) !=
+        null) {
+      return true;
+    }
     final allowed = await ref
         .read(monetizationServiceProvider)
         .canGenerateCard();
@@ -669,12 +671,6 @@ class _CardsBinderPageState extends ConsumerState<CardsBinderPage> {
         'Errore generazione carta',
       null => 'Errore generazione carta',
     };
-  }
-
-  bool _hasFinalCardImage(CatDiscovery discovery) {
-    final card = discovery.card;
-    return isFinalGeneratedCardImageSource(card?.cardImageUrl) ||
-        isFinalGeneratedCardImageSource(card?.cardImagePath);
   }
 }
 
@@ -1358,13 +1354,22 @@ class _RarityCardsAlbumPageState extends ConsumerState<RarityCardsAlbumPage> {
     }
 
     final version = DateTime.now().millisecondsSinceEpoch;
-    final refreshed = await ref
+    await ref
         .read(localDiscoverySessionProvider.notifier)
         .refreshDiscoveryById(discoveryId);
     if (!mounted) {
       return;
     }
-    if (!hasPersistedGeneratedCard(refreshed)) {
+    final persistedCards = await ref
+        .read(catCardRepositoryProvider)
+        .getCardsForDiscovery(discoveryId);
+    if (!mounted) {
+      return;
+    }
+    final persistedResult = persistedCards.any(
+      (card) => card.isCompleted && card.finalCardUrl == result,
+    );
+    if (!persistedResult) {
       generationController.fail(discoveryId);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.cardGenerationError)),
@@ -1578,20 +1583,32 @@ class _RarityAlbumEmptyState extends StatelessWidget {
 }
 
 bool _entryHasFinalCardImage(CatDexCollectionEntry entry) {
-  return hasPersistedGeneratedCard(entry.discovery);
+  return entry.cardRecord?.isCompleted == true || _hasLegacyNormalCard(entry);
 }
 
 String? _entryCardImageSource(
   CatDexCollectionEntry entry, {
   required int? cacheBustVersion,
 }) {
-  final source = canonicalGeneratedCardUrl(entry.discovery);
+  final source = entry.cardRecord?.isCompleted == true
+      ? entry.cardRecord!.finalCardUrl
+      : _hasLegacyNormalCard(entry)
+      ? canonicalGeneratedCardUrl(entry.discovery)
+      : null;
   return source == null
       ? null
       : cacheBustedCardImageUrl(
           source: source,
           version: cacheBustVersion,
         );
+}
+
+bool _hasLegacyNormalCard(CatDexCollectionEntry entry) {
+  final card = entry.discovery?.card;
+  return entry.cardRecord == null &&
+      card != null &&
+      !card.isEventCard &&
+      hasPersistedGeneratedCard(entry.discovery);
 }
 
 String _rarityValue(CatRarity rarity) {

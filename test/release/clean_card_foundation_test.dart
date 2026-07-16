@@ -80,12 +80,14 @@ void main() {
     expect(pipeline, isNot(contains('cardRenderApiServiceProvider')));
     expect(pipeline, isNot(contains('catIllustrationServiceProvider')));
     expect(binder, contains('cardGenerationPipelineProvider'));
-    expect(binder, contains('CATDEX_UI_REGENERATE_ALL_BUTTON_TAPPED'));
-    expect(binder, contains('CATDEX_UI_REGENERATE_SINGLE_BUTTON_TAPPED'));
-    expect(binder, contains('CATDEX_REGENERATE_ALL_STARTED'));
+    expect(binder, contains('CATDEX_CARD_GENERATION_USER_TAP'));
+    expect(binder, contains('CATDEX_CARD_GENERATION_AUTO_START_BLOCKED'));
+    expect(binder, isNot(contains('_scheduleAutoGeneration')));
+    expect(binder, contains('onRegenerateCard: (entry)'));
+    expect(binder, contains('callback: widget.onRegenerateCard'));
+    expect(binder, contains('CATDEX_CARD_GENERATION_DUPLICATE_BLOCKED'));
     expect(binder, contains('l10n.generatingIllustration'));
     expect(binder, contains('l10n.generateCard'));
-    expect(binder, contains('l10n.regenerateCards'));
     expect(preview, contains('l10n.regenerateCard'));
     expect(binder, contains('l10n.generateCard'));
     expect(preview, contains('Image.network'));

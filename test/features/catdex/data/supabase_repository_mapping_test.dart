@@ -6,6 +6,7 @@ import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_trait.dart';
 import 'package:catdex/features/catdex/domain/entities/player_progress.dart';
+import 'package:catdex/features/location/domain/entities/cat_discovery_location.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -50,6 +51,7 @@ void main() {
       'nickname': 'Mochi',
       'city': 'Rome',
       'country': 'Italy',
+      'photo_url': 'catdex/originals/user-1/discovery-1.jpg',
       'favorite': true,
       'discovered_at': '2026-06-28T12:00:00.000Z',
       'discovery_traits': [
@@ -65,6 +67,10 @@ void main() {
     expect(discovery.playerId, 'user-1');
     expect(discovery.personality, CatPersonality.curious);
     expect(discovery.traits.single.name, 'Mood');
+    expect(
+      discovery.originalPhotoStoragePath,
+      'catdex/originals/user-1/discovery-1.jpg',
+    );
     expect(discovery.favorite, isTrue);
   });
 
@@ -82,6 +88,8 @@ void main() {
         discoveredAt: DateTime.utc(2026, 6, 28, 12),
         friendshipPoints: 30,
         nickname: 'Mochi',
+        displayPhotoPath: '/var/mobile/current/photo.jpg',
+        originalPhotoStoragePath: 'catdex/originals/cloud-user/discovery-1.jpg',
       ),
       'cloud-user',
     );
@@ -95,9 +103,45 @@ void main() {
     expect(row['user_id'], 'cloud-user');
     expect(row['rarity'], 'common');
     expect(row['personality'], 'curious');
+    expect(
+      row['photo_url'],
+      'catdex/originals/cloud-user/discovery-1.jpg',
+    );
     expect(traitRow['discovery_id'], 'discovery-1');
     expect(traitRow['user_id'], 'cloud-user');
     expect(traitRow['trait_name'], 'Mood');
+  });
+
+  test('maps optional structured location metadata for Supabase', () {
+    final capturedAt = DateTime.utc(2026, 7, 16, 12);
+    final location = CatDiscoveryLocation.tryCreate(
+      latitude: 45.46,
+      longitude: 9.19,
+      horizontalAccuracyMeters: 1500,
+      capturedAt: capturedAt,
+      source: CatDiscoveryLocationSource.gps,
+      isApproximate: true,
+    )!;
+    final discovery = SupabaseDiscoveryRepository.mapDiscovery({
+      'id': 'discovery-location',
+      'user_id': 'user-1',
+      'species_id': 'domestic_cat',
+      'variant_id': 'normal',
+      'rarity': 'common',
+      'personality': 'curious',
+      'discovered_at': '2026-07-16T12:00:00.000Z',
+      'capture_location': location.toJson(),
+      'location_consent_version': 'location-v1',
+      'location_captured_at': capturedAt.toIso8601String(),
+      'discovery_traits': <Object?>[],
+    });
+    final locationRow = SupabaseDiscoveryRepository.toLocationMetadataRow(
+      discovery,
+    );
+
+    expect(discovery.captureLocation, location);
+    expect(discovery.locationConsentVersion, 'location-v1');
+    expect(locationRow['capture_location'], location.toJson());
   });
 
   test('maps Supabase progress rows', () {

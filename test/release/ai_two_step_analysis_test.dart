@@ -13,17 +13,27 @@ void main() {
     });
 
     test('Vision observation does not include breed', () {
-      expect(functionText, contains('VISION ENGINE'));
-      expect(functionText, contains('Return only visible facts'));
+      expect(functionText, contains('type CatVisionObservation'));
+      expect(
+        functionText,
+        contains('function observationFromVisualInspection'),
+      );
       expect(functionText, contains('baseColor'));
       expect(functionText, contains('secondaryColor'));
       expect(functionText, contains('whitePresent'));
       expect(functionText, contains('orangePresent'));
       expect(functionText, contains('blackPresent'));
       expect(functionText, contains('visibleConfidence'));
+      expect(
+        functionText,
+        isNot(contains('type CatVisionObservation = {\n  breed')),
+      );
+      expect(
+        functionText,
+        contains('Analyze only objective visible cat facts'),
+      );
       expect(functionText, contains('Do not return breed'));
-      expect(functionText, contains('Do not return breed, rarity'));
-      expect(functionText, contains('If a visual fact is uncertain'));
+      expect(functionText, contains('uncertain'));
       expect(functionText, contains('parseVisionEngineObservation'));
     });
 

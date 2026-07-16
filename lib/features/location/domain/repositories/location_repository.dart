@@ -1,10 +1,14 @@
-import 'package:catdex/features/location/domain/entities/catdex_location.dart';
 import 'package:catdex/features/location/domain/entities/location_permission_status.dart';
+import 'package:catdex/features/location/domain/entities/location_service_result.dart';
 
 abstract interface class LocationRepository {
-  Future<bool> isLocationServiceEnabled();
+  Future<bool> checkServiceEnabled();
+
+  Future<LocationPermissionStatus> checkPermission();
 
   Future<LocationPermissionStatus> requestPermission();
 
-  Future<CatDexLocation> getCurrentLocation();
+  Future<LocationServiceResult> getCurrentLocation();
+
+  Future<LocationServiceResult> getLastKnownLocation();
 }

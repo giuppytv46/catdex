@@ -5,6 +5,9 @@ import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_trait.dart';
 import 'package:catdex/features/catdex/domain/repositories/discovery_repository.dart';
+import 'package:catdex/features/location/domain/entities/cat_discovery_location.dart';
+import 'package:catdex/shared/images/catdex_persisted_photo_path.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SharedPreferencesDiscoveryRepository implements DiscoveryRepository {
@@ -46,33 +49,81 @@ class SharedPreferencesDiscoveryRepository implements DiscoveryRepository {
   @override
   Future<void> saveDiscovery(CatDiscovery discovery) async {
     final discoveries = await _readDiscoveries();
-    final nextDiscoveries = [
+    final nextDiscoveries = _dedupeByDiscoveryId([
       discovery,
       ...discoveries.where((item) => item.id != discovery.id),
-    ];
+    ]);
 
-    await _writeDiscoveries(nextDiscoveries);
+    try {
+      await _writeDiscoveries(nextDiscoveries);
+      final readBack = await _readDiscoveries();
+      final persisted = _findById(readBack, discovery.id);
+      if (persisted == null ||
+          jsonEncode(_toJson(persisted)) != jsonEncode(_toJson(discovery))) {
+        throw StateError(
+          'Discovery read-after-write failed: ${discovery.id}',
+        );
+      }
+    } on Object {
+      await _writeDiscoveries(discoveries);
+      rethrow;
+    }
   }
 
   Future<List<CatDiscovery>> _readDiscoveries() async {
     final preferences = await SharedPreferences.getInstance();
     final encodedDiscoveries = preferences.getStringList(_storageKey) ?? [];
+    var migrated = false;
+    var skippedCorruptRecord = false;
+    final decodedDiscoveries = <Map<String, Object?>>[];
+    for (var index = 0; index < encodedDiscoveries.length; index += 1) {
+      try {
+        final encoded = encodedDiscoveries[index];
+        final json = Map<String, Object?>.from(
+          jsonDecode(encoded) as Map<String, dynamic>,
+        );
+        if (_migrateLocalPhotoPaths(json)) {
+          migrated = true;
+        }
+        // Validate each record independently so one damaged entry cannot
+        // prevent the remaining CatDex from restoring.
+        _fromJson(json);
+        decodedDiscoveries.add(json);
+      } on Object catch (error) {
+        skippedCorruptRecord = true;
+        debugPrint(
+          'CATDEX_RESTORE_CORRUPT_RECORD_SKIPPED '
+          'index=$index error=${error.runtimeType}',
+        );
+      }
+    }
 
-    return encodedDiscoveries
-        .map(
-          (encoded) => _fromJson(jsonDecode(encoded) as Map<String, Object?>),
-        )
-        .toList(growable: false);
+    if (migrated || skippedCorruptRecord) {
+      final written = await preferences.setStringList(
+        _storageKey,
+        decodedDiscoveries.map(jsonEncode).toList(growable: false),
+      );
+      if (!written) {
+        throw StateError('Discovery migration write failed');
+      }
+    }
+
+    return _dedupeByDiscoveryId(
+      decodedDiscoveries.map(_fromJson).toList(growable: false),
+    );
   }
 
   Future<void> _writeDiscoveries(List<CatDiscovery> discoveries) async {
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setStringList(
+    final written = await preferences.setStringList(
       _storageKey,
       discoveries
           .map((discovery) => jsonEncode(_toJson(discovery)))
           .toList(growable: false),
     );
+    if (!written) {
+      throw StateError('Discovery write failed');
+    }
   }
 
   Map<String, Object?> _toJson(CatDiscovery discovery) {
@@ -83,10 +134,19 @@ class SharedPreferencesDiscoveryRepository implements DiscoveryRepository {
       'suggestedName': discovery.suggestedName,
       'species': discovery.speciesId,
       'speciesId': discovery.speciesId,
-      'photo': discovery.photoPath,
-      'photoPath': discovery.photoPath,
-      'originalPhotoPath': discovery.originalPhotoPath,
-      'displayPhotoPath': discovery.displayPhotoPath,
+      'photo': CatDexPersistedPhotoPath.normalizeForPersistence(
+        discovery.photoPath,
+      ),
+      'photoPath': CatDexPersistedPhotoPath.normalizeForPersistence(
+        discovery.photoPath,
+      ),
+      'originalPhotoPath': CatDexPersistedPhotoPath.normalizeForPersistence(
+        discovery.originalPhotoPath,
+      ),
+      'displayPhotoPath': CatDexPersistedPhotoPath.normalizeForPersistence(
+        discovery.displayPhotoPath,
+      ),
+      'originalPhotoStoragePath': discovery.originalPhotoStoragePath,
       'story': discovery.story,
       'funFact': discovery.funFact,
       'rarity': discovery.rarity.name,
@@ -107,6 +167,17 @@ class SharedPreferencesDiscoveryRepository implements DiscoveryRepository {
       'city': discovery.city,
       'country': discovery.country,
       'favorite': discovery.favorite,
+      'captureLocation': discovery.captureLocation?.hasValidCoordinates == true
+          ? discovery.captureLocation!.toJson()
+          : null,
+      'locationConsentVersion':
+          discovery.captureLocation?.hasValidCoordinates == true
+          ? discovery.locationConsentVersion
+          : null,
+      'locationCapturedAt':
+          discovery.captureLocation?.hasValidCoordinates == true
+          ? discovery.locationCapturedAt?.toIso8601String()
+          : null,
       'card': discovery.card == null ? null : _cardToJson(discovery.card!),
     };
   }
@@ -122,8 +193,8 @@ class SharedPreferencesDiscoveryRepository implements DiscoveryRepository {
       rarity: _rarity(json['rarity']! as String),
       personality: _personality(json['personality'] as String? ?? 'curious'),
       traits: traits
-          .cast<Map<String, Object?>>()
-          .map(_traitFromJson)
+          .whereType<Map<Object?, Object?>>()
+          .map((item) => _traitFromJson(Map<String, Object?>.from(item)))
           .toList(growable: false),
       discoveredAt: DateTime.parse(json['discoveredAt']! as String),
       friendshipPoints: json['friendshipPoints'] as int? ?? 0,
@@ -138,6 +209,7 @@ class SharedPreferencesDiscoveryRepository implements DiscoveryRepository {
       displayPhotoPath:
           (json['displayPhotoPath'] ?? json['photoPath'] ?? json['photo'])
               as String?,
+      originalPhotoStoragePath: json['originalPhotoStoragePath'] as String?,
       story: json['story'] as String?,
       funFact: json['funFact'] as String?,
       coatColor: json['coatColor'] as String?,
@@ -150,6 +222,13 @@ class SharedPreferencesDiscoveryRepository implements DiscoveryRepository {
       confidenceScore: (json['confidence'] as num?)?.toDouble(),
       card: _cardFromJson(json['card'] as Map<String, Object?>?),
       favorite: json['favorite'] as bool? ?? false,
+      captureLocation: CatDiscoveryLocation.tryFromJson(
+        json['captureLocation'],
+      ),
+      locationConsentVersion: json['locationConsentVersion'] as String?,
+      locationCapturedAt: DateTime.tryParse(
+        json['locationCapturedAt'] as String? ?? '',
+      ),
     );
   }
 
@@ -173,7 +252,16 @@ class SharedPreferencesDiscoveryRepository implements DiscoveryRepository {
       'cardTemplateId': card.cardTemplateId,
       'cardGeneratedAt': card.cardGeneratedAt?.toIso8601String(),
       'cardVersion': card.cardVersion,
-      'originalPhotoPath': card.originalPhotoPath,
+      'generationStatus': card.generationStatus,
+      'eventKey': card.eventKey,
+      'eventEdition': card.eventEdition,
+      'eventArtworkVariantId': card.eventArtworkVariantId,
+      'eventArtworkTier': card.eventArtworkTier,
+      'eventTemplateKey': card.eventTemplateKey,
+      'generatedDuringEventAt': card.generatedDuringEventAt?.toIso8601String(),
+      'originalPhotoPath': CatDexPersistedPhotoPath.normalizeForPersistence(
+        card.originalPhotoPath,
+      ),
       'generatedAt': card.generatedAt.toIso8601String(),
     };
   }
@@ -201,6 +289,15 @@ class SharedPreferencesDiscoveryRepository implements DiscoveryRepository {
       illustratedCatPath: json['illustratedCatPath'] as String?,
       cardTemplateId: json['cardTemplateId'] as String? ?? 'common_clean',
       cardVersion: json['cardVersion'] as int? ?? 1,
+      generationStatus: json['generationStatus'] as String?,
+      eventKey: json['eventKey'] as String?,
+      eventEdition: json['eventEdition'] as String?,
+      eventArtworkVariantId: json['eventArtworkVariantId'] as String?,
+      eventArtworkTier: json['eventArtworkTier'] as String?,
+      eventTemplateKey: json['eventTemplateKey'] as String?,
+      generatedDuringEventAt: DateTime.tryParse(
+        json['generatedDuringEventAt'] as String? ?? '',
+      ),
       originalPhotoPath: json['originalPhotoPath'] as String?,
       generatedAt: DateTime.parse(
         (json['cardGeneratedAt'] ?? json['generatedAt'])! as String,
@@ -224,6 +321,35 @@ class SharedPreferencesDiscoveryRepository implements DiscoveryRepository {
     );
   }
 
+  bool _migrateLocalPhotoPaths(Map<String, Object?> json) {
+    var migrated = false;
+
+    void migrateValue(Map<String, Object?> target, String key) {
+      final current = target[key] as String?;
+      final normalized = CatDexPersistedPhotoPath.normalizeForPersistence(
+        current,
+      );
+      if (normalized != current) {
+        target[key] = normalized;
+        migrated = true;
+      }
+    }
+
+    migrateValue(json, 'photo');
+    migrateValue(json, 'photoPath');
+    migrateValue(json, 'originalPhotoPath');
+    migrateValue(json, 'displayPhotoPath');
+
+    final rawCard = json['card'];
+    if (rawCard is Map<Object?, Object?>) {
+      final card = Map<String, Object?>.from(rawCard);
+      migrateValue(card, 'originalPhotoPath');
+      json['card'] = card;
+    }
+
+    return migrated;
+  }
+
   CatRarity _rarity(String name) {
     for (final rarity in CatRarity.values) {
       if (rarity.name == name) {
@@ -242,5 +368,29 @@ class SharedPreferencesDiscoveryRepository implements DiscoveryRepository {
     }
 
     return CatPersonality.curious;
+  }
+
+  List<CatDiscovery> _dedupeByDiscoveryId(List<CatDiscovery> discoveries) {
+    final seen = <String>{};
+    final deduped = <CatDiscovery>[];
+    for (final discovery in discoveries) {
+      if (seen.add(discovery.id)) {
+        deduped.add(discovery);
+      }
+    }
+
+    return deduped;
+  }
+
+  CatDiscovery? _findById(
+    List<CatDiscovery> discoveries,
+    String discoveryId,
+  ) {
+    for (final discovery in discoveries) {
+      if (discovery.id == discoveryId) {
+        return discovery;
+      }
+    }
+    return null;
   }
 }

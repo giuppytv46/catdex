@@ -15,17 +15,21 @@ async function exists(filePath: string): Promise<boolean> {
   }
 }
 
-export async function selectTemplate(rarity: CatRarity, eventKey?: string): Promise<SelectedTemplate> {
+export async function selectTemplate(
+  rarity: CatRarity,
+  eventKey?: string,
+  eventTemplateKey?: string,
+): Promise<SelectedTemplate> {
   console.log('CATDEX_TEMPLATE_RARITY_REQUESTED', rarity);
   console.log('CATDEX_TEMPLATE_EVENT_KEY', eventKey ?? '-');
 
-  if (eventKey) {
-    const eventTemplateKey = `events/${eventKey}/${rarity}`;
-    const eventPaths = templatePaths(eventTemplateKey);
+  if (eventKey && eventTemplateKey) {
+    const selectedEventTemplateKey = `events/${eventKey}/${eventTemplateKey}`;
+    const eventPaths = templatePaths(selectedEventTemplateKey, true);
     console.log('CATDEX_TEMPLATE_TRY_EVENT_PATH', eventPaths.templatePath);
     if (await exists(eventPaths.templatePath) && (await exists(eventPaths.layoutPath))) {
       console.log('CATDEX_TEMPLATE_FALLBACK_USED', false);
-      return loadSelectedTemplate(eventTemplateKey, eventPaths.templatePath, eventPaths.layoutPath);
+      return loadSelectedTemplate(selectedEventTemplateKey, eventPaths.templatePath, eventPaths.layoutPath);
     }
   } else {
     console.log('CATDEX_TEMPLATE_TRY_EVENT_PATH', '-');
@@ -50,10 +54,13 @@ export async function selectTemplate(rarity: CatRarity, eventKey?: string): Prom
   return loadSelectedTemplate('legacy/catdex_template_v2', legacyTemplatePath, commonPaths.layoutPath);
 }
 
-function templatePaths(templateKey: string) {
+function templatePaths(templateKey: string, svgTemplate = false) {
   const templateDirectory = path.join(templatesRoot, templateKey);
   return {
-    templatePath: path.join(templateDirectory, 'template.png'),
+    templatePath: path.join(
+      templateDirectory,
+      svgTemplate ? 'template.svg' : 'template.png',
+    ),
     layoutPath: path.join(templateDirectory, 'layout.json'),
   };
 }

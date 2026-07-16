@@ -13,6 +13,8 @@ type CreateCatIllustrationInput = {
   cardStyle: string;
   publicBaseUrl?: string;
   performanceTrace: PipelinePerformanceTrace;
+  eventArtworkInstructions?: readonly string[];
+  eventArtworkNegativeConstraints?: readonly string[];
 };
 
 export async function createCatIllustration(input: CreateCatIllustrationInput): Promise<string> {
@@ -145,7 +147,7 @@ async function createMockCatIllustration(discoveryId: string, publicBaseUrl?: st
 }
 
 function illustrationPrompt(input: CreateCatIllustrationInput): string {
-  return [
+  const instructions = [
     'Create a polished fantasy collectible companion illustration of only the cat in the provided reference photo.',
     'Output a transparent PNG cutout: the cat must be isolated on a fully transparent background.',
     'Do not add any background, paper texture, beige square, colored panel, floor, wall, scenery, frame, border, shadow box, text, UI, stars, or card elements.',
@@ -161,7 +163,19 @@ function illustrationPrompt(input: CreateCatIllustrationInput): string {
     'Preserve body shape, facial structure, ear shape, muzzle color, tail shape, paw markings, stripes, patches, and other distinctive visible markings.',
     'Full cat body if possible, centered, clean silhouette, card-ready pose.',
     'No text, no labels, no card frame, no stars, no UI elements.',
-  ].join('\n');
+  ];
+  if (input.eventArtworkInstructions?.length) {
+    instructions.push(
+      'Apply this fixed CatDex event profile:',
+      ...input.eventArtworkInstructions,
+    );
+  }
+  if (input.eventArtworkNegativeConstraints?.length) {
+    instructions.push(
+      `Avoid: ${input.eventArtworkNegativeConstraints.join(', ')}.`,
+    );
+  }
+  return instructions.join('\n');
 }
 
 async function saveIllustration(

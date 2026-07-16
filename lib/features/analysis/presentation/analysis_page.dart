@@ -142,10 +142,11 @@ class _PhotoPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
-    final file = File(photo.path);
+    final imagePath = photo.bestLocalPath;
+    final file = File(imagePath);
 
     return Hero(
-      tag: 'catdex-photo-${photo.path}',
+      tag: 'catdex-photo-$imagePath',
       child: AspectRatio(
         aspectRatio: 1,
         child: DecoratedBox(
@@ -854,14 +855,15 @@ class _CollectiblePhoto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final file = File(photo.path);
+    final imagePath = photo.bestLocalPath;
+    final file = File(imagePath);
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Positioned.fill(child: _StarField(color: rarityColor)),
         Hero(
-          tag: 'catdex-photo-${photo.path}',
+          tag: 'catdex-photo-$imagePath',
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(36),

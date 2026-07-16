@@ -7,9 +7,11 @@ import 'package:catdex/features/capture/presentation/capture_page.dart';
 import 'package:catdex/features/cards/presentation/cards_binder_page.dart';
 import 'package:catdex/features/catdex/presentation/catdex_page.dart';
 import 'package:catdex/features/error/presentation/global_error_page.dart';
+import 'package:catdex/features/events/presentation/event_page.dart';
 import 'package:catdex/features/friends/presentation/friends_page.dart';
 import 'package:catdex/features/home/presentation/home_page.dart';
 import 'package:catdex/features/login/presentation/login_page.dart';
+import 'package:catdex/features/map/presentation/catdex_map_page.dart';
 import 'package:catdex/features/offline/presentation/offline_page.dart';
 import 'package:catdex/features/onboarding/presentation/onboarding_page.dart';
 import 'package:catdex/features/premium/presentation/premium_page.dart';
@@ -83,18 +85,32 @@ final appRouterProvider = Provider<GoRouter>((_) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: AppRoute.profile.path,
-                name: AppRoute.profile.name,
+                path: AppRoute.map.path,
+                name: AppRoute.map.name,
                 pageBuilder: (_, state) {
-                  return _fadePage(state: state, child: const ProfilePage());
+                  return _fadePage(state: state, child: const CatDexMapPage());
                 },
               ),
             ],
           ),
         ],
       ),
+      _animatedRoute(route: AppRoute.profile, child: const ProfilePage()),
       _animatedRoute(route: AppRoute.settings, child: const SettingsPage()),
       _animatedRoute(route: AppRoute.premium, child: const PremiumPage()),
+      GoRoute(
+        path: AppRoute.event.path,
+        name: AppRoute.event.name,
+        pageBuilder: (_, state) {
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: EventPage(
+              eventKey: state.pathParameters['eventKey'] ?? '',
+            ),
+            transitionsBuilder: _slideTransition,
+          );
+        },
+      ),
       _animatedRoute(route: AppRoute.friends, child: const FriendsPage()),
       GoRoute(
         path: AppRoute.analysis.path,
@@ -124,6 +140,20 @@ final appRouterProvider = Provider<GoRouter>((_) {
           return CustomTransitionPage<void>(
             key: state.pageKey,
             child: child,
+            transitionsBuilder: _slideTransition,
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoute.discoveryDetail.path,
+        name: AppRoute.discoveryDetail.name,
+        pageBuilder: (_, state) {
+          final discoveryId = state.pathParameters['discoveryId'] ?? '';
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: CatDexDiscoveryDetailRoutePage(
+              discoveryId: discoveryId,
+            ),
             transitionsBuilder: _slideTransition,
           );
         },

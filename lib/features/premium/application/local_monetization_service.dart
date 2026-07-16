@@ -141,10 +141,17 @@ class MonetizationStatusSummary {
   }
 }
 
+enum CardGenerationCreditReservationResult {
+  reserved,
+  duplicate,
+  unavailable,
+}
+
 class MonetizationService {
-  const MonetizationService(this._notifyListeners);
+  MonetizationService(this._notifyListeners);
 
   final VoidCallback _notifyListeners;
+  final Set<String> _cardGenerationCreditReservations = <String>{};
 
   static const freeDailyAnalysisLimit = 3;
   static const freeDailyCardGenerationLimit = 3;
@@ -236,6 +243,58 @@ class MonetizationService {
     }
     _logStatus(preferences);
     return allowed;
+  }
+
+  Future<CardGenerationCreditReservationResult> reserveCardGenerationCredit(
+    String discoveryId,
+  ) async {
+    final normalizedId = discoveryId.trim();
+    if (_cardGenerationCreditReservations.contains(normalizedId)) {
+      debugPrint('CATDEX_CARD_GENERATION_DUPLICATE_BLOCKED $normalizedId');
+      return CardGenerationCreditReservationResult.duplicate;
+    }
+
+    final preferences = await _preparedPreferences();
+    final premium = preferences.getBool(_isPremiumKey) ?? false;
+    final used = preferences.getInt(_dailyCardGenerationCountKey) ?? 0;
+    final credits = preferences.getInt(_extraCardGenerationCreditsKey) ?? 0;
+    final remainingDaily = (freeDailyCardGenerationLimit - used).clamp(
+      0,
+      freeDailyCardGenerationLimit,
+    );
+    final availableUnits = remainingDaily + credits;
+    if (!premium &&
+        _cardGenerationCreditReservations.length >= availableUnits) {
+      debugPrint('CATDEX_FREE_LIMIT_REACHED card_generation');
+      return CardGenerationCreditReservationResult.unavailable;
+    }
+
+    _cardGenerationCreditReservations.add(normalizedId);
+    debugPrint('CATDEX_CARD_CREDIT_RESERVED $normalizedId');
+    return CardGenerationCreditReservationResult.reserved;
+  }
+
+  Future<bool> commitCardGenerationCredit(String discoveryId) async {
+    final normalizedId = discoveryId.trim();
+    if (!_cardGenerationCreditReservations.remove(normalizedId)) {
+      return false;
+    }
+
+    final committed = await consumeCardGeneration();
+    if (committed) {
+      debugPrint('CATDEX_CARD_CREDIT_COMMITTED $normalizedId');
+      return true;
+    }
+
+    debugPrint('CATDEX_CARD_CREDIT_RELEASED $normalizedId commit_failed');
+    return false;
+  }
+
+  void releaseCardGenerationCredit(String discoveryId) {
+    final normalizedId = discoveryId.trim();
+    if (_cardGenerationCreditReservations.remove(normalizedId)) {
+      debugPrint('CATDEX_CARD_CREDIT_RELEASED $normalizedId');
+    }
   }
 
   Future<bool> consumeCardGeneration() async {

@@ -41,18 +41,20 @@ class _CatDexBottomNavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
     final labels = [
+      l10n.bottomHome,
       l10n.bottomCatdex,
       l10n.bottomCapture,
       l10n.bottomCards,
-      l10n.bottomProfile,
+      l10n.bottomMap,
     ];
     const icons = [
+      Icons.home_rounded,
       Icons.style_rounded,
       Icons.camera_alt_rounded,
       Icons.collections_bookmark_rounded,
-      Icons.person_rounded,
+      Icons.map_rounded,
     ];
-    const branchIndexes = [1, 2, 3, 4];
+    const branchIndexes = [0, 1, 2, 3, 4];
     final selectedTabIndex = branchIndexes.indexOf(currentIndex);
 
     return SafeArea(
@@ -82,7 +84,7 @@ class _CatDexBottomNavigationBar extends StatelessWidget {
           child: Row(
             children: List.generate(labels.length, (index) {
               final selected = selectedTabIndex == index;
-              final isCapture = index == 1;
+              final isCapture = index == 2;
 
               return Expanded(
                 child: _CatDexNavigationItem(
@@ -103,10 +105,11 @@ class _CatDexBottomNavigationBar extends StatelessWidget {
 
   String _pathForIndex(int index) {
     return switch (index) {
-      0 => AppRoute.catDex.path,
-      1 => AppRoute.capture.path,
-      2 => AppRoute.cards.path,
-      _ => AppRoute.profile.path,
+      0 => AppRoute.home.path,
+      1 => AppRoute.catDex.path,
+      2 => AppRoute.capture.path,
+      3 => AppRoute.cards.path,
+      _ => AppRoute.map.path,
     };
   }
 }

@@ -81,6 +81,16 @@ export type GenerateCardInput = {
   rarity: CatRarity;
   publicBaseUrl?: string;
   eventKey?: string;
+  eventEdition?: string;
+  eventArtworkVariantId?: string;
+  eventArtworkTier?: 'free' | 'premium';
+  eventTemplateKey?: string;
+  eventInstructionKey?: string;
+  eventGenerationRequestId?: string;
+  isEventCard?: boolean;
+  eventArtworkInstructions?: readonly string[];
+  eventArtworkNegativeConstraints?: readonly string[];
+  artifactStorageId?: string;
   displayName?: string;
   displaySpecies?: string;
   displayCoatColor?: string;
@@ -98,6 +108,15 @@ export type GenerateCardOutput = {
   illustratedCatUrl: string;
   analysisJson: CatAnalysisJson;
   selectedTemplateKey: string;
+  templateKey?: string;
+  eventKey?: string;
+  eventEdition?: string;
+  eventArtworkVariantId?: string;
+  eventArtworkTier?: 'free' | 'premium';
+  eventTemplateKey?: string;
+  isEventCard?: boolean;
+  generationStatus?: 'completed';
+  transformationValidation?: 'passed' | 'uncertain' | 'failed';
 };
 
 export type StoredGeneratedCard = GenerateCardOutput & {
@@ -109,4 +128,5 @@ export type StoredGeneratedCard = GenerateCardOutput & {
   analysisPath: string;
   metadataPath: string;
   createdAt: string;
+  artifactStorageId?: string;
 };

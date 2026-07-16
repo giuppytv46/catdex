@@ -4,8 +4,11 @@ import 'package:catdex/core/localization/catdex_localizations.dart';
 import 'package:catdex/features/ads/presentation/catdex_banner_ad_widget.dart';
 import 'package:catdex/features/analysis/presentation/cat_display_data.dart';
 import 'package:catdex/features/analysis/presentation/cat_display_formatter.dart';
+import 'package:catdex/features/capture/data/supabase_cat_photo_storage_repository.dart';
 import 'package:catdex/features/catdex/application/catdex_controller.dart';
+import 'package:catdex/features/catdex/application/catdex_photo_recovery_service.dart';
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
+import 'package:catdex/features/catdex/application/local_discovery_session_controller.dart';
 import 'package:catdex/features/catdex/application/local_player_progress_session_controller.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/catdex_collection.dart';
@@ -31,88 +34,98 @@ class CatDexPage extends ConsumerWidget {
     final levelXp = progress.totalXp - levelStartXp;
     final xpProgress = levelSpan <= 0 ? 1.0 : levelXp / levelSpan;
 
+    Future<void> refreshCollection() async {
+      await ref
+          .read(localDiscoverySessionProvider.notifier)
+          .refreshFromRepository();
+    }
+
     return Scaffold(
       backgroundColor: AppColors.backgroundGray,
-      body: CustomScrollView(
-        key: const Key('catdex_collection_scroll'),
-        slivers: [
-          SliverAppBar(
-            pinned: true,
-            backgroundColor: AppColors.backgroundGray,
-            surfaceTintColor: Colors.transparent,
-            foregroundColor: const Color(0xFF1E243B),
-            title: Text(
-              l10n.catDexTitle,
-              style: const TextStyle(color: Color(0xFF1E243B)),
-            ),
-            actions: [
-              IconButton(
-                tooltip: l10n.profileTitle,
-                onPressed: () {},
-                icon: const Icon(Icons.person_rounded),
+      body: RefreshIndicator(
+        onRefresh: refreshCollection,
+        child: CustomScrollView(
+          key: const Key('catdex_collection_scroll'),
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              backgroundColor: AppColors.backgroundGray,
+              surfaceTintColor: Colors.transparent,
+              foregroundColor: const Color(0xFF1E243B),
+              title: Text(
+                l10n.catDexTitle,
+                style: const TextStyle(color: Color(0xFF1E243B)),
               ),
-            ],
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.md,
-              AppSpacing.lg,
-              0,
-            ),
-            sliver: SliverList.list(
-              children: [
-                _PlayerCollectionHeader(
-                  level: progress.level,
-                  totalXp: progress.totalXp,
-                  levelXp: levelXp.clamp(0, levelSpan),
-                  nextLevelXp: levelSpan,
-                  xpProgress: xpProgress.clamp(0, 1),
-                  coins: progress.coins,
-                  found: state.discoveredCount,
-                  total: state.totalCount,
-                  completion: state.completionPercentage,
+              actions: [
+                IconButton(
+                  tooltip: l10n.refreshAction,
+                  onPressed: () => unawaited(refreshCollection()),
+                  icon: const Icon(Icons.refresh_rounded),
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                _SearchBar(onChanged: controller.updateSearchQuery),
-                const SizedBox(height: AppSpacing.md),
-                _CollectionFilters(
-                  state: state,
-                  onAll: () {
-                    controller
-                      ..setDiscoveryFilter(CatDexDiscoveryFilter.all)
-                      ..clearRarityFilter();
-                  },
-                  onRarity: controller.toggleRarity,
-                  onFavorites: () {
-                    controller
-                      ..clearRarityFilter()
-                      ..setDiscoveryFilter(CatDexDiscoveryFilter.favorites);
-                  },
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                const CatDexBannerAdWidget(
-                  placementLog: 'CATDEX_AD_BANNER_PLACEMENT_TOP_CATDEX',
-                ),
-                const SizedBox(height: AppSpacing.lg),
               ],
             ),
-          ),
-          ..._collectionGridSlivers(context, state.visibleEntries),
-          const SliverPadding(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              0,
-              AppSpacing.lg,
-              128,
-            ),
-            sliver: SliverToBoxAdapter(
-              child: CatDexBannerAdWidget(
-                placementLog: 'CATDEX_AD_BANNER_PLACEMENT_BOTTOM_CATDEX',
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.md,
+                AppSpacing.lg,
+                0,
+              ),
+              sliver: SliverList.list(
+                children: [
+                  _PlayerCollectionHeader(
+                    level: progress.level,
+                    totalXp: progress.totalXp,
+                    levelXp: levelXp.clamp(0, levelSpan),
+                    nextLevelXp: levelSpan,
+                    xpProgress: xpProgress.clamp(0, 1),
+                    coins: progress.coins,
+                    found: state.discoveredCount,
+                    total: state.totalCount,
+                    completion: state.completionPercentage,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _SearchBar(onChanged: controller.updateSearchQuery),
+                  const SizedBox(height: AppSpacing.md),
+                  _CollectionFilters(
+                    state: state,
+                    onAll: () {
+                      controller
+                        ..setDiscoveryFilter(CatDexDiscoveryFilter.all)
+                        ..clearRarityFilter();
+                    },
+                    onRarity: controller.toggleRarity,
+                    onFavorites: () {
+                      controller
+                        ..clearRarityFilter()
+                        ..setDiscoveryFilter(CatDexDiscoveryFilter.favorites);
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  const CatDexBannerAdWidget(
+                    placementLog: 'CATDEX_AD_BANNER_PLACEMENT_TOP_CATDEX',
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                ],
               ),
             ),
-          ),
-        ],
+            ..._collectionGridSlivers(context, state.visibleEntries),
+            const SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                128,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: CatDexBannerAdWidget(
+                  placementLog: 'CATDEX_AD_BANNER_PLACEMENT_BOTTOM_CATDEX',
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -153,6 +166,8 @@ class CatDexPage extends ConsumerWidget {
             itemBuilder: (context, index) {
               final globalIndex = start + index;
               final entry = chunk[index];
+              final entryKey =
+                  entry.discovery?.id ?? 'species_${entry.species.id}';
               return TweenAnimationBuilder<double>(
                 tween: Tween(begin: 0, end: 1),
                 duration: Duration(milliseconds: 260 + (globalIndex % 8) * 45),
@@ -167,7 +182,7 @@ class CatDexPage extends ConsumerWidget {
                   );
                 },
                 child: _CatCollectionCard(
-                  key: ValueKey('catdex_card_${entry.species.id}'),
+                  key: ValueKey('catdex_card_$entryKey'),
                   entry: entry,
                   onTap: () => _openEntry(context, entry),
                 ),
@@ -225,13 +240,108 @@ class CatDexPage extends ConsumerWidget {
   }
 }
 
-class CatDexDetailPage extends StatelessWidget {
+Future<String?> _createSignedCatPhotoUrl(
+  WidgetRef ref,
+  String storagePath,
+) async {
+  final trimmed = storagePath.trim();
+  if (trimmed.isEmpty || trimmed == '-') {
+    return null;
+  }
+  if (!ref.read(supabaseConfiguredProvider)) {
+    return null;
+  }
+
+  try {
+    return await ref
+        .read(supabaseClientProvider)
+        .storage
+        .from(SupabaseCatPhotoStorageRepository.catPhotosBucketName)
+        .createSignedUrl(trimmed, 60 * 60 * 24);
+  } on Object catch (error) {
+    debugPrint('CATDEX_IMAGE_RESOLVER_SIGNED_URL_FAILED $error');
+    return null;
+  }
+}
+
+// Riverpod's family builder returns an internal implementation type.
+// ignore: specify_nonobvious_property_types
+final _catDexDiscoveryDetailRefreshProvider = FutureProvider.autoDispose
+    .family<void, String>((ref, discoveryId) async {
+      if (discoveryId.trim().isEmpty) {
+        throw ArgumentError.value(discoveryId, 'discoveryId');
+      }
+      await ref
+          .read(localDiscoverySessionProvider.notifier)
+          .refreshDiscoveryById(discoveryId);
+    });
+
+class CatDexDiscoveryDetailRoutePage extends ConsumerWidget {
+  const CatDexDiscoveryDetailRoutePage({
+    required this.discoveryId,
+    super.key,
+  });
+
+  final String discoveryId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final refresh = ref.watch(
+      _catDexDiscoveryDetailRefreshProvider(discoveryId),
+    );
+    final state = ref.watch(catDexControllerProvider);
+    CatDexCollectionEntry? matchingEntry;
+    for (final entry in state.entries) {
+      if (entry.discovery?.id == discoveryId) {
+        matchingEntry = entry;
+        break;
+      }
+    }
+
+    if (refresh.isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (matchingEntry != null) {
+      return CatDexDetailPage(entry: matchingEntry);
+    }
+
+    final l10n = CatDexLocalizations.of(context);
+    return Scaffold(
+      appBar: AppBar(),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                l10n.globalErrorMessage,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              OutlinedButton(
+                onPressed: () => ref.invalidate(
+                  _catDexDiscoveryDetailRefreshProvider(discoveryId),
+                ),
+                child: Text(l10n.retryAction),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class CatDexDetailPage extends ConsumerWidget {
   const CatDexDetailPage({required this.entry, super.key});
 
   final CatDexCollectionEntry entry;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = CatDexLocalizations.of(context);
     final discovery = entry.discovery;
     final rarity = _entryRarity(entry);
@@ -240,14 +350,18 @@ class CatDexDetailPage extends StatelessWidget {
       displayData?.displaySpecies ?? entry.species.displayName,
     );
     final name = displayData?.displayName ?? entry.displayName ?? speciesLabel;
-    final resolvedImage = CatDexImageResolver.resolveBestImagePath(
+    final resolvedImageFuture = CatDexImageResolver.resolveBestImagePath(
       discovery: discovery,
       discoveredPhotoPath: entry.discoveredPhotoPath,
-    );
-    debugPrint('CATDEX_DETAIL_DISCOVERY_ID ${discovery?.id ?? '-'}');
-    debugPrint('CATDEX_DETAIL_IMAGE_PATH ${resolvedImage.path ?? '-'}');
-    debugPrint(
-      'CATDEX_DETAIL_SHOWING_PLACEHOLDER ${resolvedImage.usesPlaceholder}',
+      signedUrlForStoragePath: (path) => _createSignedCatPhotoUrl(ref, path),
+      cacheFileForStoragePath: discovery == null
+          ? null
+          : (path) => ref
+                .read(catDexPhotoRecoveryServiceProvider)
+                .recoverFromStorage(
+                  discovery: discovery,
+                  storagePath: path,
+                ),
     );
 
     return Scaffold(
@@ -268,10 +382,40 @@ class CatDexDetailPage extends StatelessWidget {
         children: [
           AspectRatio(
             aspectRatio: 1.15,
-            child: _CatPhotoFrame(
-              resolvedImage: resolvedImage,
-              rarity: rarity,
-              frameStyle: entry.cardFrameStyle,
+            child: FutureBuilder<CatDexResolvedImage>(
+              future: resolvedImageFuture,
+              builder: (context, snapshot) {
+                final resolvedImage = snapshot.data;
+                if (resolvedImage == null) {
+                  return _CatPhotoFrame(
+                    resolvedImage: const CatDexResolvedImage.none(
+                      source: 'loading',
+                      candidates: [],
+                      placeholderReason: 'loading',
+                      discoveryDebugJson: {},
+                    ),
+                    rarity: rarity,
+                    frameStyle: entry.cardFrameStyle,
+                  );
+                }
+
+                debugPrint(
+                  'CATDEX_DETAIL_DISCOVERY_ID ${discovery?.id ?? '-'}',
+                );
+                debugPrint(
+                  'CATDEX_DETAIL_IMAGE_PATH ${resolvedImage.path ?? '-'}',
+                );
+                debugPrint(
+                  'CATDEX_DETAIL_SHOWING_PLACEHOLDER '
+                  '${resolvedImage.usesPlaceholder}',
+                );
+
+                return _CatPhotoFrame(
+                  resolvedImage: resolvedImage,
+                  rarity: rarity,
+                  frameStyle: entry.cardFrameStyle,
+                );
+              },
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -1041,7 +1185,7 @@ class _CatCollectionCard extends StatelessWidget {
   }
 }
 
-class _DiscoveredCardContent extends StatelessWidget {
+class _DiscoveredCardContent extends ConsumerWidget {
   const _DiscoveredCardContent({
     required this.entry,
     required this.name,
@@ -1055,47 +1199,77 @@ class _DiscoveredCardContent extends StatelessWidget {
   final _TradingCardStyle style;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = CatDexLocalizations.of(context);
     final rarity = _entryRarity(entry);
     final speciesLabel = l10n.localizeDisplayValue(
       displayData?.displaySpecies ?? entry.species.displayName,
     );
-    final resolvedImage = CatDexImageResolver.resolveForEntry(entry);
-    final hasPhoto = !resolvedImage.usesPlaceholder;
-    debugPrint('CATDEX_GRID_DISCOVERY_ID ${entry.discovery?.id ?? '-'}');
-    debugPrint('CATDEX_GRID_IMAGE_PATH ${resolvedImage.path ?? '-'}');
+    final resolvedImageFuture = CatDexImageResolver.resolveForEntry(
+      entry,
+      signedUrlForStoragePath: (path) => _createSignedCatPhotoUrl(ref, path),
+      cacheFileForStoragePath: entry.discovery == null
+          ? null
+          : (path) => ref
+                .read(catDexPhotoRecoveryServiceProvider)
+                .recoverFromStorage(
+                  discovery: entry.discovery!,
+                  storagePath: path,
+                ),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: _CatPhotoFrame(
-                  resolvedImage: resolvedImage,
-                  rarity: rarity,
-                  frameStyle: entry.cardFrameStyle,
-                ),
-              ),
-              if (!hasPhoto)
-                const Positioned(
-                  left: AppSpacing.sm,
-                  bottom: AppSpacing.sm,
-                  child: _LegacyDiscoveryBadge(),
-                ),
-              Positioned(
-                top: AppSpacing.sm,
-                right: AppSpacing.sm,
-                child: Icon(
-                  entry.favorite
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_border_rounded,
-                  color: entry.favorite ? AppColors.danger : AppColors.white,
-                ),
-              ),
-            ],
+          child: FutureBuilder<CatDexResolvedImage>(
+            future: resolvedImageFuture,
+            builder: (context, snapshot) {
+              final resolvedImage =
+                  snapshot.data ??
+                  const CatDexResolvedImage.none(
+                    source: 'loading',
+                    candidates: [],
+                    placeholderReason: 'loading',
+                    discoveryDebugJson: {},
+                  );
+              final hasPhoto = !resolvedImage.usesPlaceholder;
+              debugPrint(
+                'CATDEX_GRID_DISCOVERY_ID ${entry.discovery?.id ?? '-'}',
+              );
+              debugPrint('CATDEX_GRID_IMAGE_PATH ${resolvedImage.path ?? '-'}');
+
+              return Stack(
+                children: [
+                  Positioned.fill(
+                    child: _CatPhotoFrame(
+                      resolvedImage: resolvedImage,
+                      rarity: rarity,
+                      frameStyle: entry.cardFrameStyle,
+                    ),
+                  ),
+                  if (!hasPhoto &&
+                      snapshot.connectionState != ConnectionState.waiting)
+                    const Positioned(
+                      left: AppSpacing.sm,
+                      bottom: AppSpacing.sm,
+                      child: _LegacyDiscoveryBadge(),
+                    ),
+                  Positioned(
+                    top: AppSpacing.sm,
+                    right: AppSpacing.sm,
+                    child: Icon(
+                      entry.favorite
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      color: entry.favorite
+                          ? AppColors.danger
+                          : AppColors.white,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -1219,6 +1393,11 @@ class _CatPhotoFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint(
+      'CATDEX_CATDEX_IMAGE_WIDGET_SOURCE '
+      '${_widgetSourceLog(resolvedImage.type)}',
+    );
+
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(26),
@@ -1243,11 +1422,34 @@ class _CatPhotoFrame extends StatelessWidget {
               : Image(
                   image: resolvedImage.provider!,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const _PhotoPlaceholder(),
+                  loadingBuilder: (context, child, progress) {
+                    if (!resolvedImage.isNetworkUrl || progress == null) {
+                      return child;
+                    }
+
+                    return const _PhotoPlaceholder();
+                  },
+                  errorBuilder: (_, error, _) {
+                    final failedSource =
+                        resolvedImage.path ?? resolvedImage.networkUrl ?? '-';
+                    debugPrint(
+                      'CATDEX_CATDEX_IMAGE_LOAD_ERROR '
+                      '$failedSource $error',
+                    );
+                    return const _PhotoPlaceholder();
+                  },
                 ),
         ),
       ),
     );
+  }
+
+  String _widgetSourceLog(CatDexResolvedImageType type) {
+    return switch (type) {
+      CatDexResolvedImageType.local => 'file',
+      CatDexResolvedImageType.network => 'network',
+      CatDexResolvedImageType.none => 'placeholder',
+    };
   }
 
   Color _frameColor(String? style, CatRarity rarity) {

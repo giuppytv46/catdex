@@ -1,0 +1,3 @@
+"NSCameraUsageDescription" = "CatDex usa la fotocamera solo quando scegli di scattare una foto a un gatto per la tua collezione.";
+"NSPhotoLibraryUsageDescription" = "CatDex usa la libreria foto solo quando scegli di importare una foto di un gatto.";
+"NSPhotoLibraryAddUsageDescription" = "CatDex puo salvare foto di gatti solo quando scegli di conservarle nella tua libreria.";

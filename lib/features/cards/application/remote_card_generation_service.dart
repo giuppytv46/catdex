@@ -7,6 +7,7 @@ import 'package:catdex/features/cards/application/card_generation_performance.da
 import 'package:catdex/features/cards/presentation/card_image_cache_buster.dart';
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
+import 'package:catdex/features/events/domain/entities/event_card_generation.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -51,12 +52,26 @@ class RemoteGeneratedCard {
     this.illustratedCatUrl,
     this.selectedTemplateKey,
     this.analysisJson,
+    this.eventKey,
+    this.eventEdition,
+    this.eventArtworkVariantId,
+    this.eventArtworkTier,
+    this.eventTemplateKey,
+    this.generationStatus,
+    this.isEventCard = false,
   });
 
   final String finalCardUrl;
   final String? illustratedCatUrl;
   final String? selectedTemplateKey;
   final Map<String, Object?>? analysisJson;
+  final String? eventKey;
+  final String? eventEdition;
+  final String? eventArtworkVariantId;
+  final String? eventArtworkTier;
+  final String? eventTemplateKey;
+  final String? generationStatus;
+  final bool isEventCard;
 }
 
 enum RemoteCardGenerationFailureReason {
@@ -97,18 +112,30 @@ class RemoteCardGenerationService {
   final List<Duration> _recoveryDelays;
   final CardGenerationRecoveryDelay _recoveryDelay;
   RemoteCardGenerationFailureReason? _lastFailureReason;
+  EventCardGenerationFailure? _lastEventFailure;
 
   RemoteCardGenerationFailureReason? get lastFailureReason =>
       _lastFailureReason;
+
+  bool get isConfigured {
+    final uri = Uri.tryParse(_endpoint.trim());
+    return uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
+  }
+
+  EventCardGenerationFailure? get lastEventFailure => _lastEventFailure;
 
   Future<RemoteGeneratedCard?> generateCard({
     required CatDiscovery discovery,
     required CatDisplayData displayData,
     required int collectionNumber,
     String? debugRarityOverride,
+    EventCardGenerationRequest? eventRequest,
     ValueChanged<RemoteCardGenerationPendingReason>? onPending,
   }) async {
     _lastFailureReason = null;
+    _lastEventFailure = null;
     debugPrint('CATDEX_REMOTE_GENERATE_CARD_STARTED ${discovery.id}');
     debugPrint(
       'CATDEX_REMOTE_GENERATE_CARD_ENDPOINT ${_logValue(_endpoint)}',
@@ -180,6 +207,16 @@ class RemoteCardGenerationService {
         'displayStory': displayData.displayStory,
         'displayFunFact': displayData.displayFunFact,
       };
+      if (eventRequest != null) {
+        payload
+          ..addAll(eventRequest.toPayload())
+          ..['idempotencyKey'] = eventRequest.idempotencyKey(discovery.id);
+        debugPrint('CATDEX_EVENT_CARD_REQUEST_STARTED');
+        debugPrint('CATDEX_EVENT_CARD_EVENT_KEY ${eventRequest.eventKey}');
+        debugPrint('CATDEX_EVENT_CARD_VARIANT ${eventRequest.variantId}');
+        debugPrint('CATDEX_EVENT_CARD_TIER ${eventRequest.tier.wireValue}');
+        debugPrint('CATDEX_EVENT_CARD_RENDERER_STARTED');
+      }
       debugPrint(
         'CATDEX_REMOTE_GENERATE_CARD_DISPLAY_NAME '
         '${displayData.displayName}',
@@ -223,6 +260,14 @@ class RemoteCardGenerationService {
         endpointUri,
       );
       final selectedTemplateKey = decoded['selectedTemplateKey'] as String?;
+      final responseEventKey = decoded['eventKey'] as String?;
+      final responseEventEdition = decoded['eventEdition'] as String?;
+      final responseVariantId = decoded['eventArtworkVariantId'] as String?;
+      final responseTier = decoded['eventArtworkTier'] as String?;
+      final responseTemplateKey =
+          (decoded['eventTemplateKey'] ?? decoded['templateKey']) as String?;
+      final responseIsEventCard = decoded['isEventCard'] as bool? ?? false;
+      final generationStatus = decoded['generationStatus'] as String?;
       final analysisRaw = decoded['analysisJson'];
       final analysisJson = analysisRaw is Map
           ? Map<String, Object?>.from(analysisRaw)
@@ -258,6 +303,26 @@ class RemoteCardGenerationService {
         return null;
       }
 
+      if (eventRequest != null &&
+          !_eventResponseMatches(
+            request: eventRequest,
+            eventKey: responseEventKey,
+            eventEdition: responseEventEdition,
+            variantId: responseVariantId,
+            tier: responseTier,
+            templateKey: responseTemplateKey,
+            isEventCard: responseIsEventCard,
+            generationStatus: generationStatus,
+          )) {
+        _lastFailureReason = RemoteCardGenerationFailureReason.remoteApiFailure;
+        _lastEventFailure = EventCardGenerationFailure.eventPersistenceFailed;
+        debugPrint(
+          'CATDEX_EVENT_CARD_BLOCKED reason=response_metadata_mismatch',
+        );
+        debugPrint('CATDEX_REMOTE_GENERATE_CARD_SUCCESS false');
+        return null;
+      }
+
       if (_looksLikeOriginalPhotoResult(
         finalCardUrl: finalCardUrl!,
         photoUrl: photoUrl!,
@@ -278,6 +343,13 @@ class RemoteCardGenerationService {
         illustratedCatUrl: illustratedCatUrl,
         selectedTemplateKey: selectedTemplateKey,
         analysisJson: analysisJson,
+        eventKey: responseEventKey,
+        eventEdition: responseEventEdition,
+        eventArtworkVariantId: responseVariantId,
+        eventArtworkTier: responseTier,
+        eventTemplateKey: responseTemplateKey,
+        generationStatus: generationStatus,
+        isEventCard: responseIsEventCard,
       );
     } on Object catch (error) {
       _lastFailureReason = RemoteCardGenerationFailureReason.remoteApiFailure;
@@ -285,6 +357,25 @@ class RemoteCardGenerationService {
       debugPrint('CATDEX_REMOTE_GENERATE_CARD_SUCCESS false');
       return null;
     }
+  }
+
+  bool _eventResponseMatches({
+    required EventCardGenerationRequest request,
+    required String? eventKey,
+    required String? eventEdition,
+    required String? variantId,
+    required String? tier,
+    required String? templateKey,
+    required bool isEventCard,
+    required String? generationStatus,
+  }) {
+    return isEventCard &&
+        eventKey == request.eventKey &&
+        eventEdition == request.eventEdition &&
+        variantId == request.variantId &&
+        tier == request.tier.wireValue &&
+        templateKey == request.templateKey &&
+        generationStatus == 'completed';
   }
 
   Future<String?> resolveRendererAccessiblePhotoUrl(
@@ -596,6 +687,7 @@ class RemoteCardGenerationService {
         errorCode: errorCode,
       );
       if (pendingReason == null) {
+        _lastEventFailure = _eventFailureFromErrorCode(errorCode);
         _lastFailureReason = RemoteCardGenerationFailureReason.remoteApiFailure;
         debugPrint(
           'CATDEX_REMOTE_GENERATE_CARD_ERROR HTTP ${response.statusCode}: '
@@ -630,6 +722,28 @@ class RemoteCardGenerationService {
       );
       await _recoveryDelay(delay);
     }
+  }
+
+  EventCardGenerationFailure? _eventFailureFromErrorCode(String? code) {
+    return switch (code) {
+      'eventInactive' => EventCardGenerationFailure.eventInactive,
+      'eventVariantInvalid' => EventCardGenerationFailure.eventVariantInvalid,
+      'eventVariantDisabled' => EventCardGenerationFailure.eventVariantDisabled,
+      'freeEventLimitReached' =>
+        EventCardGenerationFailure.freeEventLimitReached,
+      'premiumRequired' => EventCardGenerationFailure.premiumRequired,
+      'premiumVerificationUnavailable' =>
+        EventCardGenerationFailure.premiumVerificationUnavailable,
+      'eventReservationConflict' =>
+        EventCardGenerationFailure.eventReservationConflict,
+      'eventGenerationPending' =>
+        EventCardGenerationFailure.eventGenerationPending,
+      'eventArtworkValidationFailed' =>
+        EventCardGenerationFailure.eventArtworkValidationFailed,
+      'eventPersistenceFailed' =>
+        EventCardGenerationFailure.eventPersistenceFailed,
+      _ => null,
+    };
   }
 
   String? _responseErrorCode(String responseBody) {

@@ -13,12 +13,16 @@ void main() {
     });
 
     test('prompt distinguishes common tabby coat colors', () {
-      expect(functionText, contains('marrone tigrato'));
-      expect(functionText, contains('grigio tigrato'));
-      expect(functionText, contains('arancione tigrato'));
-      expect(functionText, contains('nero solido'));
-      expect(functionText, contains('mostly solid black'));
-      expect(functionText, contains('mostly white'));
+      expect(functionText, contains('Allowed coatBaseColor values only'));
+      expect(functionText, contains('Allowed coatPattern values only'));
+      expect(functionText, contains('coatBaseColor orange'));
+      expect(functionText, contains('true black fur => coatBaseColor black'));
+      expect(functionText, contains('pure white or mostly white fur'));
+      expect(functionText, contains('brown or taupe non-orange fur'));
+      expect(
+        functionText,
+        contains('Do not return brown or gray for orange/ginger cats'),
+      );
     });
 
     test('tabby normalization cannot become Nero, Calico, or Colorpoint', () {
@@ -36,6 +40,12 @@ void main() {
     });
 
     test('black and white bicolor safeguards run before tabby fallback', () {
+      final normalizeBody = _functionBody(
+        functionText,
+        'normalizeCoatColorFromObservation',
+      );
+      final realisticBody = _functionBody(functionText, 'realisticCoatColor');
+
       expect(
         functionText,
         contains('function isBlackWhiteBicolorObservation('),
@@ -46,10 +56,13 @@ void main() {
       expect(functionText, contains('"domestic_black_white_cat"'));
       expect(functionText, contains('"domestic_tuxedo_cat"'));
       expect(
-        functionText,
-        contains('Do not classify black-and-white bicolor cats as brown'),
+        normalizeBody.indexOf('isBlackWhiteBicolorObservation'),
+        lessThan(normalizeBody.indexOf('if (isBicolorPattern(pattern))')),
       );
-      expect(functionText, contains('Use tabby or mackerel_tabby only'));
+      expect(
+        realisticBody.indexOf('isBlackWhiteBicolorVisual'),
+        lessThan(realisticBody.indexOf('if (tabby)')),
+      );
     });
 
     test('Cat03-like brown gray mackerel tabby does not become orange', () {
@@ -65,13 +78,16 @@ void main() {
       expect(functionText, contains('function isClearlyOrangeTabby('));
       expect(functionText, contains('current.includes("arancione")'));
       expect(functionText, contains('return "marrone/grigio tigrato";'));
-      expect(functionText, contains('return "marrone/grigio tigrato";'));
       expect(functionText, contains('return "marrone tigrato";'));
       expect(functionText, contains('return "tigrato mackerel";'));
       expect(functionText, contains('secondaryColor === "unknown"'));
       expect(functionText, contains('secondaryUnknown'));
-      expect(functionText, contains('Orange tabby is allowed only when'));
-      expect(functionText, contains('must not become orange'));
+
+      final realisticBody = _functionBody(functionText, 'realisticCoatColor');
+      expect(
+        realisticBody.indexOf('isCat03LikeTabby'),
+        lessThan(realisticBody.indexOf('isClearlyOrangeTabby')),
+      );
     });
 
     test('true orange tabby remains allowed by post-processing guard', () {
@@ -83,4 +99,54 @@ void main() {
       expect(functionText, contains('return "arancione tigrato";'));
     });
   });
+}
+
+String _functionBody(String source, String functionName) {
+  final start = source.indexOf('function $functionName');
+  expect(start, isNonNegative, reason: '$functionName should exist');
+
+  final parameterStart = source.indexOf('(', start);
+  expect(
+    parameterStart,
+    isNonNegative,
+    reason: '$functionName should have parameters',
+  );
+
+  var parameterDepth = 0;
+  var signatureEnd = -1;
+  for (var index = parameterStart; index < source.length; index++) {
+    final char = source[index];
+    if (char == '(') {
+      parameterDepth++;
+    } else if (char == ')') {
+      parameterDepth--;
+      if (parameterDepth == 0) {
+        signatureEnd = index;
+        break;
+      }
+    }
+  }
+  expect(
+    signatureEnd,
+    isNonNegative,
+    reason: '$functionName signature should end',
+  );
+
+  final openBrace = source.indexOf('{', signatureEnd);
+  expect(openBrace, isNonNegative, reason: '$functionName should have a body');
+
+  var depth = 0;
+  for (var index = openBrace; index < source.length; index++) {
+    final char = source[index];
+    if (char == '{') {
+      depth++;
+    } else if (char == '}') {
+      depth--;
+      if (depth == 0) {
+        return source.substring(openBrace, index + 1);
+      }
+    }
+  }
+
+  fail('Could not read $functionName body');
 }

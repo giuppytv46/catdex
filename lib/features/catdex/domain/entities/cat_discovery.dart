@@ -1,6 +1,7 @@
 import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_trait.dart';
+import 'package:catdex/features/location/domain/entities/cat_discovery_location.dart';
 
 class CatDiscovery {
   const CatDiscovery({
@@ -21,6 +22,7 @@ class CatDiscovery {
     String? photoPath,
     String? originalPhotoPath,
     String? displayPhotoPath,
+    this.originalPhotoStoragePath,
     this.story,
     this.funFact,
     this.coatColor,
@@ -33,6 +35,9 @@ class CatDiscovery {
     this.confidenceScore,
     this.card,
     this.favorite = false,
+    this.captureLocation,
+    this.locationConsentVersion,
+    this.locationCapturedAt,
   }) : suggestedName = suggestedName ?? nickname ?? 'Mochi',
        customName = customName ?? nickname ?? suggestedName ?? 'Mochi',
        originalPhotoPath = originalPhotoPath ?? photoPath,
@@ -54,6 +59,7 @@ class CatDiscovery {
   final String? country;
   final String? originalPhotoPath;
   final String? displayPhotoPath;
+  final String? originalPhotoStoragePath;
   final String? story;
   final String? funFact;
   final String? coatColor;
@@ -66,9 +72,123 @@ class CatDiscovery {
   final double? confidenceScore;
   final CatDiscoveryCard? card;
   final bool favorite;
+  final CatDiscoveryLocation? captureLocation;
+  final String? locationConsentVersion;
+  final DateTime? locationCapturedAt;
 
   String? get nickname => customName;
   String? get photoPath => displayPhotoPath ?? originalPhotoPath;
+
+  CatDiscovery copyWith({
+    String? customName,
+    String? suggestedName,
+    CatDiscoveryCard? card,
+    CatDiscoveryLocation? captureLocation,
+    String? locationConsentVersion,
+    DateTime? locationCapturedAt,
+    bool clearCaptureLocation = false,
+  }) {
+    return CatDiscovery(
+      id: id,
+      playerId: playerId,
+      speciesId: speciesId,
+      variantId: variantId,
+      rarity: rarity,
+      personality: personality,
+      traits: traits,
+      discoveredAt: discoveredAt,
+      friendshipPoints: friendshipPoints,
+      customName: customName ?? this.customName,
+      suggestedName: suggestedName ?? this.suggestedName,
+      city: city,
+      country: country,
+      originalPhotoPath: originalPhotoPath,
+      displayPhotoPath: displayPhotoPath,
+      originalPhotoStoragePath: originalPhotoStoragePath,
+      story: story,
+      funFact: funFact,
+      coatColor: coatColor,
+      coatPattern: coatPattern,
+      eyeColor: eyeColor,
+      hairLength: hairLength,
+      estimatedAge: estimatedAge,
+      xpEarned: xpEarned,
+      coinsEarned: coinsEarned,
+      confidenceScore: confidenceScore,
+      card: card ?? this.card,
+      favorite: favorite,
+      captureLocation: clearCaptureLocation
+          ? null
+          : captureLocation ?? this.captureLocation,
+      locationConsentVersion: clearCaptureLocation
+          ? null
+          : locationConsentVersion ?? this.locationConsentVersion,
+      locationCapturedAt: clearCaptureLocation
+          ? null
+          : locationCapturedAt ??
+                captureLocation?.capturedAt ??
+                this.locationCapturedAt,
+    );
+  }
+
+  CatDiscovery copyWithPhotoPaths({
+    String? originalPhotoPath,
+    String? displayPhotoPath,
+    String? originalPhotoStoragePath,
+  }) {
+    return CatDiscovery(
+      id: id,
+      playerId: playerId,
+      speciesId: speciesId,
+      variantId: variantId,
+      rarity: rarity,
+      personality: personality,
+      traits: traits,
+      discoveredAt: discoveredAt,
+      friendshipPoints: friendshipPoints,
+      customName: customName,
+      suggestedName: suggestedName,
+      city: city,
+      country: country,
+      originalPhotoPath: originalPhotoPath ?? this.originalPhotoPath,
+      displayPhotoPath: displayPhotoPath ?? this.displayPhotoPath,
+      originalPhotoStoragePath:
+          originalPhotoStoragePath ?? this.originalPhotoStoragePath,
+      story: story,
+      funFact: funFact,
+      coatColor: coatColor,
+      coatPattern: coatPattern,
+      eyeColor: eyeColor,
+      hairLength: hairLength,
+      estimatedAge: estimatedAge,
+      xpEarned: xpEarned,
+      coinsEarned: coinsEarned,
+      confidenceScore: confidenceScore,
+      card: card,
+      favorite: favorite,
+      captureLocation: captureLocation,
+      locationConsentVersion: locationConsentVersion,
+      locationCapturedAt: locationCapturedAt,
+    );
+  }
+
+  CatDiscovery copyWithCard(CatDiscoveryCard updatedCard) {
+    return copyWith(card: updatedCard);
+  }
+
+  CatDiscovery copyWithLocation({
+    CatDiscoveryLocation? captureLocation,
+    String? locationConsentVersion,
+    DateTime? locationCapturedAt,
+    bool clearCaptureLocation = false,
+  }) {
+    return copyWith(
+      captureLocation: captureLocation,
+      locationConsentVersion: locationConsentVersion,
+      locationCapturedAt: locationCapturedAt,
+      clearCaptureLocation: clearCaptureLocation,
+    );
+  }
 }
 
 class CatDiscoveryCard {
@@ -92,6 +212,13 @@ class CatDiscoveryCard {
     this.illustratedCatPath,
     this.cardTemplateId = 'common_clean',
     this.cardVersion = 1,
+    this.generationStatus,
+    this.eventKey,
+    this.eventEdition,
+    this.eventArtworkVariantId,
+    this.eventArtworkTier,
+    this.eventTemplateKey,
+    this.generatedDuringEventAt,
   }) : cardGeneratedAt = generatedAt;
 
   final String cardId;
@@ -114,4 +241,11 @@ class CatDiscoveryCard {
   final DateTime generatedAt;
   final DateTime? cardGeneratedAt;
   final int cardVersion;
+  final String? generationStatus;
+  final String? eventKey;
+  final String? eventEdition;
+  final String? eventArtworkVariantId;
+  final String? eventArtworkTier;
+  final String? eventTemplateKey;
+  final DateTime? generatedDuringEventAt;
 }

@@ -18,11 +18,11 @@ void main() {
       expect(location.displayLabel, 'Milan, Lombardy, Italy');
     });
 
-    test('falls back to coordinates only without place details', () {
+    test('does not invent a place label without place details', () {
       const location = CatDexLocation(latitude: 45.4642, longitude: 9.19);
 
       expect(location.hasPlaceDetails, isFalse);
-      expect(location.displayLabel, 'Coordinates only');
+      expect(location.displayLabel, isEmpty);
     });
   });
 

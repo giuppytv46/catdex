@@ -3,6 +3,8 @@ import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_trait.dart';
 import 'package:catdex/features/catdex/domain/repositories/discovery_repository.dart';
+import 'package:catdex/features/location/domain/entities/cat_discovery_location.dart';
+import 'package:catdex/shared/images/catdex_persisted_photo_path.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseDiscoveryRepository implements DiscoveryRepository {
@@ -85,6 +87,7 @@ class SupabaseDiscoveryRepository implements DiscoveryRepository {
 
   static CatDiscovery mapDiscovery(Map<String, dynamic> row) {
     final traitRows = row['discovery_traits'] as List<dynamic>? ?? const [];
+    final photoUrl = row['photo_url'] as String?;
 
     return CatDiscovery(
       id: row['id'] as String,
@@ -102,8 +105,18 @@ class SupabaseDiscoveryRepository implements DiscoveryRepository {
       nickname: row['nickname'] as String?,
       city: row['city'] as String?,
       country: row['country'] as String?,
-      photoPath: row['photo_url'] as String?,
+      photoPath: photoUrl,
+      originalPhotoStoragePath: _looksLikeStoragePath(photoUrl)
+          ? photoUrl
+          : null,
       favorite: row['favorite'] as bool? ?? false,
+      captureLocation: CatDiscoveryLocation.tryFromJson(
+        row['capture_location'],
+      ),
+      locationConsentVersion: row['location_consent_version'] as String?,
+      locationCapturedAt: DateTime.tryParse(
+        row['location_captured_at'] as String? ?? '',
+      ),
     );
   }
 
@@ -117,9 +130,10 @@ class SupabaseDiscoveryRepository implements DiscoveryRepository {
 
   static Map<String, Object?> toDiscoveryRow(
     CatDiscovery discovery,
-    String userId,
-  ) {
-    return {
+    String userId, {
+    bool includeLocationMetadata = false,
+  }) {
+    final row = <String, Object?>{
       'id': discovery.id,
       'user_id': userId,
       'species_id': discovery.speciesId,
@@ -130,10 +144,56 @@ class SupabaseDiscoveryRepository implements DiscoveryRepository {
       'nickname': discovery.nickname,
       'city': discovery.city,
       'country': discovery.country,
-      'photo_url': discovery.photoPath,
+      'photo_url':
+          discovery.originalPhotoStoragePath ??
+          CatDexPersistedPhotoPath.normalizeForPersistence(
+            discovery.originalPhotoPath,
+          ) ??
+          CatDexPersistedPhotoPath.normalizeForPersistence(
+            discovery.photoPath,
+          ),
       'favorite': discovery.favorite,
       'discovered_at': discovery.discoveredAt.toIso8601String(),
     };
+    if (includeLocationMetadata) {
+      row.addAll(toLocationMetadataRow(discovery));
+    }
+    return row;
+  }
+
+  /// Opt-in mapping for deployments whose discoveries table has the location
+  /// columns. Keeping it separate avoids assuming a database migration in this
+  /// foundation-only change.
+  static Map<String, Object?> toLocationMetadataRow(
+    CatDiscovery discovery,
+  ) {
+    return {
+      'capture_location': discovery.captureLocation?.hasValidCoordinates == true
+          ? discovery.captureLocation!.toJson()
+          : null,
+      'location_consent_version':
+          discovery.captureLocation?.hasValidCoordinates == true
+          ? discovery.locationConsentVersion
+          : null,
+      'location_captured_at':
+          discovery.captureLocation?.hasValidCoordinates == true
+          ? discovery.locationCapturedAt?.toIso8601String()
+          : null,
+    };
+  }
+
+  static bool _looksLikeStoragePath(String? value) {
+    final normalized = value?.trim().toLowerCase();
+    if (normalized == null || normalized.isEmpty) {
+      return false;
+    }
+    if (CatDexPersistedPhotoPath.isPersistedLocalPhotoPath(normalized)) {
+      return false;
+    }
+
+    return normalized.startsWith('catdex/originals/') ||
+        normalized.startsWith('catdex/photos/') ||
+        normalized.startsWith('uploads/');
   }
 
   static Map<String, Object?> toTraitRow({

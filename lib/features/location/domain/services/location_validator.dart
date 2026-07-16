@@ -9,11 +9,10 @@ class LocationValidator {
       return const InvalidLocationValidationResult('Location unavailable');
     }
 
-    final latitudeValid = location.latitude >= -90 && location.latitude <= 90;
-    final longitudeValid =
-        location.longitude >= -180 && location.longitude <= 180;
-
-    if (!latitudeValid || !longitudeValid) {
+    if (!location.hasValidCoordinates ||
+        (location.horizontalAccuracyMeters != null &&
+            (!location.horizontalAccuracyMeters!.isFinite ||
+                location.horizontalAccuracyMeters! < 0))) {
       return const InvalidLocationValidationResult('Location unavailable');
     }
 

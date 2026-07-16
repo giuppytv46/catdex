@@ -5,6 +5,7 @@ import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_species.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_variant.dart';
+import 'package:catdex/features/catdex/domain/entities/catdex_collection.dart';
 import 'package:catdex/features/catdex/domain/services/discovery_reward_calculator.dart';
 import 'package:catdex/features/catdex/domain/services/level_calculator.dart';
 import 'package:catdex/features/home/domain/entities/home_dashboard.dart';
@@ -123,6 +124,7 @@ class HomeController extends Notifier<HomeDashboard> {
       variantId: discovery.variantId,
       rarity: discovery.rarity,
       location: _locationLabel(discovery),
+      discovery: discovery,
     );
   }
 
@@ -131,10 +133,14 @@ class HomeController extends Notifier<HomeDashboard> {
     required String speciesId,
     required String variantId,
     required CatRarity rarity,
-    required String location,
+    required String? location,
+    CatDiscovery? discovery,
   }) {
     final species = _speciesById(speciesId);
     final variant = _variantById(variantId);
+    final speciesIndex = CatDexSeedData.species.indexWhere(
+      (candidate) => candidate.id == speciesId,
+    );
 
     return RecentDiscovery(
       catName: catName,
@@ -148,6 +154,18 @@ class HomeController extends Notifier<HomeDashboard> {
         rarity: rarity,
         duplicate: false,
       ),
+      collectionEntry: discovery == null
+          ? null
+          : CatDexCollectionEntry(
+              species: species,
+              variantName: variant.name,
+              variantId: variant.id,
+              discovered: true,
+              collectionNumber: speciesIndex < 0 ? 1 : speciesIndex + 1,
+              discovery: discovery,
+              displayName: discovery.customName,
+              discoveredPhotoPath: discovery.photoPath,
+            ),
     );
   }
 
@@ -170,13 +188,11 @@ class HomeController extends Notifier<HomeDashboard> {
     };
   }
 
-  String _locationLabel(CatDiscovery discovery) {
-    final city = discovery.city;
-    final country = discovery.country;
-    if (city != null && country != null) {
-      return '$city, $country';
-    }
-
-    return 'Location placeholder';
+  String? _locationLabel(CatDiscovery discovery) {
+    final parts = [
+      discovery.city?.trim(),
+      discovery.country?.trim(),
+    ].whereType<String>().where((part) => part.isNotEmpty).toList();
+    return parts.isEmpty ? null : parts.join(', ');
   }
 }

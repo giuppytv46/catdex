@@ -1,8 +1,16 @@
+import 'dart:async';
+
 import 'package:catdex/core/localization/catdex_localizations.dart';
 import 'package:catdex/features/ads/presentation/catdex_banner_ad_widget.dart';
+import 'package:catdex/features/capture/data/supabase_cat_photo_storage_repository.dart';
+import 'package:catdex/features/catdex/application/catdex_photo_recovery_service.dart';
+import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
+import 'package:catdex/features/catdex/presentation/catdex_page.dart';
+import 'package:catdex/features/events/presentation/home_event_banner.dart';
 import 'package:catdex/features/home/application/home_controller.dart';
 import 'package:catdex/features/home/domain/entities/home_dashboard.dart';
 import 'package:catdex/routing/app_routes.dart';
+import 'package:catdex/shared/images/catdex_image_resolver.dart';
 import 'package:catdex/theme/app_colors.dart';
 import 'package:catdex/theme/app_spacing.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +29,12 @@ class HomePage extends ConsumerWidget {
       appBar: AppBar(
         title: Text(l10n.homeTitle),
         actions: [
+          IconButton(
+            key: const ValueKey('home-profile-button'),
+            tooltip: l10n.profileTitle,
+            icon: const Icon(Icons.account_circle_rounded),
+            onPressed: () => context.pushNamed(AppRoute.profile.name),
+          ),
           IconButton(
             tooltip: l10n.settingsTitle,
             icon: const Icon(Icons.settings_rounded),
@@ -47,11 +61,16 @@ class HomePage extends ConsumerWidget {
           const SizedBox(height: AppSpacing.md),
           _SectionTitle(title: l10n.recentDiscoveriesTitle),
           const SizedBox(height: AppSpacing.md),
-          _RecentDiscoveries(discoveries: dashboard.recentDiscoveries),
-          const SizedBox(height: AppSpacing.lg),
-          _SectionTitle(title: l10n.currentEventTitle),
-          const SizedBox(height: AppSpacing.md),
-          _CurrentEventCard(event: dashboard.currentEvent),
+          _RecentDiscoveries(
+            discoveries: dashboard.recentDiscoveries,
+            onOpen: (discovery) => _openDiscovery(context, discovery),
+          ),
+          HomeActiveEventSection(
+            onOpen: (eventKey) => context.pushNamed(
+              AppRoute.event.name,
+              pathParameters: {'eventKey': eventKey},
+            ),
+          ),
           const SizedBox(height: AppSpacing.lg),
           _SectionTitle(title: l10n.quickActionsTitle),
           const SizedBox(height: AppSpacing.md),
@@ -60,6 +79,21 @@ class HomePage extends ConsumerWidget {
             placementLog: 'CATDEX_AD_BANNER_PLACEMENT_HOME',
           ),
         ],
+      ),
+    );
+  }
+
+  void _openDiscovery(BuildContext context, RecentDiscovery discovery) {
+    final entry = discovery.collectionEntry;
+    if (entry == null) {
+      return;
+    }
+
+    unawaited(
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute<void>(
+          builder: (_) => CatDexDetailPage(entry: entry),
+        ),
       ),
     );
   }
@@ -260,156 +294,465 @@ class _MissionTile extends StatelessWidget {
   }
 }
 
-class _RecentDiscoveries extends StatelessWidget {
-  const _RecentDiscoveries({required this.discoveries});
+class _RecentDiscoveries extends ConsumerWidget {
+  const _RecentDiscoveries({required this.discoveries, required this.onOpen});
 
   final List<RecentDiscovery> discoveries;
+  final ValueChanged<RecentDiscovery> onOpen;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final usesLargeText = MediaQuery.textScalerOf(context).scale(1) > 1.15;
+
     return SizedBox(
-      height: 256,
+      height: usesLargeText ? 336 : 316,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: discoveries.length,
         separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.md),
         itemBuilder: (context, index) {
-          return _DiscoveryCard(discovery: discoveries[index]);
+          final discovery = discoveries[index];
+          return _DiscoveryCard(
+            discovery: discovery,
+            resolveImage: () => _resolveHomeDiscoveryImage(ref, discovery),
+            onTap: discovery.collectionEntry == null
+                ? null
+                : () => onOpen(discovery),
+          );
         },
       ),
     );
   }
 }
 
-class _DiscoveryCard extends StatelessWidget {
-  const _DiscoveryCard({required this.discovery});
+@visibleForTesting
+Widget homeDiscoveryCardForTesting(
+  RecentDiscovery discovery, {
+  Future<CatDexResolvedImage> Function()? resolveImage,
+  VoidCallback? onTap,
+}) {
+  return _DiscoveryCard(
+    discovery: discovery,
+    resolveImage:
+        resolveImage ??
+        () => CatDexImageResolver.resolveBestImagePath(
+          discovery: discovery.collectionEntry?.discovery,
+          discoveredPhotoPath: discovery.collectionEntry?.discoveredPhotoPath,
+        ),
+    onTap: onTap,
+  );
+}
+
+class _DiscoveryCard extends StatefulWidget {
+  const _DiscoveryCard({
+    required this.discovery,
+    required this.resolveImage,
+    this.onTap,
+  });
 
   final RecentDiscovery discovery;
+  final Future<CatDexResolvedImage> Function() resolveImage;
+  final VoidCallback? onTap;
+
+  @override
+  State<_DiscoveryCard> createState() => _DiscoveryCardState();
+}
+
+class _DiscoveryCardState extends State<_DiscoveryCard> {
+  late Future<CatDexResolvedImage> _resolvedImage;
+  String? _lastImageSourceLog;
+
+  RecentDiscovery get discovery => widget.discovery;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveImage();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DiscoveryCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.discovery != widget.discovery) {
+      _resolveImage();
+    }
+  }
+
+  void _resolveImage() {
+    final discoveryId =
+        widget.discovery.collectionEntry?.discovery?.id ?? 'preview';
+    debugPrint('CATDEX_HOME_CARD_DISCOVERY_ID $discoveryId');
+    _lastImageSourceLog = null;
+    _resolvedImage = widget.resolveImage();
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final colors = Theme.of(context).colorScheme;
+    final l10n = CatDexLocalizations.of(context);
     final rarityColor = _rarityColor(discovery.rarityName);
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final usesLargeText = textScale > 1.15;
+    final location = _meaningfulLocation(discovery.location);
+    final speciesLabel = l10n.localizeDisplayValue(discovery.speciesName);
+    final rarityLabel = l10n.localizeDisplayValue(discovery.rarityName);
+    final variantLabel = l10n.localizeDisplayValue(discovery.variantName);
 
-    return Container(
-      width: 196,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: _softCardDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.white,
-            rarityColor.withValues(alpha: 0.22),
-            AppColors.primaryPurple.withValues(alpha: 0.18),
-          ],
-        ),
+    return SizedBox(
+      key: ValueKey(
+        'home_discovery_card_'
+        '${discovery.collectionEntry?.discovery?.id ?? discovery.catName}',
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Align(
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 74,
-                  height: 74,
-                  decoration: BoxDecoration(
-                    color: rarityColor.withValues(alpha: 0.22),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: rarityColor,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: rarityColor.withValues(alpha: 0.32),
-                        blurRadius: 18,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.pets_rounded,
-                    color: AppColors.white,
-                    size: 30,
-                  ),
-                ),
-              ],
-            ),
+      width: usesLargeText ? 218 : 208,
+      child: Material(
+        color: colors.surface,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+          side: BorderSide(
+            color: rarityColor.withValues(alpha: 0.72),
+            width: 1.5,
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Container(
-            height: 4,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  rarityColor,
-                  AppColors.primaryPurple.withValues(alpha: 0.7),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            discovery.catName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.titleLarge?.copyWith(
-              color: AppColors.ink,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            discovery.speciesName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.bodyMedium?.copyWith(color: AppColors.ink),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
-            children: [
-              _MiniBadge(label: discovery.rarityName),
-              _MiniBadge(label: discovery.variantName),
-            ],
-          ),
-          Expanded(
-            child: Align(
-              alignment: Alignment.bottomLeft,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+        elevation: 4,
+        shadowColor: rarityColor.withValues(alpha: 0.2),
+        child: InkWell(
+          onTap: widget.onTap,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    discovery.location,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodySmall?.copyWith(color: AppColors.ink),
+                  Expanded(
+                    flex: usesLargeText ? 55 : 57,
+                    child: FutureBuilder<CatDexResolvedImage>(
+                      future: _resolvedImage,
+                      builder: (context, snapshot) {
+                        return _buildImage(snapshot, colors, rarityColor);
+                      },
+                    ),
                   ),
-                  Text(
-                    '${discovery.xpReward} XP',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelLarge?.copyWith(
-                      color: AppColors.primaryPurple,
-                      fontWeight: FontWeight.w900,
+                  Expanded(
+                    flex: usesLargeText ? 45 : 43,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        12,
+                        usesLargeText ? 8 : 10,
+                        12,
+                        10,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            discovery.catName,
+                            key: const Key('home_discovery_name'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.titleMedium?.copyWith(
+                              color: colors.onSurface,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            speciesLabel,
+                            key: const Key('home_discovery_species'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 7),
+                          Row(
+                            key: const Key('home_discovery_badges'),
+                            children: [
+                              Flexible(
+                                child: _DiscoveryBadge(
+                                  label: rarityLabel,
+                                  color: rarityColor,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Flexible(
+                                child: _DiscoveryBadge(
+                                  label: variantLabel,
+                                  color: colors.secondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          Row(
+                            key: const Key('home_discovery_bottom_row'),
+                            children: [
+                              if (location != null) ...[
+                                Icon(
+                                  Icons.location_on_rounded,
+                                  size: 14,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 2),
+                                Expanded(
+                                  child: Text(
+                                    location,
+                                    key: const Key('home_discovery_location'),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: textTheme.labelSmall?.copyWith(
+                                      color: colors.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                              ] else
+                                const Spacer(),
+                              Text(
+                                '${discovery.xpReward} XP',
+                                key: const Key('home_discovery_xp'),
+                                maxLines: 1,
+                                style: textTheme.labelMedium?.copyWith(
+                                  color: colors.onSurface,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
-              ),
-            ),
+              );
+            },
           ),
-        ],
+        ),
       ),
     );
+  }
+
+  Widget _buildImage(
+    AsyncSnapshot<CatDexResolvedImage> snapshot,
+    ColorScheme colors,
+    Color rarityColor,
+  ) {
+    if (snapshot.hasError) {
+      final error = snapshot.error;
+      final signature = 'error|$error';
+      if (_lastImageSourceLog != signature) {
+        _lastImageSourceLog = signature;
+        debugPrint(
+          'CATDEX_HOME_CARD_IMAGE_ERROR '
+          'id=${discovery.collectionEntry?.discovery?.id ?? 'preview'} '
+          'resolver=$error',
+        );
+      }
+    }
+    if (snapshot.connectionState == ConnectionState.waiting &&
+        snapshot.data == null) {
+      _logImageSource('loading', null);
+      return _HomeDiscoveryImagePlaceholder(
+        loading: true,
+        colorScheme: colors,
+        rarityColor: rarityColor,
+      );
+    }
+
+    final resolved = snapshot.data;
+    if (resolved == null || resolved.type == CatDexResolvedImageType.none) {
+      _logImageSource('placeholder', null);
+      return _HomeDiscoveryImagePlaceholder(
+        colorScheme: colors,
+        rarityColor: rarityColor,
+      );
+    }
+
+    final source = resolved.isLocalFile ? 'local' : 'network';
+    final path = resolved.path ?? resolved.networkUrl;
+    _logImageSource(source, path);
+    return Image(
+      key: const Key('home_discovery_photo'),
+      image: resolved.provider!,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      loadingBuilder: (context, child, progress) {
+        if (!resolved.isNetworkUrl || progress == null) {
+          return child;
+        }
+        return _HomeDiscoveryImagePlaceholder(
+          loading: true,
+          colorScheme: colors,
+          rarityColor: rarityColor,
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint(
+          'CATDEX_HOME_CARD_IMAGE_ERROR '
+          'id=${discovery.collectionEntry?.discovery?.id ?? 'preview'} '
+          'source=${path ?? '-'} error=$error',
+        );
+        return _HomeDiscoveryImagePlaceholder(
+          colorScheme: colors,
+          rarityColor: rarityColor,
+        );
+      },
+    );
+  }
+
+  void _logImageSource(String source, String? path) {
+    final signature = '$source|${path ?? '-'}';
+    if (_lastImageSourceLog == signature) {
+      return;
+    }
+    _lastImageSourceLog = signature;
+    debugPrint('CATDEX_HOME_CARD_IMAGE_SOURCE $source');
+    debugPrint('CATDEX_HOME_CARD_IMAGE_PATH ${path ?? '-'}');
+  }
+}
+
+class _HomeDiscoveryImagePlaceholder extends StatelessWidget {
+  const _HomeDiscoveryImagePlaceholder({
+    required this.colorScheme,
+    required this.rarityColor,
+    this.loading = false,
+  });
+
+  final ColorScheme colorScheme;
+  final Color rarityColor;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      key: Key(
+        loading
+            ? 'home_discovery_image_loading'
+            : 'home_discovery_image_placeholder',
+      ),
+      color: Color.alphaBlend(
+        rarityColor.withValues(alpha: 0.12),
+        colorScheme.surfaceContainerHighest,
+      ),
+      child: Center(
+        child: loading
+            ? SizedBox.square(
+                dimension: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: rarityColor,
+                ),
+              )
+            : Icon(
+                Icons.pets_rounded,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.72),
+                size: 46,
+              ),
+      ),
+    );
+  }
+}
+
+class _DiscoveryBadge extends StatelessWidget {
+  const _DiscoveryBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(
+          color.withValues(alpha: 0.14),
+          colors.surface,
+        ),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.46)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: colors.onSurface,
+            fontWeight: FontWeight.w800,
+            height: 1,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String? _meaningfulLocation(String? location) {
+  final value = location?.trim();
+  if (value == null || value.isEmpty || value == '-') {
+    return null;
+  }
+
+  final normalized = value.toLowerCase();
+  const rejectedValues = {
+    'unknown',
+    'sconosciuto',
+    'non rilevato',
+    'location unavailable',
+  };
+  if (rejectedValues.contains(normalized) ||
+      normalized.contains('placeholder') ||
+      normalized.startsWith('location_')) {
+    return null;
+  }
+  return value;
+}
+
+Future<CatDexResolvedImage> _resolveHomeDiscoveryImage(
+  WidgetRef ref,
+  RecentDiscovery recent,
+) {
+  final entry = recent.collectionEntry;
+  final discovery = entry?.discovery;
+  return CatDexImageResolver.resolveBestImagePath(
+    discovery: discovery,
+    discoveredPhotoPath: entry?.discoveredPhotoPath,
+    signedUrlForStoragePath: (path) => _createHomeSignedPhotoUrl(ref, path),
+    cacheFileForStoragePath: discovery == null
+        ? null
+        : (path) => ref
+              .read(catDexPhotoRecoveryServiceProvider)
+              .recoverFromStorage(discovery: discovery, storagePath: path),
+  );
+}
+
+Future<String?> _createHomeSignedPhotoUrl(
+  WidgetRef ref,
+  String storagePath,
+) async {
+  final trimmed = storagePath.trim();
+  if (trimmed.isEmpty || trimmed == '-') {
+    return null;
+  }
+  if (!ref.read(supabaseConfiguredProvider)) {
+    return null;
+  }
+
+  try {
+    return await ref
+        .read(supabaseClientProvider)
+        .storage
+        .from(SupabaseCatPhotoStorageRepository.catPhotosBucketName)
+        .createSignedUrl(trimmed, 60 * 60 * 24);
+  } on Object catch (error) {
+    debugPrint('CATDEX_HOME_CARD_IMAGE_ERROR signed_url $error');
+    return null;
   }
 }
 
@@ -423,76 +766,6 @@ Color _rarityColor(String rarityName) {
     'mythic' => AppColors.danger,
     _ => AppColors.primaryGreen,
   };
-}
-
-class _CurrentEventCard extends StatelessWidget {
-  const _CurrentEventCard({required this.event});
-
-  final CurrentEvent event;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return DecoratedBox(
-      decoration: _softCardDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.warning,
-            AppColors.primaryGreen,
-            AppColors.primaryPurple,
-          ],
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Row(
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.white.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Icon(
-                Icons.emoji_events_rounded,
-                color: AppColors.warning,
-                size: 36,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.title,
-                    style: textTheme.titleLarge?.copyWith(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    event.dateRange,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  _Pill(label: event.badgeName, icon: Icons.workspace_premium),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _QuickActions extends StatelessWidget {
@@ -642,35 +915,6 @@ class _Pill extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _MiniBadge extends StatelessWidget {
-  const _MiniBadge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.primaryPurple.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.xs,
-        ),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: AppColors.primaryPurple,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
       ),
     );
   }

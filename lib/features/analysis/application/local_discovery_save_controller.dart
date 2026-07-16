@@ -13,6 +13,7 @@ import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/pending_discovery_sync.dart';
 import 'package:catdex/features/catdex/domain/entities/player_progress.dart';
 import 'package:catdex/features/catdex/domain/services/discovery_reward.dart';
+import 'package:catdex/features/location/application/discovery_location_capture_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -37,6 +38,7 @@ class LocalDiscoverySaveController
   Future<void> save(
     CatAnalysisResult result, {
     String? photoPath,
+    String? cloudStoragePath,
     String customName = 'Mochi',
     String suggestedName = 'Mochi',
     String? nickname,
@@ -57,10 +59,15 @@ class LocalDiscoverySaveController
       final photoStorage = ref.read(discoveryPhotoStorageServiceProvider);
       final chosenName = nickname ?? customName;
       final discoveryId = _newDiscoveryId();
+      debugPrint('CATDEX_DISCOVERY_SAVE_STARTED id=$discoveryId');
       debugPrint('CATDEX_SAVE_SOURCE_IMAGE_PATH ${photoPath ?? '-'}');
+      debugPrint('CATDEX_SAVE_SOURCE_STORAGE_PATH ${cloudStoragePath ?? '-'}');
       final stablePhotoPath = await photoStorage.storePhoto(
         discoveryId: discoveryId,
         sourcePath: photoPath,
+      );
+      final stablePhotoRuntimePath = await photoStorage.resolveRuntimePath(
+        stablePhotoPath,
       );
       debugPrint('CATDEX_SAVE_STABLE_IMAGE_PATH ${stablePhotoPath ?? '-'}');
       final discoveries = await discoveryRepository.getDiscoveriesForPlayer(
@@ -77,6 +84,7 @@ class LocalDiscoverySaveController
         rarity: result.rarity,
         duplicate: duplicate,
       );
+      final locationOutcome = await _captureLocationWithoutBlockingSave();
       discovery = factory.create(
         result: result,
         discoveryId: discoveryId,
@@ -89,6 +97,12 @@ class LocalDiscoverySaveController
         suggestedName: suggestedName,
         originalPhotoPath: stablePhotoPath,
         displayPhotoPath: stablePhotoPath,
+        captureLocation: locationOutcome.location,
+        locationConsentVersion: locationOutcome.locationConsentVersion,
+      );
+      debugPrint(
+        'CATDEX_LOCATION_SAVE_DISCOVERY_ID id=$discoveryId '
+        'hasLocation=${discovery.captureLocation != null}',
       );
       debugPrint(
         'CATDEX_CARD_METADATA_USES_EDITED_DETAILS $usesEditedDetails',
@@ -100,19 +114,21 @@ class LocalDiscoverySaveController
       debugPrint(
         'CATDEX_CARD_METADATA_PERSONALITY ${discovery.personality.name}',
       );
-      final uploadedOriginalPath = await _uploadStableOriginalPhoto(
-        discoveryId: discoveryId,
-        stablePhotoPath: stablePhotoPath,
-        playerId: activeSession.playerId,
-      );
+      final uploadedOriginalPath =
+          _validStoragePath(cloudStoragePath) ??
+          await _uploadStableOriginalPhoto(
+            discoveryId: discoveryId,
+            stablePhotoPath: stablePhotoRuntimePath,
+            playerId: activeSession.playerId,
+          );
       debugPrint(
         'CATDEX_SAVE_UPLOADED_ORIGINAL_STORAGE_PATH '
         '${uploadedOriginalPath ?? '-'}',
       );
       if (uploadedOriginalPath != null) {
-        discovery = _discoveryWithOriginalPhotoPath(
+        discovery = _discoveryWithOriginalPhotoStoragePath(
           discovery: discovery,
-          originalPhotoPath: uploadedOriginalPath,
+          originalPhotoStoragePath: uploadedOriginalPath,
         );
         debugPrint(
           'CATDEX_ORIGINAL_PHOTO_STORAGE_PATH_SAVED $uploadedOriginalPath',
@@ -120,6 +136,24 @@ class LocalDiscoverySaveController
       }
 
       await discoveryRepository.saveDiscovery(discovery);
+      debugPrint('CATDEX_DISCOVERY_SAVE_PERSISTED id=$discoveryId');
+      final persistedDiscovery = await discoveryRepository.getDiscoveryById(
+        discoveryId,
+      );
+      if (persistedDiscovery == null) {
+        debugPrint('CATDEX_DISCOVERY_SAVE_READBACK_FAILED id=$discoveryId');
+        throw StateError('Discovery read-after-write failed: $discoveryId');
+      }
+      discovery = persistedDiscovery;
+      debugPrint('CATDEX_DISCOVERY_SAVE_READBACK_SUCCESS id=$discoveryId');
+      debugPrint(
+        'CATDEX_LOCATION_SAVE_PERSISTED '
+        'hasLocation=${discovery.captureLocation != null}',
+      );
+      debugPrint(
+        'CATDEX_LOCATION_SAVE_READBACK_SUCCESS '
+        'hasLocation=${discovery.captureLocation != null}',
+      );
       debugPrint(
         'CATDEX_DISCOVERY_SAVED_ORIGINAL_PHOTO_PATH '
         '${discovery.originalPhotoPath ?? '-'}',
@@ -131,8 +165,25 @@ class LocalDiscoverySaveController
         'CATDEX_DISCOVERY_SAVED_DISPLAY_PHOTO_PATH '
         '${discovery.displayPhotoPath ?? '-'}',
       );
+      debugPrint(
+        'CATDEX_DISCOVERY_IMAGE_FIELDS_SAVED '
+        'displayPhotoPath=${discovery.displayPhotoPath ?? '-'} '
+        'originalPhotoPath=${discovery.originalPhotoPath ?? '-'} '
+        'originalPhotoStoragePath=${discovery.originalPhotoStoragePath ?? '-'} '
+        'photoPath=${discovery.photoPath ?? '-'}',
+      );
+      final hasUsableLocalPhoto =
+          stablePhotoRuntimePath != null &&
+          File(stablePhotoRuntimePath).existsSync();
+      debugPrint(
+        'CATDEX_DISCOVERY_SAVED_HAS_USABLE_LOCAL_PHOTO '
+        '$hasUsableLocalPhoto',
+      );
       final progress = await _applyProgressReward(reward);
-      ref.read(localDiscoverySessionProvider.notifier).addDiscovery(discovery);
+      final discoverySession = ref.read(
+        localDiscoverySessionProvider.notifier,
+      );
+      await (discoverySession..addDiscovery(discovery)).refreshFromRepository();
       ref.read(localPlayerProgressSessionProvider.notifier).progress = progress;
       state = AsyncData(
         LocalDiscoverySaveState(
@@ -241,6 +292,20 @@ class LocalDiscoverySaveController
         '${hex.substring(20)}';
   }
 
+  Future<DiscoveryLocationCaptureOutcome>
+  _captureLocationWithoutBlockingSave() async {
+    try {
+      return await ref
+          .read(discoveryLocationCaptureServiceProvider)
+          .captureForDiscovery();
+    } on Object catch (error) {
+      debugPrint(
+        'CATDEX_LOCATION_REQUEST_FAILED reason=unexpected_${error.runtimeType}',
+      );
+      return const DiscoveryLocationCaptureOutcome();
+    }
+  }
+
   Future<String?> _uploadStableOriginalPhoto({
     required String discoveryId,
     required String? stablePhotoPath,
@@ -259,6 +324,7 @@ class LocalDiscoverySaveController
 
     final safePlayerId = playerId.trim().isEmpty ? 'dev' : playerId.trim();
     final storagePath = 'catdex/originals/$safePlayerId/$discoveryId.jpg';
+    debugPrint('CATDEX_PHOTO_UPLOAD_STARTED ${file.path}');
     debugPrint('CATDEX_ORIGINAL_PHOTO_UPLOAD_STARTED ${file.path}');
     debugPrint(
       'CATDEX_ORIGINAL_PHOTO_UPLOAD_BUCKET '
@@ -283,20 +349,38 @@ class LocalDiscoverySaveController
           .from(SupabaseCatPhotoStorageRepository.catPhotosBucketName)
           .createSignedUrl(storagePath, 60 * 60 * 24);
       debugPrint('CATDEX_ORIGINAL_PHOTO_UPLOAD_SUCCESS true');
+      debugPrint('CATDEX_PHOTO_UPLOAD_SUCCESS true');
       debugPrint('CATDEX_ORIGINAL_PHOTO_UPLOAD_SIGNED_URL $signedUrl');
       debugPrint('CATDEX_ORIGINAL_PHOTO_UPLOAD_ERROR -');
       return storagePath;
     } on Object catch (error) {
       debugPrint('CATDEX_ORIGINAL_PHOTO_UPLOAD_SUCCESS false');
+      debugPrint('CATDEX_PHOTO_UPLOAD_SUCCESS false');
+      debugPrint('CATDEX_PHOTO_UPLOAD_FAILED $error');
       debugPrint('CATDEX_ORIGINAL_PHOTO_UPLOAD_SIGNED_URL -');
       debugPrint('CATDEX_ORIGINAL_PHOTO_UPLOAD_ERROR $error');
       return null;
     }
   }
 
-  CatDiscovery _discoveryWithOriginalPhotoPath({
+  String? _validStoragePath(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty || trimmed == '-') {
+      return null;
+    }
+
+    if (trimmed.startsWith('http://') ||
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('/')) {
+      return null;
+    }
+
+    return trimmed;
+  }
+
+  CatDiscovery _discoveryWithOriginalPhotoStoragePath({
     required CatDiscovery discovery,
-    required String originalPhotoPath,
+    required String originalPhotoStoragePath,
   }) {
     final previousCard = discovery.card;
     final card = previousCard == null
@@ -308,7 +392,7 @@ class LocalDiscoverySaveController
             cardBackgroundStyle: previousCard.cardBackgroundStyle,
             cardRarityStyle: previousCard.cardRarityStyle,
             isEventCard: previousCard.isEventCard,
-            originalPhotoPath: originalPhotoPath,
+            originalPhotoPath: previousCard.originalPhotoPath,
             generatedAt: previousCard.generatedAt,
             eventThemeId: previousCard.eventThemeId,
             cardImageUrl: previousCard.cardImageUrl,
@@ -338,8 +422,9 @@ class LocalDiscoverySaveController
       city: discovery.city,
       country: discovery.country,
       photoPath: discovery.photoPath,
-      originalPhotoPath: originalPhotoPath,
+      originalPhotoPath: discovery.originalPhotoPath,
       displayPhotoPath: discovery.displayPhotoPath,
+      originalPhotoStoragePath: originalPhotoStoragePath,
       story: discovery.story,
       funFact: discovery.funFact,
       coatColor: discovery.coatColor,
@@ -352,6 +437,9 @@ class LocalDiscoverySaveController
       confidenceScore: discovery.confidenceScore,
       card: card,
       favorite: discovery.favorite,
+      captureLocation: discovery.captureLocation,
+      locationConsentVersion: discovery.locationConsentVersion,
+      locationCapturedAt: discovery.locationCapturedAt,
     );
   }
 }

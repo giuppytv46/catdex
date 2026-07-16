@@ -183,6 +183,32 @@ void main() {
     expect(result.primaryBreed.species.id, 'domestic_shorthair_cat');
     expect(result.visualTraits.coatColor, 'Unknown');
   });
+
+  test('recognizes breed field alias when speciesId is missing', () {
+    const parser = CatAnalysisResultJsonParser();
+    final json = _realJson()
+      ..['breed'] = 'sphynx_cat'
+      ..remove('speciesId')
+      ..remove('primaryBreed');
+
+    final result = parser.parse(json);
+
+    expect(result.primaryBreed.species.id, 'sphynx');
+    expect(result.displayBreed, 'sphynx_cat');
+  });
+
+  test('recognizes speciesId field when breed is missing', () {
+    const parser = CatAnalysisResultJsonParser();
+    final json = _realJson()
+      ..remove('breed')
+      ..['speciesId'] = 'sphynx_cat'
+      ..remove('primaryBreed');
+
+    final result = parser.parse(json);
+
+    expect(result.primaryBreed.species.id, 'sphynx');
+    expect(result.displayBreed, 'sphynx_cat');
+  });
 }
 
 Map<String, Object?> _json() {

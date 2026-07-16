@@ -74,6 +74,8 @@ class CatDexLocalizations {
   String get bottomCapture => captureTitle;
   String get bottomCards => cardsTitle;
   String get bottomProfile => profileTitle;
+  String get bottomHome => homeTitle;
+  String get bottomMap => mapTitle;
   String get captureChooseCatPhoto => captureHeading;
   String get captureChooseCatPhotoSubtitle => captureEmptyMessage;
   String get captureTakePhoto => takePhotoAction;
@@ -93,6 +95,137 @@ class CatDexLocalizations {
   String get eyesLabel => _coreValue('eyes');
   String get notDetectedLabel => _coreValue('notDetected');
   String get unknownLabel => _coreValue('unknown');
+
+  String get mapTitle => _mapValue(en: 'Map', it: 'Mappa');
+
+  String get mapEmptyTitle => _mapValue(
+    en: 'No cats on the map yet',
+    it: 'Ancora nessun gatto sulla mappa',
+  );
+
+  String get mapEmptyMessage => _mapValue(
+    en: 'Enable location when saving a discovery to find it here.',
+    it: 'Attiva la posizione quando salvi una scoperta per ritrovarla qui.',
+  );
+
+  String get mapOpenInCatDex => _mapValue(
+    en: 'Open in CatDex',
+    it: 'Apri nel CatDex',
+  );
+
+  String get mapApproximateLocation => _mapValue(
+    en: 'Approximate location',
+    it: 'Posizione approssimativa',
+  );
+
+  String get mapPreciseLocation => _mapValue(
+    en: 'Precise location',
+    it: 'Posizione precisa',
+  );
+
+  String get mapLocationUnavailable => _mapValue(
+    en: 'Location unavailable',
+    it: 'Posizione non disponibile',
+  );
+
+  String get mapCenterCurrentLocation => _mapValue(
+    en: 'Center on my location',
+    it: 'Centra sulla mia posizione',
+  );
+
+  String get mapLocationPermissionRequired => _mapValue(
+    en: 'Location permission required',
+    it: 'Permesso posizione necessario',
+  );
+
+  String get mapLocationPermissionExplanation => _mapValue(
+    en:
+        'CatDex uses your location only to center this private map. '
+        'It is not shared with other users.',
+    it:
+        'CatDex usa la tua posizione solo per centrare questa mappa privata. '
+        'Non viene condivisa con altri utenti.',
+  );
+
+  String get mapLocationPermissionPermanentlyDenied => _mapValue(
+    en: 'Enable location for CatDex in your device settings.',
+    it: 'Abilita la posizione per CatDex nelle impostazioni del dispositivo.',
+  );
+
+  String get mapAllowLocationAction => _mapValue(
+    en: 'Allow location',
+    it: 'Consenti posizione',
+  );
+
+  String get mapMissingLocationMessage => _mapValue(
+    en: 'Some discoveries do not have a location',
+    it: 'Alcune scoperte non hanno una posizione',
+  );
+
+  String get mapLoadError => _mapValue(
+    en: 'Unable to load the map',
+    it: 'Impossibile caricare la mappa',
+  );
+
+  String get mapOpenCapture => _mapValue(
+    en: 'Open Capture',
+    it: 'Apri Cattura',
+  );
+
+  String get mapLocationPreferences => _mapValue(
+    en: 'Location preferences',
+    it: 'Preferenze posizione',
+  );
+
+  String get mapLocationPreferencesMessage => _mapValue(
+    en:
+        'Choose whether new discoveries save an approximate or precise '
+        'location.',
+    it:
+        'Scegli se le nuove scoperte salvano una posizione approssimativa '
+        'o precisa.',
+  );
+
+  String get mapSaveDiscoveryLocation => _mapValue(
+    en: 'Save location for new discoveries',
+    it: 'Salva la posizione delle nuove scoperte',
+  );
+
+  String get mapRemoveLocation => _mapValue(
+    en: 'Remove from map',
+    it: 'Rimuovi dalla mappa',
+  );
+
+  String get mapRemoveLocationConfirmation => _mapValue(
+    en: 'Remove the saved location from this discovery?',
+    it: 'Rimuovere la posizione salvata da questa scoperta?',
+  );
+
+  String get mapRemoveAction => _mapValue(en: 'Remove', it: 'Rimuovi');
+
+  String mapLocatedDiscoveryCount(int count) => _mapValue(
+    en: '$count cats on the map',
+    it: '$count gatti sulla mappa',
+  );
+
+  String mapMissingLocationCount(int count) => _mapValue(
+    en: '$count discoveries do not have a location',
+    it: '$count scoperte non hanno una posizione',
+  );
+
+  String get refreshAction => _localizedValue(
+    en: 'Refresh',
+    it: 'Aggiorna',
+    es: 'Refresh',
+    fr: 'Refresh',
+    de: 'Refresh',
+    ja: 'Refresh',
+    zh: 'Refresh',
+    ko: 'Refresh',
+    hi: 'Refresh',
+    ptBr: 'Refresh',
+    ptPt: 'Refresh',
+  );
 
   String get alphaInfoTitle => _localizedValue(
     en: 'Alpha tester info',
@@ -540,6 +673,34 @@ class CatDexLocalizations {
     ptPt: 'A criar ilustração...',
   );
 
+  String get wakingCardGenerator => _localizedValue(
+    en: 'Preparing the generator...',
+    it: 'Preparazione del generatore...',
+    es: 'Preparando el generador...',
+    fr: 'Préparation du générateur...',
+    de: 'Generator wird vorbereitet...',
+    ja: '生成器を準備中...',
+    zh: '正在准备生成器...',
+    ko: '생성기 준비 중...',
+    hi: 'जनरेटर तैयार हो रहा है...',
+    ptBr: 'Preparando o gerador...',
+    ptPt: 'A preparar o gerador...',
+  );
+
+  String get savingCard => _localizedValue(
+    en: 'Saving the card...',
+    it: 'Salvataggio della carta...',
+    es: 'Guardando la carta...',
+    fr: 'Enregistrement de la carte...',
+    de: 'Karte wird gespeichert...',
+    ja: 'カードを保存中...',
+    zh: '正在保存卡牌...',
+    ko: '카드 저장 중...',
+    hi: 'कार्ड सहेजा जा रहा है...',
+    ptBr: 'Salvando a carta...',
+    ptPt: 'A guardar a carta...',
+  );
+
   String get generateCard => _localizedValue(
     en: 'Generate card',
     it: 'Genera carta',
@@ -580,6 +741,20 @@ class CatDexLocalizations {
     hi: 'कार्ड नहीं बना',
     ptBr: 'Carta não gerada',
     ptPt: 'Carta não gerada',
+  );
+
+  String get cardNoLongerAvailable => _localizedValue(
+    en: 'This card is no longer available.',
+    it: 'Questa carta non è più disponibile.',
+    es: 'Esta carta ya no está disponible.',
+    fr: 'Cette carte n’est plus disponible.',
+    de: 'Diese Karte ist nicht mehr verfügbar.',
+    ja: 'このカードは利用できなくなりました。',
+    zh: '此卡牌已不可用。',
+    ko: '이 카드는 더 이상 사용할 수 없습니다.',
+    hi: 'यह कार्ड अब उपलब्ध नहीं है।',
+    ptBr: 'Esta carta não está mais disponível.',
+    ptPt: 'Esta carta já não está disponível.',
   );
 
   String get createFinalCardHint => _localizedValue(
@@ -1714,6 +1889,179 @@ class CatDexLocalizations {
     ja: 'Current Event',
   );
 
+  String _eventValue({required String en, required String it}) =>
+      _localizedValue(en: en, it: it, es: en, fr: en, de: en, ja: en);
+
+  String get eventHalloweenTitle =>
+      _eventValue(en: 'Halloween CatDex', it: 'Halloween CatDex');
+  String get eventHalloweenDescription => _eventValue(
+    en: 'Create limited Halloween cards with your discovered cats.',
+    it: 'Crea carte Halloween limitate con i gatti che hai scoperto.',
+  );
+  String get eventTestBadge => _eventValue(en: 'TEST EVENT', it: 'EVENTO TEST');
+  String get eventDiscoverAction =>
+      _eventValue(en: 'Discover the event', it: "Scopri l'evento");
+  String get eventGenerations =>
+      _eventValue(en: 'Event generations', it: 'Generazioni evento');
+  String get eventPremiumGenerations => _eventValue(
+    en: 'Premium event generations',
+    it: 'Generazioni evento Premium',
+  );
+  String eventUsage(int used, int limit) => _eventValue(
+    en: '$used of $limit used',
+    it: '$used di $limit utilizzate',
+  );
+  String eventRemaining(int count) =>
+      _eventValue(en: '$count remaining', it: '$count rimaste');
+  String eventDaysRemaining(int count) => _eventValue(
+    en: '$count days remaining',
+    it: '$count giorni rimanenti',
+  );
+  String get eventFreeArtworks =>
+      _eventValue(en: 'Free artwork', it: 'Artwork gratuiti');
+  String get eventPremiumArtworks =>
+      _eventValue(en: 'Premium artwork', it: 'Artwork Premium');
+  String get eventPumpkinsName =>
+      _eventValue(en: 'Enchanted pumpkins', it: 'Zucche incantate');
+  String get eventPumpkinsDescription => _eventValue(
+    en: 'Warm lanterns and enchanted pumpkins.',
+    it: 'Lanterne calde e zucche incantate.',
+  );
+  String get eventMoonlightName =>
+      _eventValue(en: 'Moonlit night', it: 'Notte di luna');
+  String get eventMoonlightDescription => _eventValue(
+    en: 'A mysterious scene under the Halloween moon.',
+    it: 'Una scena misteriosa sotto la luna di Halloween.',
+  );
+  String get eventHauntedName =>
+      _eventValue(en: 'Haunted house', it: 'Casa infestata');
+  String get eventHauntedDescription => _eventValue(
+    en: 'A playful haunted frame full of surprises.',
+    it: 'Una cornice infestata e giocosa, piena di sorprese.',
+  );
+  String get eventWitchName =>
+      _eventValue(en: 'Witch cat', it: 'Gatto stregone');
+  String get eventWitchDescription => _eventValue(
+    en: 'An exclusive magical portrait with hat and cape.',
+    it: 'Un ritratto magico esclusivo con cappello e mantello.',
+  );
+  String get eventCollected => _eventValue(en: 'Collected', it: 'Raccolto');
+  String get eventNotCollected =>
+      _eventValue(en: 'Not collected yet', it: 'Non ancora raccolto');
+  String get eventFreeBadge => _eventValue(en: 'FREE', it: 'FREE');
+  String get eventPremiumBadge => _eventValue(en: 'PREMIUM', it: 'PREMIUM');
+  String get eventChooseCat =>
+      _eventValue(en: 'Choose your cat', it: 'Scegli il gatto');
+  String get eventGenerateCard => _eventValue(
+    en: 'Generate event card',
+    it: 'Genera carta evento',
+  );
+  String get eventPreparingMagic => _eventValue(
+    en: 'Preparing the magic...',
+    it: 'Prepariamo la magia...',
+  );
+  String get eventCatEntering => _eventValue(
+    en: 'Your cat is entering the event...',
+    it: "Il tuo gatto sta entrando nell'evento...",
+  );
+  String get eventCreatingCard =>
+      _eventValue(en: 'Creating the card...', it: 'Creiamo la carta...');
+  String get eventAlmostReady =>
+      _eventValue(en: 'Almost ready...', it: 'Quasi pronta...');
+  String get eventLongWait => _eventValue(
+    en: 'It is taking longer than expected, but creation is still running.',
+    it:
+        'La creazione sta richiedendo più tempo del previsto, '
+        'ma è ancora in corso.',
+  );
+  String get eventOpenCard => _eventValue(en: 'Open card', it: 'Apri la carta');
+  String get eventBackToEvent =>
+      _eventValue(en: 'Back to event', it: "Torna all'evento");
+  String get eventEnded =>
+      _eventValue(en: 'Event ended', it: 'Evento terminato');
+  String get eventDiscoverCatFirst => _eventValue(
+    en: 'Discover a cat first',
+    it: 'Prima scopri un gatto',
+  );
+  String get eventDiscoverCatHint => _eventValue(
+    en: 'Capture or import a cat to join the event.',
+    it: "Scatta o importa un gatto per partecipare all'evento.",
+  );
+  String get eventDiscoverPremium =>
+      _eventValue(en: 'Discover Premium', it: 'Scopri Premium');
+  String get eventAttemptNotConsumed => _eventValue(
+    en: 'Attempt not consumed',
+    it: 'Tentativo non consumato',
+  );
+  String get eventAlreadyCreating => _eventValue(
+    en: 'This card is already being created.',
+    it: 'Questa carta è già in fase di creazione.',
+  );
+  String get eventAlbumTitle =>
+      _eventValue(en: 'Event album', it: 'Album evento');
+  String get eventNoOwnedCards => _eventValue(
+    en: 'You have not collected event cards yet.',
+    it: 'Non hai ancora raccolto carte evento.',
+  );
+  String eventFreeCollectionSummary(int count) => _eventValue(
+    en: '$count of 3 Free artworks collected',
+    it: '$count artwork su 3 Free raccolti',
+  );
+  String get eventPremiumCollected => _eventValue(
+    en: 'Premium artwork collected',
+    it: 'Artwork Premium raccolto',
+  );
+  String get eventPremiumNotCollected => _eventValue(
+    en: 'Premium artwork not collected yet',
+    it: 'Artwork Premium non ancora raccolto',
+  );
+  String eventCardsOwned(int count) => _eventValue(
+    en: '$count event cards',
+    it: '$count carte evento',
+  );
+  String get eventRendererUnavailable => _eventValue(
+    en: 'The card generator is not available right now.',
+    it: 'Il generatore carte non è disponibile in questo momento.',
+  );
+  String get eventInactiveError => _eventValue(
+    en: 'The event is no longer active.',
+    it: "L'evento non è più attivo.",
+  );
+  String get eventFreeLimitError => _eventValue(
+    en: 'You used all 3 free event generations.',
+    it: "Hai utilizzato tutte le 3 generazioni gratuite dell'evento.",
+  );
+  String eventLimitError(int limit) => _eventValue(
+    en: 'You used all $limit event generations.',
+    it: "Hai utilizzato tutte le $limit generazioni dell'evento.",
+  );
+  String get eventPremiumRequiredError => _eventValue(
+    en: 'This artwork is reserved for Premium subscribers.',
+    it: 'Questo artwork è riservato agli abbonati Premium.',
+  );
+  String get eventPremiumVerificationError => _eventValue(
+    en: 'We cannot verify Premium right now. Try again later.',
+    it: 'Non possiamo verificare Premium in questo momento. Riprova più tardi.',
+  );
+  String get eventQualityError => _eventValue(
+    en:
+        'The artwork did not pass quality checks. '
+        'The attempt was not consumed.',
+    it:
+        "L'artwork non ha superato il controllo qualità. "
+        'Il tentativo non è stato consumato.',
+  );
+  String get eventPersistenceError => _eventValue(
+    en: 'We could not save the card. The attempt was not consumed.',
+    it:
+        'Non siamo riusciti a salvare la carta. '
+        'Il tentativo non è stato consumato.',
+  );
+  String get eventNetworkError => _eventValue(
+    en: 'No connection. Check your network and try again.',
+    it: 'Connessione non disponibile. Controlla la rete e riprova.',
+  );
+
   String get quickActionsTitle => _localizedValue(
     en: 'Quick Actions',
     it: 'Azioni Rapide',
@@ -2493,6 +2841,17 @@ class CatDexLocalizations {
     de: 'Zuruck Home',
     ja: 'Back Home',
   );
+
+  String _mapValue({required String en, required String it}) {
+    return _localizedValue(
+      en: en,
+      it: it,
+      es: en,
+      fr: en,
+      de: en,
+      ja: en,
+    );
+  }
 
   String _localizedValue({
     required String en,

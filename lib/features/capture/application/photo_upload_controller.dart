@@ -56,6 +56,8 @@ class PhotoUploadController extends Notifier<PhotoUploadState> {
         source: photo.source,
         sizeBytes: photo.sizeBytes,
         capturedAt: photo.capturedAt,
+        localPath: photo.bestLocalPath,
+        storagePath: storagePath,
       );
       final result = PhotoUploadResult.cloud(
         photo: uploadedPhoto,

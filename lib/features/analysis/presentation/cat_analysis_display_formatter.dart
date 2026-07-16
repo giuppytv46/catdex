@@ -1,3 +1,4 @@
+import 'package:catdex/features/catdex/data/cat_species_catalog.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_trait.dart';
 
 class CatAnalysisDisplayFormatter {
@@ -18,6 +19,17 @@ class CatAnalysisDisplayFormatter {
     'domestic_mediumhair_cat': 'Gatto domestico a pelo medio',
     'domestic_longhair_cat': 'Gatto domestico a pelo lungo',
     'maine_coon': 'Maine Coon',
+    'siamese': 'Siamese',
+    'persian': 'Persiano',
+    'ragdoll': 'Ragdoll',
+    'bengal': 'Bengala',
+    'sphynx': 'Sphynx',
+    'british_shorthair': 'British Shorthair',
+    'scottish_fold': 'Scottish Fold',
+    'abyssinian': 'Abissino',
+    'russian_blue': 'Blu di Russia',
+    'siberian': 'Gatto Siberiano',
+    'birman': 'Sacro di Birmania',
     'norwegian_forest_cat': 'Gatto Norvegese delle Foreste',
     'siberian_cat': 'Gatto Siberiano',
     'persian_cat': 'Persiano',
@@ -86,28 +98,48 @@ class CatAnalysisDisplayFormatter {
     'medium': 'Pelo medio',
     'long': 'Pelo lungo',
     'unknown': 'Sconosciuto',
-    'sleepy': 'Sonnolento',
-    'relaxed': 'Rilassato',
-    'calm': 'Tranquillo',
+  };
+
+  static const personalityLabels = <String, String>{
+    'alert': 'Vigile',
     'curious': 'Curioso',
-    'sweet': 'Dolce',
-    'shy': 'Timido',
+    'relaxed': 'Rilassato',
     'playful': 'Giocherellone',
+    'shy': 'Timido',
+    'friendly': 'Socievole',
+    'independent': 'Indipendente',
+    'affectionate': 'Affettuoso',
+    'energetic': 'Energico',
+    'calm': 'Tranquillo',
+    'reserved': 'Riservato',
+    'confident': 'Sicuro',
+    'gentle': 'Docile',
+    'sleepy': 'Sonnolento',
+    'sweet': 'Dolce',
     'boss': 'Capetto',
-    'friendly': 'Amichevole',
     'elegant': 'Elegante',
     'royal': 'Regale',
     'mischievous': 'Birichino',
     'silly': 'Buffo',
     'mysterious': 'Misterioso',
-    'energetic': 'Energico',
     'brave': 'Coraggioso',
     'lazy': 'Pigro',
   };
 
   String value(String value) {
     final trimmed = value.trim();
-    return _labels[trimmed] ?? _humanizeTechnicalValue(trimmed);
+    final personality = personalityLabels[_normalizePersonality(trimmed)];
+    if (personality != null) {
+      return personality;
+    }
+
+    final directLabel = _labels[trimmed];
+    if (directLabel != null) {
+      return directLabel;
+    }
+
+    final species = CatSpeciesCatalog.find(trimmed);
+    return species?.displayName ?? _humanizeTechnicalValue(trimmed);
   }
 
   String nullableValue(String? value, {String fallback = 'Unknown'}) {
@@ -123,23 +155,54 @@ class CatAnalysisDisplayFormatter {
     String? coatColor,
     String? coatPattern,
   }) {
-    if (_usesOrangeTabbyLabel(
-      speciesId: speciesId,
-      coatColor: coatColor,
-      coatPattern: coatPattern,
-    )) {
+    final canonicalSpeciesId = canonicalSpeciesIdentifier(speciesId);
+    final specificBreed = isSpecificBreed(canonicalSpeciesId);
+
+    if (!specificBreed &&
+        _usesOrangeTabbyLabel(
+          speciesId: canonicalSpeciesId,
+          coatColor: coatColor,
+          coatPattern: coatPattern,
+        )) {
       return 'Gatto domestico arancione tigrato';
     }
 
-    if (_usesBlackWhiteBicolorSafeguard(
-      speciesId: speciesId,
-      coatColor: coatColor,
-      coatPattern: coatPattern,
-    )) {
+    if (!specificBreed &&
+        _usesBlackWhiteBicolorSafeguard(
+          speciesId: canonicalSpeciesId,
+          coatColor: coatColor,
+          coatPattern: coatPattern,
+        )) {
       return _labels['domestic_black_white_cat']!;
     }
 
-    return value(speciesId);
+    return value(canonicalSpeciesId);
+  }
+
+  String canonicalSpeciesIdentifier(
+    String? rawIdentifier, {
+    String? fallbackIdentifier,
+  }) {
+    return CatSpeciesCatalog.canonicalIdentifier(
+      rawIdentifier,
+      fallbackIdentifier: fallbackIdentifier,
+    );
+  }
+
+  bool isKnownSpeciesIdentifier(String? rawIdentifier) {
+    return CatSpeciesCatalog.isKnownIdentifier(rawIdentifier);
+  }
+
+  bool isSpecificBreed(String? rawIdentifier) {
+    return CatSpeciesCatalog.isSpecificBreed(rawIdentifier);
+  }
+
+  String personalityLabel(String? rawValue, {String fallback = 'Curioso'}) {
+    return personalityLabels[_normalizePersonality(rawValue)] ?? fallback;
+  }
+
+  bool isKnownPersonality(String? rawValue) {
+    return personalityLabels.containsKey(_normalizePersonality(rawValue));
   }
 
   String coatColorLabel({
@@ -323,4 +386,13 @@ class CatAnalysisDisplayFormatter {
   }
 
   String _normalize(String? value) => value?.trim().toLowerCase() ?? '';
+
+  String _normalizePersonality(String? value) {
+    return value
+            ?.trim()
+            .toLowerCase()
+            .replaceAll(RegExp('[^a-z0-9]+'), '_')
+            .replaceAll(RegExp(r'^_+|_+$'), '') ??
+        '';
+  }
 }

@@ -431,6 +431,9 @@ CatDiscovery discoveryWithGeneratedCard({
     confidenceScore: discovery.confidenceScore,
     card: card,
     favorite: discovery.favorite,
+    captureLocation: discovery.captureLocation,
+    locationConsentVersion: discovery.locationConsentVersion,
+    locationCapturedAt: discovery.locationCapturedAt,
   );
 }
 
@@ -496,6 +499,9 @@ CatDiscovery discoveryWithGeneratedCutout({
     confidenceScore: discovery.confidenceScore,
     card: card,
     favorite: discovery.favorite,
+    captureLocation: discovery.captureLocation,
+    locationConsentVersion: discovery.locationConsentVersion,
+    locationCapturedAt: discovery.locationCapturedAt,
   );
 }
 

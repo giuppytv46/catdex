@@ -15,9 +15,17 @@ class CatDisplayFormatter {
       'dagli altri.';
 
   CatDisplayData fromAnalysis(CatAnalysisResult result) {
+    final rawSpeciesIdentifier =
+        _cleanText(result.backendBreed) ?? result.primaryBreed.species.id;
+    final canonicalSpeciesIdentifier = _legacyFormatter
+        .canonicalSpeciesIdentifier(
+          rawSpeciesIdentifier,
+          fallbackIdentifier: result.primaryBreed.species.id,
+        );
     final raw = {
       'source': 'analysis',
-      'breed': result.displayBreed,
+      'breed': rawSpeciesIdentifier,
+      'speciesId': result.primaryBreed.species.id,
       'coatColor': result.visualTraits.coatColor,
       'coatPattern': result.visualTraits.coatPattern,
       'eyeColor': result.visualTraits.eyeColor,
@@ -32,8 +40,13 @@ class CatDisplayFormatter {
 
     return _normalize(
       raw: raw,
-      displayName: _legacyFormatter.value(result.displayBreed),
-      speciesId: result.displayBreed,
+      displayName: _legacyFormatter.speciesLabel(
+        speciesId: canonicalSpeciesIdentifier,
+        coatColor: result.visualTraits.coatColor,
+        coatPattern: result.visualTraits.coatPattern,
+      ),
+      rawSpeciesIdentifier: rawSpeciesIdentifier,
+      speciesId: canonicalSpeciesIdentifier,
       coatColor: result.visualTraits.coatColor,
       coatPattern: result.visualTraits.coatPattern,
       eyeColor: result.visualTraits.eyeColor,
@@ -48,6 +61,8 @@ class CatDisplayFormatter {
   }
 
   CatDisplayData fromDiscovery(CatDiscovery discovery, {String? fallbackName}) {
+    final canonicalSpeciesIdentifier = _legacyFormatter
+        .canonicalSpeciesIdentifier(discovery.speciesId);
     final raw = {
       'source': 'discovery',
       'id': discovery.id,
@@ -72,8 +87,9 @@ class CatDisplayFormatter {
           _cleanText(discovery.customName) ??
           _cleanText(discovery.suggestedName) ??
           fallbackName ??
-          _legacyFormatter.value(discovery.speciesId),
-      speciesId: discovery.speciesId,
+          _legacyFormatter.value(canonicalSpeciesIdentifier),
+      rawSpeciesIdentifier: discovery.speciesId,
+      speciesId: canonicalSpeciesIdentifier,
       coatColor: discovery.coatColor,
       coatPattern: discovery.coatPattern,
       eyeColor: discovery.eyeColor,
@@ -90,6 +106,7 @@ class CatDisplayFormatter {
   CatDisplayData _normalize({
     required Map<String, Object?> raw,
     required String displayName,
+    required String rawSpeciesIdentifier,
     required String speciesId,
     required String? coatColor,
     required String? coatPattern,
@@ -107,8 +124,14 @@ class CatDisplayFormatter {
       coatColor: coatColor,
       coatPattern: coatPattern,
     );
-    final overrideApplied = override != null;
+    final specificBreed = _legacyFormatter.isSpecificBreed(speciesId);
+    final overrideApplied = override != null && !specificBreed;
+    final coatOverrideApplied = override != null;
     final normalizedEyeColor = _normalizedEyeColor(eyeColor);
+    final localizedPersonality = _legacyFormatter.personalityLabel(personality);
+    final personalityFallbackUsed = !_legacyFormatter.isKnownPersonality(
+      personality,
+    );
     final orangeTabby = _isOrangeTabby(
       speciesId: speciesId,
       coatColor: coatColor,
@@ -117,7 +140,13 @@ class CatDisplayFormatter {
       funFact: funFact,
       raw: raw,
     );
-    final displaySpecies = overrideApplied
+    final displaySpecies = specificBreed
+        ? _legacyFormatter.speciesLabel(
+            speciesId: speciesId,
+            coatColor: coatColor,
+            coatPattern: coatPattern,
+          )
+        : overrideApplied
         ? 'Gatto domestico bicolore'
         : orangeTabby
         ? 'Gatto domestico arancione tigrato'
@@ -126,7 +155,7 @@ class CatDisplayFormatter {
             coatColor: coatColor,
             coatPattern: coatPattern,
           );
-    final displayCoatColor = overrideApplied
+    final displayCoatColor = coatOverrideApplied
         ? override.coatColor
         : orangeTabby
         ? 'Arancione tigrato'
@@ -141,13 +170,12 @@ class CatDisplayFormatter {
       displayName: displayName,
       displaySpecies: displaySpecies,
       displayCoatColor: displayCoatColor,
-      displayCoatPattern: overrideApplied
+      displayCoatPattern: coatOverrideApplied
           ? 'Bicolore'
-          : _legacyFormatter.coatPatternLabel(
+          : _displayCoatPatternLabel(
               speciesId: speciesId,
               coatColor: coatColor,
               coatPattern: coatPattern,
-              fallback: '-',
             ),
       displayEyeColor: normalizedEyeColor.value,
       displayHairLength: _legacyFormatter.nullableValue(
@@ -155,10 +183,7 @@ class CatDisplayFormatter {
         fallback: '-',
       ),
       displayAge: _legacyFormatter.nullableValue(age, fallback: '-'),
-      displayPersonality: _legacyFormatter.nullableValue(
-        personality,
-        fallback: '-',
-      ),
+      displayPersonality: localizedPersonality,
       displayRarity: _legacyFormatter.nullableValue(rarity, fallback: 'Comune'),
       displayVariant: _legacyFormatter.nullableValue(
         variant,
@@ -176,6 +201,10 @@ class CatDisplayFormatter {
     _debugPrintNormalization(
       raw: raw,
       displayData: displayData,
+      rawSpeciesIdentifier: rawSpeciesIdentifier,
+      canonicalSpeciesIdentifier: speciesId,
+      specificBreed: specificBreed,
+      speciesOverrideSkipped: coatOverrideApplied && specificBreed,
       overrideApplied: overrideApplied,
       overrideReason: override?.reason ?? '-',
       coatColorRaw: coatColor,
@@ -185,6 +214,8 @@ class CatDisplayFormatter {
       eyeColorRaw: eyeColor,
       eyeColorDecision: normalizedEyeColor.decision,
       orangeTabbyDetected: orangeTabby,
+      personalityRaw: personality,
+      personalityFallbackUsed: personalityFallbackUsed,
     );
 
     return displayData;
@@ -423,6 +454,30 @@ class CatDisplayFormatter {
     );
   }
 
+  String _displayCoatPatternLabel({
+    required String speciesId,
+    required String? coatColor,
+    required String? coatPattern,
+  }) {
+    final label = _legacyFormatter.coatPatternLabel(
+      speciesId: speciesId,
+      coatColor: coatColor,
+      coatPattern: coatPattern,
+      fallback: '-',
+    );
+
+    return _capitalizeDisplayLabel(label);
+  }
+
+  String _capitalizeDisplayLabel(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || trimmed == '-') {
+      return trimmed;
+    }
+
+    return trimmed[0].toUpperCase() + trimmed.substring(1);
+  }
+
   String _bicolorStory(String coatColor) {
     final coatPhrase = switch (coatColor) {
       'Nero/bianco' => 'nero e bianco',
@@ -461,6 +516,10 @@ class CatDisplayFormatter {
   void _debugPrintNormalization({
     required Map<String, Object?> raw,
     required CatDisplayData displayData,
+    required String rawSpeciesIdentifier,
+    required String canonicalSpeciesIdentifier,
+    required bool specificBreed,
+    required bool speciesOverrideSkipped,
     required bool overrideApplied,
     required String overrideReason,
     required String? coatColorRaw,
@@ -469,6 +528,8 @@ class CatDisplayFormatter {
     required String? eyeColorRaw,
     required String eyeColorDecision,
     required bool orangeTabbyDetected,
+    required String? personalityRaw,
+    required bool personalityFallbackUsed,
   }) {
     final orangeTabbyDecision = orangeTabbyDetected
         ? 'orange_signal_with_tabby_pattern'
@@ -477,6 +538,15 @@ class CatDisplayFormatter {
     _log(
       'CATDEX_NORMALIZED_DISPLAY_DATA ${_safeJson(displayData.toDebugJson())}',
     );
+    _log('CATDEX_SPECIES_RAW_IDENTIFIER $rawSpeciesIdentifier');
+    _log('CATDEX_SPECIES_CANONICAL_IDENTIFIER $canonicalSpeciesIdentifier');
+    _log('CATDEX_SPECIES_IS_SPECIFIC_BREED $specificBreed');
+    if (speciesOverrideSkipped) {
+      _log('CATDEX_SPECIES_OVERRIDE_SKIPPED reason=specific_breed');
+    }
+    _log('CATDEX_PERSONALITY_RAW ${personalityRaw ?? '-'}');
+    _log('CATDEX_PERSONALITY_LOCALIZED ${displayData.displayPersonality}');
+    _log('CATDEX_PERSONALITY_FALLBACK_USED $personalityFallbackUsed');
     _log('CATDEX_COAT_COLOR_RAW ${coatColorRaw ?? '-'}');
     _log('CATDEX_COAT_PATTERN_RAW ${coatPatternRaw ?? '-'}');
     _log('CATDEX_ORANGE_TABBY_RAW_COLOR ${coatColorRaw ?? '-'}');

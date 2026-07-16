@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:catdex/features/analysis/application/local_discovery_save_controller.dart';
 import 'package:catdex/features/analysis/application/local_discovery_save_state.dart';
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_confidence.dart';
@@ -19,13 +21,48 @@ import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/repositories/discovery_repository.dart';
 import 'package:catdex/features/home/application/home_controller.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late Directory tempDirectory;
+  late Directory documentsDirectory;
+
+  setUp(() {
+    tempDirectory = Directory.systemTemp.createTempSync('catdex_save_test_');
+    documentsDirectory = Directory('${tempDirectory.path}/documents')
+      ..createSync(recursive: true);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          (call) async {
+            if (call.method == 'getApplicationDocumentsDirectory') {
+              return documentsDirectory.path;
+            }
+
+            return null;
+          },
+        );
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          null,
+        );
+    if (tempDirectory.existsSync()) {
+      tempDirectory.deleteSync(recursive: true);
+    }
+  });
+
   test('saves local discovery into repository and session state', () async {
     final discoveryRepository = InMemoryDiscoveryRepository();
     final progressRepository = InMemoryPlayerProgressRepository();
+    final sourcePhoto = _writeTestPhoto(tempDirectory, 'cat.jpg');
     final container = _container(
       discoveryRepository: discoveryRepository,
       progressRepository: progressRepository,
@@ -37,7 +74,7 @@ void main() {
         .read(localDiscoverySaveControllerProvider.notifier)
         .save(
           _analysisResult(),
-          photoPath: '/tmp/cat.jpg',
+          photoPath: sourcePhoto.path,
           customName: 'Nebbia',
         );
 
@@ -57,9 +94,13 @@ void main() {
     );
     expect(discoveries.single.nickname, 'Nebbia');
     expect(discoveries.single.suggestedName, 'Mochi');
-    expect(discoveries.single.originalPhotoPath, '/tmp/cat.jpg');
-    expect(discoveries.single.displayPhotoPath, '/tmp/cat.jpg');
-    expect(discoveries.single.photoPath, '/tmp/cat.jpg');
+    expect(
+      discoveries.single.originalPhotoPath,
+      contains('/catdex/originals/'),
+    );
+    expect(discoveries.single.displayPhotoPath, contains('/catdex/originals/'));
+    expect(discoveries.single.photoPath, contains('/catdex/originals/'));
+    expect(File(discoveries.single.displayPhotoPath!).existsSync(), isTrue);
     expect(discoveries.single.story, _analysisResult().story);
     expect(discoveries.single.funFact, _analysisResult().funFact);
     expect(discoveries.single.coatColor, 'Black');
@@ -77,7 +118,10 @@ void main() {
     expect(discoveries.single.card?.cardFrameStyle, 'green_simple_frame');
     expect(discoveries.single.card?.isEventCard, isFalse);
     expect(catDex.entries.first.displayName, 'Nebbia');
-    expect(catDex.entries.first.discoveredPhotoPath, '/tmp/cat.jpg');
+    expect(
+      catDex.entries.first.discoveredPhotoPath,
+      discoveries.single.photoPath,
+    );
   });
 
   test('updates local player progress with discovery reward', () async {
@@ -104,6 +148,53 @@ void main() {
     expect(progress.discoveryCount, 1);
     expect(progress.level, greaterThanOrEqualTo(1));
   });
+
+  test(
+    'keeps persistent local display photo when cloud storage path exists',
+    () async {
+      final discoveryRepository = InMemoryDiscoveryRepository();
+      final progressRepository = InMemoryPlayerProgressRepository();
+      final sourcePhoto = _writeTestPhoto(tempDirectory, 'local-cat.jpg');
+      final container = _container(
+        discoveryRepository: discoveryRepository,
+        progressRepository: progressRepository,
+      );
+      addTearDown(container.dispose);
+
+      await container.read(localDiscoverySaveControllerProvider.future);
+      await container
+          .read(localDiscoverySaveControllerProvider.notifier)
+          .save(
+            _analysisResult(),
+            photoPath: sourcePhoto.path,
+            cloudStoragePath: 'catdex/originals/cloud-user/discovery.jpg',
+          );
+
+      final discoveries = await discoveryRepository.getDiscoveriesForPlayer(
+        LocalPlayerSession.playerId,
+      );
+      final catDex = container.read(catDexControllerProvider);
+
+      expect(
+        discoveries.single.displayPhotoPath,
+        contains('/catdex/originals/'),
+      );
+      expect(File(discoveries.single.displayPhotoPath!).existsSync(), isTrue);
+      expect(
+        discoveries.single.originalPhotoPath,
+        discoveries.single.displayPhotoPath,
+      );
+      expect(
+        discoveries.single.originalPhotoStoragePath,
+        'catdex/originals/cloud-user/discovery.jpg',
+      );
+      expect(discoveries.single.photoPath, discoveries.single.displayPhotoPath);
+      expect(
+        catDex.entries.first.discoveredPhotoPath,
+        discoveries.single.displayPhotoPath,
+      );
+    },
+  );
 
   test('updates live Home and CatDex state after saving', () async {
     final discoveryRepository = InMemoryDiscoveryRepository();
@@ -208,6 +299,32 @@ void main() {
     expect(pendingItems, hasLength(1));
     expect(sessionDiscoveries, hasLength(1));
   });
+
+  test('does not report save success when read-after-write fails', () async {
+    final progressRepository = InMemoryPlayerProgressRepository();
+    final container = ProviderContainer(
+      overrides: [
+        discoveryRepositoryProvider.overrideWithValue(
+          const _MissingReadbackDiscoveryRepository(),
+        ),
+        playerProgressRepositoryProvider.overrideWithValue(progressRepository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(localDiscoverySaveControllerProvider.future);
+    await container
+        .read(localDiscoverySaveControllerProvider.notifier)
+        .save(_analysisResult());
+
+    final saveState = container.read(localDiscoverySaveControllerProvider);
+    expect(saveState.value?.status, LocalDiscoverySaveStatus.failure);
+    expect(container.read(localDiscoverySessionProvider), isEmpty);
+  });
+}
+
+File _writeTestPhoto(Directory directory, String name) {
+  return File('${directory.path}/$name')..writeAsBytesSync(_onePixelPng);
 }
 
 ProviderContainer _container({
@@ -249,6 +366,29 @@ class _FailingDiscoveryRepository implements DiscoveryRepository {
   }
 }
 
+class _MissingReadbackDiscoveryRepository implements DiscoveryRepository {
+  const _MissingReadbackDiscoveryRepository();
+
+  @override
+  Future<CatDiscovery?> getDiscoveryById(String id) async => null;
+
+  @override
+  Future<List<CatDiscovery>> getDiscoveriesForPlayer(String playerId) async {
+    return const [];
+  }
+
+  @override
+  Future<bool> hasDiscoveredSpecies({
+    required String playerId,
+    required String speciesId,
+  }) async {
+    return false;
+  }
+
+  @override
+  Future<void> saveDiscovery(CatDiscovery discovery) async {}
+}
+
 CatAnalysisResult _analysisResult() {
   final species = CatDexSeedData.species.first;
   final variant = CatDexSeedData.variants.first;
@@ -279,3 +419,73 @@ CatAnalysisResult _analysisResult() {
     funFact: 'Domestic cats can recognize familiar voices.',
   );
 }
+
+const _onePixelPng = <int>[
+  137,
+  80,
+  78,
+  71,
+  13,
+  10,
+  26,
+  10,
+  0,
+  0,
+  0,
+  13,
+  73,
+  72,
+  68,
+  82,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  1,
+  8,
+  6,
+  0,
+  0,
+  0,
+  31,
+  21,
+  196,
+  137,
+  0,
+  0,
+  0,
+  13,
+  73,
+  68,
+  65,
+  84,
+  120,
+  156,
+  99,
+  248,
+  15,
+  4,
+  0,
+  9,
+  251,
+  3,
+  253,
+  160,
+  130,
+  243,
+  191,
+  0,
+  0,
+  0,
+  0,
+  73,
+  69,
+  68,
+  174,
+  66,
+  96,
+  130,
+];

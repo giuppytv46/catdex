@@ -5,8 +5,9 @@ import 'package:catdex/features/catdex/application/active_catdex_session.dart';
 import 'package:catdex/features/catdex/application/local_player_session.dart';
 import 'package:catdex/features/catdex/data/repositories/in_memory_catdex_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/in_memory_pending_sync_queue_repository.dart';
-import 'package:catdex/features/catdex/data/repositories/in_memory_player_progress_repository.dart';
+import 'package:catdex/features/catdex/data/repositories/merged_discovery_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/shared_preferences_discovery_repository.dart';
+import 'package:catdex/features/catdex/data/repositories/shared_preferences_player_progress_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/supabase_catdex_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/supabase_discovery_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/supabase_player_progress_repository.dart';
@@ -51,9 +52,12 @@ final catDexRepositoryProvider = Provider<CatDexRepository>((ref) {
 final discoveryRepositoryProvider = Provider<DiscoveryRepository>((ref) {
   final userId = ref.watch(cloudUserIdProvider);
   if (userId != null) {
-    return SupabaseDiscoveryRepository(
-      client: ref.watch(supabaseClientProvider),
-      userId: userId,
+    return MergedDiscoveryRepository(
+      localRepository: const SharedPreferencesDiscoveryRepository(),
+      remoteRepository: SupabaseDiscoveryRepository(
+        client: ref.watch(supabaseClientProvider),
+        userId: userId,
+      ),
     );
   }
 
@@ -67,8 +71,8 @@ final playerProgressRepositoryProvider = Provider<PlayerProgressRepository>((
     return SupabasePlayerProgressRepository(ref.watch(supabaseClientProvider));
   }
 
-  return InMemoryPlayerProgressRepository(
-    progress: const [LocalPlayerSession.initialProgress],
+  return const SharedPreferencesPlayerProgressRepository(
+    fallbackProgress: LocalPlayerSession.initialProgress,
   );
 });
 

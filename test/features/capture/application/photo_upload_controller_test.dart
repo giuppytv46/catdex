@@ -45,6 +45,8 @@ void main() {
         .prepareForAnalysis(_photo());
 
     expect(result?.photo.path, 'cloud-user/123.jpg');
+    expect(result?.photo.localPath, 'cat.jpg');
+    expect(result?.photo.storagePath, 'cloud-user/123.jpg');
     expect(result?.storagePath, 'cloud-user/123.jpg');
     expect(storageRepository.uploadCount, 1);
     expect(storageRepository.lastUserId, 'cloud-user');

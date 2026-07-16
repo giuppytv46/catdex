@@ -1,9 +1,9 @@
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:catdex/features/catdex/data/repositories/in_memory_catdex_repository.dart';
-import 'package:catdex/features/catdex/data/repositories/in_memory_player_progress_repository.dart';
+import 'package:catdex/features/catdex/data/repositories/merged_discovery_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/shared_preferences_discovery_repository.dart';
+import 'package:catdex/features/catdex/data/repositories/shared_preferences_player_progress_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/supabase_catdex_repository.dart';
-import 'package:catdex/features/catdex/data/repositories/supabase_discovery_repository.dart';
 import 'package:catdex/features/catdex/data/repositories/supabase_player_progress_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,7 +24,7 @@ void main() {
     );
     expect(
       container.read(playerProgressRepositoryProvider),
-      isA<InMemoryPlayerProgressRepository>(),
+      isA<SharedPreferencesPlayerProgressRepository>(),
     );
   });
 
@@ -45,7 +45,7 @@ void main() {
     );
     expect(
       container.read(discoveryRepositoryProvider),
-      isA<SupabaseDiscoveryRepository>(),
+      isA<MergedDiscoveryRepository>(),
     );
     expect(
       container.read(playerProgressRepositoryProvider),

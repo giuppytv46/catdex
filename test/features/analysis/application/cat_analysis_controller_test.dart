@@ -14,8 +14,15 @@ import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   test('starts idle', () {
     final container = _container(repository: _SuccessAnalysisRepository());
     addTearDown(container.dispose);
@@ -34,6 +41,7 @@ void main() {
     final analysis = container
         .read(catAnalysisControllerProvider.notifier)
         .analyze(_photo());
+    await Future<void>.delayed(Duration.zero);
 
     expect(
       container.read(catAnalysisControllerProvider).status,

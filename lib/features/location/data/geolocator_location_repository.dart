@@ -1,100 +1,95 @@
-import 'package:catdex/features/location/domain/entities/catdex_location.dart';
+import 'package:catdex/features/location/domain/entities/cat_discovery_location.dart';
 import 'package:catdex/features/location/domain/entities/location_permission_status.dart';
+import 'package:catdex/features/location/domain/entities/location_service_result.dart';
 import 'package:catdex/features/location/domain/repositories/location_repository.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 
 class GeolocatorLocationRepository implements LocationRepository {
   const GeolocatorLocationRepository();
 
   @override
-  Future<bool> isLocationServiceEnabled() {
-    return Geolocator.isLocationServiceEnabled();
+  Future<bool> checkServiceEnabled() async {
+    try {
+      return await Geolocator.isLocationServiceEnabled();
+    } on Object {
+      return false;
+    }
+  }
+
+  @override
+  Future<LocationPermissionStatus> checkPermission() async {
+    try {
+      return _permissionStatus(await Geolocator.checkPermission());
+    } on Object {
+      return LocationPermissionStatus.unsupported;
+    }
   }
 
   @override
   Future<LocationPermissionStatus> requestPermission() async {
-    final currentPermission = await Geolocator.checkPermission();
-    final permission = switch (currentPermission) {
-      LocationPermission.denied => await Geolocator.requestPermission(),
-      _ => currentPermission,
-    };
+    try {
+      return _permissionStatus(await Geolocator.requestPermission());
+    } on Object {
+      return LocationPermissionStatus.unsupported;
+    }
+  }
 
+  @override
+  Future<LocationServiceResult> getCurrentLocation() async {
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      return _resultFor(position);
+    } on LocationServiceDisabledException {
+      return const LocationServiceFailure(
+        LocationFailureReason.serviceDisabled,
+      );
+    } on PermissionDeniedException {
+      return const LocationServiceFailure(
+        LocationFailureReason.permissionDenied,
+      );
+    } on Object {
+      return const LocationServiceFailure(LocationFailureReason.unavailable);
+    }
+  }
+
+  @override
+  Future<LocationServiceResult> getLastKnownLocation() async {
+    try {
+      final position = await Geolocator.getLastKnownPosition();
+      if (position == null) {
+        return const LocationServiceFailure(LocationFailureReason.unavailable);
+      }
+      return _resultFor(position);
+    } on Object {
+      return const LocationServiceFailure(LocationFailureReason.unavailable);
+    }
+  }
+
+  LocationServiceResult _resultFor(Position position) {
+    final location = CatDiscoveryLocation.tryCreate(
+      latitude: position.latitude,
+      longitude: position.longitude,
+      horizontalAccuracyMeters: position.accuracy,
+      capturedAt: position.timestamp,
+      source: CatDiscoveryLocationSource.gps,
+    );
+    if (location == null) {
+      return const LocationServiceFailure(
+        LocationFailureReason.invalidCoordinates,
+      );
+    }
+    return LocationServiceSuccess(location);
+  }
+
+  LocationPermissionStatus _permissionStatus(LocationPermission permission) {
     return switch (permission) {
       LocationPermission.always ||
       LocationPermission.whileInUse => LocationPermissionStatus.granted,
       LocationPermission.denied => LocationPermissionStatus.denied,
       LocationPermission.deniedForever =>
         LocationPermissionStatus.permanentlyDenied,
-      LocationPermission.unableToDetermine => LocationPermissionStatus.denied,
+      LocationPermission.unableToDetermine =>
+        LocationPermissionStatus.notDetermined,
     };
   }
-
-  @override
-  Future<CatDexLocation> getCurrentLocation() async {
-    final position = await Geolocator.getCurrentPosition();
-    final placeDetails = await _reverseGeocode(
-      latitude: position.latitude,
-      longitude: position.longitude,
-    );
-
-    return CatDexLocation(
-      latitude: position.latitude,
-      longitude: position.longitude,
-      city: placeDetails.city,
-      region: placeDetails.region,
-      country: placeDetails.country,
-    );
-  }
-
-  Future<_PlaceDetails> _reverseGeocode({
-    required double latitude,
-    required double longitude,
-  }) async {
-    try {
-      final placemarks = await placemarkFromCoordinates(latitude, longitude);
-
-      if (placemarks.isEmpty) {
-        return const _PlaceDetails();
-      }
-
-      final placemark = placemarks.first;
-
-      return _PlaceDetails(
-        city: _firstNotBlank([
-          placemark.locality,
-          placemark.subAdministrativeArea,
-        ]),
-        region: _firstNotBlank([
-          placemark.administrativeArea,
-          placemark.subAdministrativeArea,
-        ]),
-        country: _firstNotBlank([placemark.country]),
-      );
-    } on Object {
-      return const _PlaceDetails();
-    }
-  }
-
-  String? _firstNotBlank(List<String?> values) {
-    for (final value in values) {
-      if (value != null && value.trim().isNotEmpty) {
-        return value.trim();
-      }
-    }
-
-    return null;
-  }
-}
-
-class _PlaceDetails {
-  const _PlaceDetails({
-    this.city,
-    this.region,
-    this.country,
-  });
-
-  final String? city;
-  final String? region;
-  final String? country;
 }

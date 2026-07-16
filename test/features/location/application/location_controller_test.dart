@@ -2,6 +2,7 @@ import 'package:catdex/features/location/application/location_controller.dart';
 import 'package:catdex/features/location/application/location_state.dart';
 import 'package:catdex/features/location/domain/entities/catdex_location.dart';
 import 'package:catdex/features/location/domain/entities/location_permission_status.dart';
+import 'package:catdex/features/location/domain/entities/location_service_result.dart';
 import 'package:catdex/features/location/domain/repositories/location_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -85,7 +86,7 @@ void main() {
 
         expect(state.status, LocationStatus.located);
         expect(state.location?.hasPlaceDetails, isFalse);
-        expect(state.location?.displayLabel, 'Coordinates only');
+        expect(state.location?.displayLabel, isEmpty);
       },
     );
 
@@ -137,8 +138,13 @@ class _FakeLocationRepository implements LocationRepository {
   final bool throwOnLocate;
 
   @override
-  Future<bool> isLocationServiceEnabled() async {
+  Future<bool> checkServiceEnabled() async {
     return serviceEnabled;
+  }
+
+  @override
+  Future<LocationPermissionStatus> checkPermission() async {
+    return permissionStatus;
   }
 
   @override
@@ -147,11 +153,16 @@ class _FakeLocationRepository implements LocationRepository {
   }
 
   @override
-  Future<CatDexLocation> getCurrentLocation() async {
+  Future<LocationServiceResult> getCurrentLocation() async {
     if (throwOnLocate) {
       throw StateError('location unavailable');
     }
 
-    return location;
+    return LocationServiceSuccess(location);
+  }
+
+  @override
+  Future<LocationServiceResult> getLastKnownLocation() async {
+    return LocationServiceSuccess(location);
   }
 }

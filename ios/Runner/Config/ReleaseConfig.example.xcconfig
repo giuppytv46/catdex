@@ -3,6 +3,6 @@
 // Do not commit real signing credentials or secrets.
 
 APP_DISPLAY_NAME=CatDex
-PRODUCT_BUNDLE_IDENTIFIER=com.catdex.app
+PRODUCT_BUNDLE_IDENTIFIER=com.giuppy.catdex
 MARKETING_VERSION=0.1.0
 CURRENT_PROJECT_VERSION=1

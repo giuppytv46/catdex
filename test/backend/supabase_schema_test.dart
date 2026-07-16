@@ -54,4 +54,25 @@ void main() {
       expect(file.readAsStringSync(), contains('insert into public.'));
     }
   });
+
+  test('collectible card migration defines ownership and uniqueness', () {
+    final migration = File(
+      'supabase/migrations/202607160001_create_cat_cards.sql',
+    );
+
+    expect(migration.existsSync(), isTrue);
+    final sql = migration.readAsStringSync();
+    expect(sql, contains('create table if not exists public.cat_cards'));
+    expect(sql, contains('cat_cards_normal_unique'));
+    expect(sql, contains("where card_type = 'normal'"));
+    expect(sql, contains('cat_cards_event_unique'));
+    expect(sql, contains('event_artwork_variant_id'));
+    expect(
+      sql,
+      contains('alter table public.cat_cards enable row level security'),
+    );
+    expect(sql, contains('cat_cards_select_own'));
+    expect(sql, contains('cat_cards_insert_own'));
+    expect(sql, contains('auth.uid() = user_id'));
+  });
 }

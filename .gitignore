@@ -35,3 +35,8 @@ ios/Runner.xcworkspace/xcshareddata/
 # CatDex card renderer
 card-renderer/node_modules/
 card-renderer/.next/
+card-renderer/public/generated/cards/
+
+android/key.properties
+*.jks
+*.keystore

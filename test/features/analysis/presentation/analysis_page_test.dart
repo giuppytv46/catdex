@@ -10,8 +10,13 @@ import 'package:catdex/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('Analysis page builds', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -29,7 +34,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await pumpAnalysisPage(tester);
 
     expect(tester.takeException(), isNull);
     expect(find.byType(AnalysisPage), findsOneWidget);
@@ -57,7 +62,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await pumpAnalysisPage(tester);
 
     expect(tester.takeException(), isNull);
 
@@ -77,12 +82,13 @@ void main() {
     expect(find.text('Dettagli'), findsOneWidget);
 
     await tester.tap(find.text('Dettagli'));
-    await tester.pumpAndSettle();
+    await pumpAnalysisPage(tester);
+    await dragAnalysisUntilVisible(tester, find.text('Eta stimata'));
 
     expect(find.text('Confidenza'), findsOneWidget);
     expect(find.text('Pattern mantello'), findsOneWidget);
     expect(find.text('Lunghezza pelo'), findsOneWidget);
-    expect(find.text('Età stimata'), findsOneWidget);
+    expect(find.text('Eta stimata'), findsOneWidget);
     expect(find.text('Variante'), findsOneWidget);
     expect(find.text('Tratti'), findsOneWidget);
   });
@@ -111,19 +117,43 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await pumpAnalysisPage(tester);
 
     expect(find.text('Gatto domestico bicolore'), findsWidgets);
-    expect(find.text('Nero/bianco'), findsOneWidget);
-    expect(find.textContaining('nero e bianco'), findsOneWidget);
+    await dragAnalysisUntilVisible(tester, find.text('Grigio/bianco'));
+
+    expect(find.text('Grigio/bianco'), findsOneWidget);
+    expect(find.textContaining('grigio e bianco'), findsOneWidget);
     expect(find.textContaining('marrone/grigio'), findsNothing);
     expect(find.textContaining('tigrato mackerel'), findsNothing);
 
     await tester.tap(find.text('Dettagli'));
-    await tester.pumpAndSettle();
+    await pumpAnalysisPage(tester);
 
     expect(find.text('Bicolore'), findsWidgets);
   });
+}
+
+Future<void> pumpAnalysisPage(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 100));
+  await tester.pump(const Duration(milliseconds: 300));
+  await tester.pump(const Duration(milliseconds: 600));
+}
+
+Future<void> dragAnalysisUntilVisible(
+  WidgetTester tester,
+  Finder target,
+) async {
+  final analysisList = find.byKey(const Key('analysis_page'));
+  for (var attempt = 0; attempt < 12 && !tester.any(target); attempt++) {
+    await tester.drag(analysisList, const Offset(0, -240));
+    await pumpAnalysisPage(tester);
+  }
+  if (tester.any(target)) {
+    await tester.ensureVisible(target);
+  }
+  await pumpAnalysisPage(tester);
 }
 
 CapturedPhoto _photo() {

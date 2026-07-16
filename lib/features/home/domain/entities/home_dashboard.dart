@@ -1,3 +1,4 @@
+import 'package:catdex/features/catdex/domain/entities/catdex_collection.dart';
 import 'package:catdex/features/catdex/domain/entities/player_progress.dart';
 
 class HomeDashboard {
@@ -64,14 +65,16 @@ class RecentDiscovery {
     required this.variantName,
     required this.location,
     required this.xpReward,
+    this.collectionEntry,
   });
 
   final String catName;
   final String speciesName;
   final String rarityName;
   final String variantName;
-  final String location;
+  final String? location;
   final int xpReward;
+  final CatDexCollectionEntry? collectionEntry;
 }
 
 class CurrentEvent {

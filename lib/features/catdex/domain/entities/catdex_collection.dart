@@ -1,3 +1,4 @@
+import 'package:catdex/features/cards/domain/cat_card_record.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_species.dart';
@@ -74,6 +75,7 @@ class CatDexCollectionEntry {
     this.discovery,
     this.displayName,
     this.discoveredPhotoPath,
+    this.cardRecord,
   });
 
   final CatSpecies species;
@@ -84,6 +86,7 @@ class CatDexCollectionEntry {
   final CatDiscovery? discovery;
   final String? displayName;
   final String? discoveredPhotoPath;
+  final CatCardRecord? cardRecord;
 
   bool get favorite => discovery?.favorite ?? false;
   String? get cardFrameStyle => discovery?.card?.cardFrameStyle;

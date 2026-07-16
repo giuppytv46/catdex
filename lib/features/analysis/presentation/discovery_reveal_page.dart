@@ -194,7 +194,8 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
     debugPrint('CATDEX_SAVE_FINAL_RARITY ${displayData.displayRarity}');
     await notifier.save(
       widget.args.result,
-      photoPath: widget.args.photo.path,
+      photoPath: widget.args.photo.bestLocalPath,
+      cloudStoragePath: widget.args.photo.storagePath,
       customName: catName,
       suggestedName: suggestedName,
       usesEditedDetails: widget.args.usesEditedDetails,
@@ -301,8 +302,8 @@ class _RevealCard extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Hero(
-                        tag: 'catdex-photo-${args.photo.path}',
-                        child: _PhotoMedallion(path: args.photo.path),
+                        tag: 'catdex-photo-${args.photo.bestLocalPath}',
+                        child: _PhotoMedallion(path: args.photo.bestLocalPath),
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Text(

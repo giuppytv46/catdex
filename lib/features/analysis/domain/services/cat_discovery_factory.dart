@@ -1,5 +1,6 @@
 import 'package:catdex/features/analysis/domain/entities/cat_analysis_result.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
+import 'package:catdex/features/location/domain/entities/cat_discovery_location.dart';
 
 class CatDiscoveryFactory {
   const CatDiscoveryFactory();
@@ -16,6 +17,8 @@ class CatDiscoveryFactory {
     String suggestedName = 'Mochi',
     String? originalPhotoPath,
     String? displayPhotoPath,
+    CatDiscoveryLocation? captureLocation,
+    String? locationConsentVersion,
   }) {
     final trimmedSuggestedName = _safeName(suggestedName);
     final trimmedCustomName = customName.trim().isEmpty
@@ -60,6 +63,9 @@ class CatDiscoveryFactory {
       coinsEarned: coinsEarned,
       confidenceScore: result.confidence.score,
       card: card,
+      captureLocation: captureLocation,
+      locationConsentVersion: locationConsentVersion,
+      locationCapturedAt: captureLocation?.capturedAt,
     );
   }
 

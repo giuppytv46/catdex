@@ -1,6 +1,7 @@
 import 'package:catdex/features/location/application/location_state.dart';
 import 'package:catdex/features/location/data/geolocator_location_repository.dart';
 import 'package:catdex/features/location/domain/entities/location_permission_status.dart';
+import 'package:catdex/features/location/domain/entities/location_service_result.dart';
 import 'package:catdex/features/location/domain/entities/location_validation_result.dart';
 import 'package:catdex/features/location/domain/repositories/location_repository.dart';
 import 'package:catdex/features/location/domain/services/location_validator.dart';
@@ -30,7 +31,7 @@ class LocationController extends Notifier<LocationState> {
 
     try {
       final repository = ref.read(locationRepositoryProvider);
-      final serviceEnabled = await repository.isLocationServiceEnabled();
+      final serviceEnabled = await repository.checkServiceEnabled();
 
       if (!serviceEnabled) {
         state = const LocationState(
@@ -40,7 +41,11 @@ class LocationController extends Notifier<LocationState> {
         return;
       }
 
-      final permissionStatus = await repository.requestPermission();
+      var permissionStatus = await repository.checkPermission();
+      if (permissionStatus == LocationPermissionStatus.notDetermined ||
+          permissionStatus == LocationPermissionStatus.denied) {
+        permissionStatus = await repository.requestPermission();
+      }
 
       if (permissionStatus != LocationPermissionStatus.granted) {
         state = const LocationState(
@@ -52,21 +57,28 @@ class LocationController extends Notifier<LocationState> {
 
       state = const LocationState(status: LocationStatus.locating);
 
-      final location = await repository.getCurrentLocation();
-      final validationResult = ref
-          .read(locationValidatorProvider)
-          .validate(location);
-
-      switch (validationResult) {
-        case ValidLocationValidationResult():
-          state = LocationState(
-            status: LocationStatus.located,
-            location: location,
-          );
-        case InvalidLocationValidationResult(:final message):
-          state = LocationState(
+      final result = await repository.getCurrentLocation();
+      switch (result) {
+        case LocationServiceSuccess(:final location):
+          final validationResult = ref
+              .read(locationValidatorProvider)
+              .validate(location);
+          switch (validationResult) {
+            case ValidLocationValidationResult():
+              state = LocationState(
+                status: LocationStatus.located,
+                location: location,
+              );
+            case InvalidLocationValidationResult(:final message):
+              state = LocationState(
+                status: LocationStatus.failure,
+                message: message,
+              );
+          }
+        case LocationServiceFailure():
+          state = const LocationState(
             status: LocationStatus.failure,
-            message: message,
+            message: 'Location unavailable',
           );
       }
     } on Object {

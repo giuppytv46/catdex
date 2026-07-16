@@ -8,6 +8,13 @@ import {
   withTimeout,
 } from '../../../lib/pipeline/requestSafety';
 import { resolveRenderJob } from '../../../lib/pipeline/renderJobLifecycle';
+import {
+  containsForbiddenArtworkFields,
+  eventArtifactStorageId,
+  EventRequestError,
+  resolveEventVariant,
+} from '../../../lib/pipeline/eventVariantRegistry';
+import { EventArtworkValidationError } from '../../../lib/pipeline/eventArtworkValidation';
 import { PerformanceStep } from '../../../lib/pipeline/performanceInstrumentation';
 import { hasFinalCardArtifact, readStoredGeneratedCard } from '../../../lib/pipeline/storage';
 import type { CatRarity, GenerateCardInput, GenerateCardOutput } from '../../../lib/pipeline/types';
@@ -55,12 +62,12 @@ export async function OPTIONS(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const requestTiming = new PerformanceStep('REQUEST_RECEIVED');
   requestTiming.end();
-  let body: Partial<GenerateCardInput>;
+  let body: Partial<GenerateCardInput> & Record<string, unknown>;
   const publicBaseUrl = resolvePublicBaseUrl(request);
 
   try {
     assertSafeJsonPayloadSize(request);
-    body = (await request.json()) as Partial<GenerateCardInput>;
+    body = (await request.json()) as Partial<GenerateCardInput> & Record<string, unknown>;
   } catch (error) {
     if (error instanceof RequestSafetyError) {
       console.log('CATDEX_RENDERER_REQUEST_FAILED', error.code);
@@ -78,7 +85,18 @@ export async function POST(request: NextRequest) {
   const displaySpecies = cleanOptionalString(body.displaySpecies);
   const displayCoatColor = cleanOptionalString(body.displayCoatColor);
   const displayCoatPattern = cleanOptionalString(body.displayCoatPattern);
-  const idempotencyKey = cleanOptionalString(body.idempotencyKey) ?? `card:${discoveryId ?? 'unknown'}:v1`;
+
+  if (containsForbiddenArtworkFields(body)) {
+    return json(
+      request,
+      {
+        success: false,
+        error: 'eventReservationConflict',
+        message: 'Custom artwork instructions are not accepted.',
+      },
+      { status: 400 },
+    );
+  }
 
   if (!discoveryId || !photoUrl || !isRarity(rarity)) {
     console.log('CATDEX_RENDERER_REQUEST_FAILED', 'INVALID_INPUT');
@@ -105,6 +123,42 @@ export async function POST(request: NextRequest) {
     throw error;
   }
 
+  let eventVariant;
+  try {
+    eventVariant = resolveEventVariant({
+      eventKey: cleanOptionalString(body.eventKey),
+      eventEdition: cleanOptionalString(body.eventEdition),
+      eventArtworkVariantId: cleanOptionalString(body.eventArtworkVariantId),
+      eventArtworkTier:
+        body.eventArtworkTier === 'free' || body.eventArtworkTier === 'premium'
+          ? body.eventArtworkTier
+          : undefined,
+      eventTemplateKey: cleanOptionalString(body.eventTemplateKey),
+      eventInstructionKey: cleanOptionalString(body.eventInstructionKey),
+      eventGenerationRequestId: cleanOptionalString(body.eventGenerationRequestId),
+      isEventCard: body.isEventCard === true,
+    });
+  } catch (error) {
+    if (error instanceof EventRequestError) {
+      console.log('CATDEX_RENDER_EVENT_FAILURE', `reason=${error.code}`);
+      return json(
+        request,
+        { success: false, error: error.code, message: error.message },
+        { status: error.status },
+      );
+    }
+    throw error;
+  }
+
+  const artifactStorageId = eventArtifactStorageId(
+    discoveryId,
+    eventVariant,
+    cleanOptionalString(body.eventGenerationRequestId),
+  );
+  const idempotencyKey = eventVariant
+    ? `event:${artifactStorageId}`
+    : cleanOptionalString(body.idempotencyKey) ?? `card:${discoveryId}:v1`;
+
   try {
     console.log('CATDEX_RENDERER_REQUEST_STARTED', discoveryId);
     console.log('CATDEX_RENDERER_IDEMPOTENCY_KEY', idempotencyKey);
@@ -113,11 +167,17 @@ export async function POST(request: NextRequest) {
     console.log('CATDEX_GENERATE_CARD_REQUEST_DISPLAY_SPECIES', displaySpecies ?? '-');
     console.log('CATDEX_GENERATE_CARD_REQUEST_DISPLAY_COAT', displayCoatColor ?? '-');
     console.log('CATDEX_GENERATE_CARD_REQUEST_DISPLAY_PATTERN', displayCoatPattern ?? '-');
+    if (eventVariant) {
+      console.log('CATDEX_RENDER_EVENT_REQUEST');
+      console.log('CATDEX_RENDER_EVENT_VALIDATED');
+      console.log('CATDEX_RENDER_EVENT_VARIANT', eventVariant.variantId);
+      console.log('CATDEX_RENDER_EVENT_TIER', eventVariant.tier);
+    }
 
     const jobResolution = await resolveRenderJob({
       jobs: activeRenderJobs,
       key: idempotencyKey,
-      readCompleted: () => readCompletedResult(discoveryId),
+      readCompleted: () => readCompletedResult(artifactStorageId),
       createJob: () =>
         generateCatDexCard({
           discoveryId,
@@ -125,7 +185,18 @@ export async function POST(request: NextRequest) {
           photoUrl,
           rarity,
           publicBaseUrl,
-          eventKey: cleanOptionalString(body.eventKey),
+          eventKey: eventVariant?.eventKey,
+          eventEdition: eventVariant?.eventEdition,
+          eventArtworkVariantId: eventVariant?.variantId,
+          eventArtworkTier: eventVariant?.tier,
+          eventTemplateKey: eventVariant?.templateKey,
+          eventInstructionKey: eventVariant?.instructionKey,
+          eventGenerationRequestId:
+            cleanOptionalString(body.eventGenerationRequestId),
+          isEventCard: Boolean(eventVariant),
+          eventArtworkInstructions: eventVariant?.artworkInstructions,
+          eventArtworkNegativeConstraints: eventVariant?.negativeConstraints,
+          artifactStorageId,
           displayName,
           displaySpecies,
           displayCoatColor,
@@ -157,6 +228,7 @@ export async function POST(request: NextRequest) {
           `discoveryId=${discoveryId}`,
           `idempotencyKey=${idempotencyKey}`,
         );
+        if (eventVariant) console.log('CATDEX_RENDER_EVENT_JOB_REUSED');
       },
       onCompleted: () => {
         console.log(
@@ -216,6 +288,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (error instanceof EventArtworkValidationError) {
+      return json(
+        request,
+        {
+          success: false,
+          error: 'eventArtworkValidationFailed',
+          message: 'Event artwork validation failed.',
+        },
+        { status: 422 },
+      );
+    }
+
     if (error instanceof RequestSafetyError) {
       return json(request, { success: false, error: error.code, message: error.message }, { status: error.status });
     }
@@ -242,5 +326,14 @@ async function readCompletedResult(discoveryId: string): Promise<GenerateCardOut
     illustratedCatUrl: metadata.illustratedCatUrl,
     analysisJson: metadata.analysisJson,
     selectedTemplateKey: metadata.selectedTemplateKey,
+    templateKey: metadata.templateKey,
+    eventKey: metadata.eventKey,
+    eventEdition: metadata.eventEdition,
+    eventArtworkVariantId: metadata.eventArtworkVariantId,
+    eventArtworkTier: metadata.eventArtworkTier,
+    eventTemplateKey: metadata.eventTemplateKey,
+    isEventCard: metadata.isEventCard,
+    generationStatus: metadata.generationStatus,
+    transformationValidation: metadata.transformationValidation,
   };
 }

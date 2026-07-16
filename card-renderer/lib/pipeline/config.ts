@@ -9,6 +9,17 @@ export function isMockArtworkEnabled(): boolean {
   return process.env.CATDEX_MOCK_AI_ARTWORK !== 'false';
 }
 
+export function isEventTestModeEnabled(): boolean {
+  return process.env.CATDEX_EVENT_TEST_MODE === 'true';
+}
+
+export function isEventPremiumTestModeEnabled(): boolean {
+  return (
+    isEventTestModeEnabled() &&
+    process.env.CATDEX_EVENT_PREMIUM_TEST_MODE === 'true'
+  );
+}
+
 export function storageMode(): StorageMode {
   return process.env.CARD_RENDERER_STORAGE_MODE === 'supabase' ? 'supabase' : 'local';
 }
@@ -35,6 +46,11 @@ export function logRendererRuntimeConfig(publicBaseUrl?: string): void {
   console.log('CATDEX_RENDERER_PUBLIC_URL', publicBaseUrl ?? '-');
   console.log('CATDEX_RENDERER_STORAGE_MODE', storageMode());
   console.log('CATDEX_MOCK_AI_ARTWORK_ENABLED', isMockArtworkEnabled());
+  console.log('CATDEX_EVENT_TEST_MODE', isEventTestModeEnabled());
+  console.log(
+    'CATDEX_EVENT_PREMIUM_TEST_MODE',
+    isEventPremiumTestModeEnabled(),
+  );
 }
 
 export function allowedOrigins(): string[] {

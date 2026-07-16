@@ -1,5 +1,10 @@
 import { analyzeCatPhoto } from './catAnalysisService';
 import { createCatIllustration } from './catIllustrationService';
+import {
+  EventArtworkValidationError,
+  validateEventArtwork,
+  validateFinalCard,
+} from './eventArtworkValidation';
 import { createCardText, fallbackCardText } from './cardTextService';
 import { PipelinePerformanceTrace } from './performanceInstrumentation';
 import { renderProgrammaticCard } from './programmaticCardRenderer';
@@ -51,6 +56,7 @@ function isBillingOrLimitError(error: unknown): boolean {
 }
 
 export async function generateCatDexCard(input: GenerateCardInput): Promise<GenerateCardOutput> {
+  const storageId = input.artifactStorageId ?? input.discoveryId;
   const performanceTrace = new PipelinePerformanceTrace({
     discoveryId: input.discoveryId,
     idempotencyKey: input.idempotencyKey,
@@ -58,11 +64,14 @@ export async function generateCatDexCard(input: GenerateCardInput): Promise<Gene
   const totalStartedAt = Date.now();
   try {
     console.log('CATDEX_GENERATE_CARD_STARTED', input.discoveryId);
-    console.log('CATDEX_GENERATE_CARD_ORIGINAL_PHOTO_URL', input.photoUrl);
-    await saveOriginalPhotoReference(input.discoveryId, input.photoUrl);
+    console.log(
+      'CATDEX_GENERATE_CARD_ORIGINAL_PHOTO_URL',
+      input.isEventCard ? '[redacted_event_photo_url]' : input.photoUrl,
+    );
+    await saveOriginalPhotoReference(storageId, input.photoUrl);
     await performanceTrace.measure('IMAGE_DOWNLOAD', 'Download', () =>
       saveImageFromUrl(
-        input.discoveryId,
+        storageId,
         'original-photo.png',
         input.photoUrl,
         input.publicBaseUrl,
@@ -70,7 +79,7 @@ export async function generateCatDexCard(input: GenerateCardInput): Promise<Gene
     );
 
     const analysisJson = await analyzeCatPhoto(input);
-    const analysisPath = await saveAnalysis(input.discoveryId, analysisJson);
+    const analysisPath = await saveAnalysis(storageId, analysisJson);
     const textSource = input.displayName || input.displaySpecies ? 'flutter_display_data' : 'fallback';
 
     let cardText: CardTextJson;
@@ -83,20 +92,28 @@ export async function generateCatDexCard(input: GenerateCardInput): Promise<Gene
   console.log('CATDEX_GENERATE_CARD_TEXT_NAME', cardText.cardTitle);
   console.log('CATDEX_GENERATE_CARD_TEXT_SPECIES', cardText.speciesLine);
 
-    const selectedTemplate = await selectTemplate(input.rarity, input.eventKey);
+    const selectedTemplate = await selectTemplate(
+      input.rarity,
+      input.eventKey,
+      input.eventTemplateKey,
+    );
 
     let illustratedCatUrl: string;
     const illustrationStartedAt = Date.now();
     try {
       console.log('CATDEX_RENDERER_OPENAI_STARTED');
       console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_STARTED');
+      if (input.isEventCard) console.log('CATDEX_RENDER_EVENT_OPENAI_STARTED');
       illustratedCatUrl = await createCatIllustration({
-        discoveryId: input.discoveryId,
+        discoveryId: storageId,
         photoUrl: input.photoUrl,
         analysis: analysisJson,
         cardStyle: selectedTemplate.key,
         publicBaseUrl: input.publicBaseUrl,
         performanceTrace,
+        eventArtworkInstructions: input.eventArtworkInstructions,
+        eventArtworkNegativeConstraints:
+          input.eventArtworkNegativeConstraints,
       });
     } catch (error) {
     console.log(
@@ -113,6 +130,7 @@ export async function generateCatDexCard(input: GenerateCardInput): Promise<Gene
       throw new AIIllustrationFailedError();
     }
     console.log('CATDEX_RENDERER_OPENAI_COMPLETED');
+    if (input.isEventCard) console.log('CATDEX_RENDER_EVENT_OPENAI_COMPLETED');
     console.log('CATDEX_CARD_GENERATION_AI_MS', Date.now() - illustrationStartedAt);
     console.log('CATDEX_GENERATE_CARD_ILLUSTRATION_URL', illustratedCatUrl);
 
@@ -120,17 +138,34 @@ export async function generateCatDexCard(input: GenerateCardInput): Promise<Gene
     console.log('CATDEX_STAR_COUNT_SELECTED', starCount);
 
     const savedIllustration = await saveImageFromUrl(
-      input.discoveryId,
+      storageId,
       'illustrated-cat.png',
       illustratedCatUrl,
       input.publicBaseUrl,
     );
     const illustrationReference =
       savedIllustration ??
-      (await saveIllustrationReference(input.discoveryId, illustratedCatUrl));
+      (await saveIllustrationReference(storageId, illustratedCatUrl));
     const artworkBuffer = savedIllustration?.data ?? await readImageBuffer(illustratedCatUrl);
+    let transformationValidation: 'passed' | 'uncertain' | 'failed' | undefined;
+    if (input.isEventCard) {
+      const validation = await validateEventArtwork(
+        artworkBuffer,
+        input.eventArtworkTier === 'premium',
+      );
+      transformationValidation = validation.transformation;
+      console.log(
+        'CATDEX_RENDER_EVENT_VALIDATION_RESULT',
+        `technical=${validation.technical}`,
+        `transformation=${validation.transformation}`,
+      );
+      if (validation.technical === 'failed') {
+        throw new EventArtworkValidationError();
+      }
+    }
     const compositionStartedAt = Date.now();
     console.log('CATDEX_RENDERER_COMPOSITION_STARTED');
+    if (input.isEventCard) console.log('CATDEX_RENDER_EVENT_COMPOSITION_STARTED');
     const finalCardBytes = await performanceTrace.measure(
       'CARD_COMPOSITION',
       'Composition',
@@ -149,33 +184,54 @@ export async function generateCatDexCard(input: GenerateCardInput): Promise<Gene
     const finalCardPath = await performanceTrace.measure(
       'UPLOAD_FINAL_ARTWORK',
       'Upload',
-      () => savePngArtifact(input.discoveryId, 'final-card.png', finalCardBytes),
+      () => savePngArtifact(storageId, 'final-card.png', finalCardBytes),
     );
     console.log('CATDEX_RENDERER_COMPOSITION_COMPLETED');
+    if (input.isEventCard) console.log('CATDEX_RENDER_EVENT_COMPOSITION_COMPLETED');
     console.log('CATDEX_CARD_GENERATION_COMPOSITION_MS', Date.now() - compositionStartedAt);
+    if (input.isEventCard) {
+      if (!(await validateFinalCard(finalCardBytes, finalCardPath))) {
+        throw new EventArtworkValidationError();
+      }
+      console.log('CATDEX_RENDER_EVENT_UPLOAD_COMPLETED');
+    }
 
     const output: GenerateCardOutput = {
       finalCardUrl: publicCardUrl(
-        input.discoveryId,
+        storageId,
         'final-card.png',
         input.publicBaseUrl,
       ),
       illustratedCatUrl: savedIllustration?.url ?? illustratedCatUrl,
       analysisJson,
       selectedTemplateKey: selectedTemplate.key,
+      ...(input.isEventCard
+        ? {
+            templateKey: input.eventTemplateKey,
+            eventKey: input.eventKey,
+            eventEdition: input.eventEdition,
+            eventArtworkVariantId: input.eventArtworkVariantId,
+            eventArtworkTier: input.eventArtworkTier,
+            eventTemplateKey: input.eventTemplateKey,
+            isEventCard: true,
+            generationStatus: 'completed' as const,
+            transformationValidation,
+          }
+        : {}),
     };
     console.log('CATDEX_GENERATE_CARD_FINAL_URL', output.finalCardUrl);
 
     const metadata: StoredGeneratedCard = {
       ...output,
-      discoveryId: input.discoveryId,
+      discoveryId: storageId,
+      artifactStorageId: storageId,
       originalPhotoUrl: input.photoUrl,
       cardText,
       finalCardPath,
       illustratedCatPath: illustrationReference.path,
       analysisPath,
       metadataPath: publicCardUrl(
-        input.discoveryId,
+        storageId,
         'metadata.json',
         input.publicBaseUrl,
       ),
@@ -187,10 +243,19 @@ export async function generateCatDexCard(input: GenerateCardInput): Promise<Gene
       () => saveMetadata(metadata),
     );
     void metadataPath;
+    if (input.isEventCard) console.log('CATDEX_RENDER_EVENT_SUCCESS');
 
     console.log('CATDEX_GENERATE_CARD_SUCCESS', true);
     console.log('CATDEX_CARD_GENERATION_TOTAL_MS', Date.now() - totalStartedAt);
     return output;
+  } catch (error) {
+    if (input.isEventCard) {
+      console.log(
+        'CATDEX_RENDER_EVENT_FAILURE',
+        `reason=${error instanceof EventArtworkValidationError ? 'eventArtworkValidationFailed' : 'generation_failed'}`,
+      );
+    }
+    throw error;
   } finally {
     performanceTrace.finish();
   }
