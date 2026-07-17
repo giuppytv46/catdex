@@ -46,6 +46,12 @@ void main() {
     expect(restored.metadata, event.metadata);
     expect(restored.freeGenerationLimit, 3);
     expect(restored.premiumGenerationLimit, 5);
+    expect(restored.allPremiumVariantIds, [
+      'summer-premium',
+      'summer-pumpkin-king',
+      'summer-night-spirit',
+    ]);
+    expect(restored.transformsCatAppearance('summer-pumpkin-king'), isTrue);
   });
 
   test('expired events keep already owned cards visible', () {
@@ -71,6 +77,21 @@ CatDexEvent _event({
     endsAt: endsAt ?? DateTime.utc(2026, 8),
     standardVariantId: 'summer-standard',
     premiumVariantId: 'summer-premium',
+    premiumVariantIds: const [
+      'summer-premium',
+      'summer-pumpkin-king',
+      'summer-night-spirit',
+    ],
+    variantSortOrders: const {
+      'summer-premium': 3,
+      'summer-pumpkin-king': 4,
+      'summer-night-spirit': 5,
+    },
+    variantTransformsCatAppearance: const {
+      'summer-premium': true,
+      'summer-pumpkin-king': true,
+      'summer-night-spirit': true,
+    },
     premiumGenerationLimit: 5,
     metadata: metadata,
   );

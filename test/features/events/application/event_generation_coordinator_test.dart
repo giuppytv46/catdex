@@ -86,10 +86,15 @@ void main() {
         requestId: 'premium-$index',
         now: now,
         premiumStatus: const PremiumStatus.premium(),
+        selectedVariantId: index.isEven
+            ? 'summer-premium'
+            : 'summer-standard-2',
       );
       expect(reservation.accessTier, EventAccessTier.premium);
       if (index == 0) {
         expect(reservation.variantId, 'summer-premium');
+      } else if (index == 1) {
+        expect(reservation.variantId, 'summer-standard-2');
       }
       await coordinator.commit(reservation);
     }
@@ -100,9 +105,130 @@ void main() {
       playerId: 'player-1',
       requestId: 'premium-5',
       now: now,
+      selectedVariantId: 'summer-premium',
     );
     expect(fifth, isA<EventReservationRejected>());
   });
+
+  test('Premium reservation requires an explicit selection', () async {
+    final coordinator = EventGenerationCoordinator(
+      usageRepository: const SharedPreferencesEventUsageRepository(),
+    );
+
+    final result = await coordinator.reserve(
+      event: _event(),
+      premiumStatus: const PremiumStatus.premium(),
+      playerId: 'player-1',
+      requestId: 'premium-missing-selection',
+      now: now,
+    );
+
+    expect(
+      result,
+      isA<EventReservationRejected>().having(
+        (value) => value.reason,
+        'reason',
+        EventReservationFailure.variantSelectionRequired,
+      ),
+    );
+  });
+
+  test('Premium may select any enabled Free or Premium variant', () async {
+    final coordinator = EventGenerationCoordinator(
+      usageRepository: const SharedPreferencesEventUsageRepository(),
+    );
+
+    for (final variant in const [
+      'summer-standard-1',
+      'summer-standard-2',
+      'summer-standard-3',
+      'summer-premium',
+      'summer-pumpkin-king',
+      'summer-night-spirit',
+    ]) {
+      final reservation = await _reserveSuccess(
+        coordinator,
+        event: _event(),
+        requestId: 'premium-select-$variant',
+        now: now,
+        premiumStatus: const PremiumStatus.premium(),
+        selectedVariantId: variant,
+      );
+      expect(reservation.variantId, variant);
+      await coordinator.commit(reservation);
+    }
+  });
+
+  test('invalid and disabled Premium selections are rejected', () async {
+    final coordinator = EventGenerationCoordinator(
+      usageRepository: const SharedPreferencesEventUsageRepository(),
+    );
+    final invalid = await coordinator.reserve(
+      event: _event(),
+      premiumStatus: const PremiumStatus.premium(),
+      playerId: 'player-1',
+      requestId: 'invalid-selection',
+      now: now,
+      selectedVariantId: 'summer-unknown',
+    );
+    final disabled = await coordinator.reserve(
+      event: _event(disabledVariantIds: const ['summer-standard-2']),
+      premiumStatus: const PremiumStatus.premium(),
+      playerId: 'player-1',
+      requestId: 'disabled-selection',
+      now: now,
+      selectedVariantId: 'summer-standard-2',
+    );
+
+    expect(
+      (invalid as EventReservationRejected).reason,
+      EventReservationFailure.selectedVariantInvalid,
+    );
+    expect(
+      (disabled as EventReservationRejected).reason,
+      EventReservationFailure.selectedVariantDisabled,
+    );
+  });
+
+  test(
+    'Free ignores a manual Free selection and rejects all Premium',
+    () async {
+      final coordinator = EventGenerationCoordinator(
+        usageRepository: const SharedPreferencesEventUsageRepository(),
+      );
+      final automatic = await coordinator.reserve(
+        event: _event(),
+        premiumStatus: const PremiumStatus.free(),
+        playerId: 'player-1',
+        requestId: 'free-manual-standard',
+        now: now,
+        selectedVariantId: 'summer-standard-3',
+      );
+      expect(
+        (automatic as EventReservationSuccess).reservation.variantId,
+        'summer-standard-1',
+      );
+      for (final variant in const [
+        'summer-premium',
+        'summer-pumpkin-king',
+        'summer-night-spirit',
+      ]) {
+        final premium = await coordinator.reserve(
+          event: _event(),
+          premiumStatus: const PremiumStatus.free(),
+          playerId: 'player-1',
+          requestId: 'free-manual-$variant',
+          now: now,
+          selectedVariantId: variant,
+        );
+        expect(
+          (premium as EventReservationRejected).reason,
+          EventReservationFailure.premiumRequired,
+          reason: variant,
+        );
+      }
+    },
+  );
 
   test('generation failure releases reservation', () async {
     const usage = SharedPreferencesEventUsageRepository();
@@ -224,6 +350,7 @@ Future<EventGenerationReservation> _reserveSuccess(
   required String requestId,
   required DateTime now,
   PremiumStatus premiumStatus = const PremiumStatus.free(),
+  String? selectedVariantId,
 }) async {
   final result = await coordinator.reserve(
     event: event,
@@ -231,12 +358,16 @@ Future<EventGenerationReservation> _reserveSuccess(
     playerId: 'player-1',
     requestId: requestId,
     now: now,
+    selectedVariantId: selectedVariantId,
   );
   expect(result, isA<EventReservationSuccess>());
   return (result as EventReservationSuccess).reservation;
 }
 
-CatDexEvent _event({int premiumLimit = 5}) {
+CatDexEvent _event({
+  int premiumLimit = 6,
+  List<String> disabledVariantIds = const [],
+}) {
   return CatDexEvent(
     id: 'summer-2026',
     startsAt: DateTime.utc(2026, 7),
@@ -248,6 +379,12 @@ CatDexEvent _event({int premiumLimit = 5}) {
       'summer-standard-3',
     ],
     premiumVariantId: 'summer-premium',
+    premiumVariantIds: const [
+      'summer-premium',
+      'summer-pumpkin-king',
+      'summer-night-spirit',
+    ],
     premiumGenerationLimit: premiumLimit,
+    disabledVariantIds: disabledVariantIds,
   );
 }

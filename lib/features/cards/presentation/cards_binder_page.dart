@@ -667,6 +667,16 @@ class _CardsBinderPageState extends ConsumerState<CardsBinderPage> {
         'Generatore carte non configurato',
       RemoteCardGenerationFailureReason.invalidPhotoUrl =>
         'Foto gatto non accessibile',
+      RemoteCardGenerationFailureReason.missingPhoto =>
+        'Foto gatto non accessibile',
+      RemoteCardGenerationFailureReason.photoUploadFailed =>
+        'Caricamento foto non riuscito',
+      RemoteCardGenerationFailureReason.storagePermissionDenied =>
+        'Accesso alla foto non disponibile',
+      RemoteCardGenerationFailureReason.signedUrlFailed =>
+        'Preparazione foto non riuscita',
+      RemoteCardGenerationFailureReason.network =>
+        'Connessione non disponibile',
       RemoteCardGenerationFailureReason.remoteApiFailure =>
         'Errore generazione carta',
       null => 'Errore generazione carta',

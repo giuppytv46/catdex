@@ -32,11 +32,21 @@ class EventPage extends ConsumerStatefulWidget {
 
 class _EventPageState extends ConsumerState<EventPage> {
   String? _selectedDiscoveryId;
+  String? _selectedVariantId;
 
   @override
   void initState() {
     super.initState();
     debugPrint('CATDEX_EVENT_UI_PAGE_OPENED eventKey=${widget.eventKey}');
+  }
+
+  @override
+  void didUpdateWidget(covariant EventPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.eventKey != widget.eventKey) {
+      _selectedDiscoveryId = null;
+      _selectedVariantId = null;
+    }
   }
 
   @override
@@ -67,6 +77,29 @@ class _EventPageState extends ConsumerState<EventPage> {
     final selected = state.discoveries
         .where((item) => item.id == selectedId)
         .firstOrNull;
+    final selectedVariantId =
+        state.isPremium &&
+            _selectedVariantId != null &&
+            state.event.isVariantEnabled(_selectedVariantId!)
+        ? _selectedVariantId
+        : null;
+    if (_selectedVariantId != null && selectedVariantId == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _selectedVariantId != null) {
+          setState(() => _selectedVariantId = null);
+        }
+      });
+    }
+    final selectedVariantCard = selected == null || selectedVariantId == null
+        ? null
+        : state.ownedCards
+              .where(
+                (card) =>
+                    card.discoveryId == selected.id &&
+                    card.eventArtworkVariantId == selectedVariantId &&
+                    card.isCompleted,
+              )
+              .firstOrNull;
     final generation = selectedId == null
         ? EventUiGenerationState.idle
         : generationStates['${state.event.id}::$selectedId'] ??
@@ -106,11 +139,18 @@ class _EventPageState extends ConsumerState<EventPage> {
                     ),
                     const SizedBox(height: AppSpacing.xl),
                     _SectionHeading(
-                      title: CatDexLocalizations.of(context).eventFreeArtworks,
-                      subtitle: CatDexLocalizations.of(context)
-                          .eventFreeCollectionSummary(
-                            state.collectedFreeArtworkCount,
-                          ),
+                      title: state.isPremium
+                          ? CatDexLocalizations.of(context).eventChooseArtwork
+                          : CatDexLocalizations.of(context).eventFreeArtworks,
+                      subtitle: state.isPremium && selectedVariantId != null
+                          ? CatDexLocalizations.of(
+                              context,
+                            ).eventArtworkSelected
+                          : CatDexLocalizations.of(
+                              context,
+                            ).eventFreeCollectionSummary(
+                              state.collectedFreeArtworkCount,
+                            ),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     EventArtworkPreviewGrid(
@@ -118,6 +158,29 @@ class _EventPageState extends ConsumerState<EventPage> {
                       onOpenCard: _openCard,
                       onOpenPremium: () =>
                           context.pushNamed(AppRoute.premium.name),
+                      selectedVariantId: selectedVariantId,
+                      onSelectVariant: state.isPremium
+                          ? (variantId) {
+                              if (!state.event.isVariantEnabled(variantId)) {
+                                return;
+                              }
+                              setState(() => _selectedVariantId = variantId);
+                              debugPrint(
+                                'CATDEX_EVENT_VARIANT_SELECTED_BY_USER '
+                                'variant=$variantId',
+                              );
+                              if (variantId == 'halloween_pumpkin_king') {
+                                debugPrint(
+                                  'CATDEX_EVENT_VARIANT_PUMPKIN_KING_SELECTED',
+                                );
+                              } else if (variantId ==
+                                  'halloween_night_spirit') {
+                                debugPrint(
+                                  'CATDEX_EVENT_VARIANT_NIGHT_SPIRIT_SELECTED',
+                                );
+                              }
+                            }
+                          : null,
                     ),
                     const SizedBox(height: AppSpacing.xl),
                     _SectionHeading(
@@ -183,16 +246,26 @@ class _EventPageState extends ConsumerState<EventPage> {
                     selectedDiscovery: selected,
                     generation: generation,
                     completedCard: completedCard,
+                    selectedVariantId: selectedVariantId,
+                    existingSelectedVariantCard: selectedVariantCard,
                     onGenerate: selected == null
                         ? null
-                        : () => _generate(state, selected),
+                        : () => _generate(
+                            state,
+                            selected,
+                            selectedVariantId: selectedVariantId,
+                          ),
                     onRetry: selected == null
                         ? null
                         : () {
                             ref
                                 .read(eventCardUiGenerationProvider.notifier)
                                 .reset(state.event.id, selected.id);
-                            return _generate(state, selected);
+                            return _generate(
+                              state,
+                              selected,
+                              selectedVariantId: selectedVariantId,
+                            );
                           },
                     onOpenCard: completedCard == null
                         ? null
@@ -202,6 +275,9 @@ class _EventPageState extends ConsumerState<EventPage> {
                         : () => ref
                               .read(eventCardUiGenerationProvider.notifier)
                               .reset(state.event.id, selected.id),
+                    onOpenExistingCard: selectedVariantCard == null
+                        ? null
+                        : () => _openCard(selectedVariantCard),
                   ),
                 ),
               ),
@@ -264,8 +340,9 @@ class _EventPageState extends ConsumerState<EventPage> {
 
   Future<void> _generate(
     EventUiState state,
-    CatDiscovery discovery,
-  ) async {
+    CatDiscovery discovery, {
+    required String? selectedVariantId,
+  }) async {
     debugPrint('CATDEX_EVENT_UI_GENERATE_TAPPED');
     await ref
         .read(eventCardUiGenerationProvider.notifier)
@@ -273,6 +350,7 @@ class _EventPageState extends ConsumerState<EventPage> {
           event: state.event,
           discovery: discovery,
           collectionNumber: state.discoveries.indexOf(discovery) + 1,
+          selectedVariantId: selectedVariantId,
         );
   }
 
@@ -484,26 +562,25 @@ class EventArtworkPreviewGrid extends StatelessWidget {
     required this.state,
     required this.onOpenCard,
     required this.onOpenPremium,
+    this.selectedVariantId,
+    this.onSelectVariant,
     super.key,
   });
 
   final EventUiState state;
   final ValueChanged<CatCardRecord> onOpenCard;
   final VoidCallback onOpenPremium;
+  final String? selectedVariantId;
+  final ValueChanged<String>? onSelectVariant;
 
   @override
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
     final variants = state.event.enabledStandardVariantIds;
+    final premiumVariants = state.event.enabledPremiumVariantIds;
     return LayoutBuilder(
       builder: (context, constraints) {
         final columns = constraints.maxWidth >= 680 ? 3 : 2;
-        final premiumWidth = constraints.maxWidth >= 680
-            ? (constraints.maxWidth - (AppSpacing.md * 2)) / 3
-            : (constraints.maxWidth - AppSpacing.md) / 2;
-        final premiumVariant = state.event.premiumVariantId;
-        final premiumOwned = state.cardsForVariant(premiumVariant);
-        final premiumLocked = !state.isPremium && premiumOwned.isEmpty;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -527,10 +604,25 @@ class EventArtworkPreviewGrid extends StatelessWidget {
                   collectedCard: owned.firstOrNull,
                   premium: false,
                   locked: false,
+                  selectable: state.isPremium,
+                  selected: selectedVariantId == variant,
+                  onSelect: state.isPremium
+                      ? () => onSelectVariant?.call(variant)
+                      : null,
                   onOpen: owned.isEmpty ? null : () => onOpenCard(owned.first),
                 );
               },
             ),
+            if (!state.isPremium) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                l10n.eventFreeVariantsAutomatic,
+                key: const Key('event_free_variants_automatic'),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
             const SizedBox(height: AppSpacing.xl),
             _SectionHeading(
               title: l10n.eventPremiumArtworks,
@@ -539,20 +631,36 @@ class EventArtworkPreviewGrid extends StatelessWidget {
                   : l10n.eventPremiumNotCollected,
             ),
             const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              width: premiumWidth,
-              height: premiumWidth / 0.67,
-              child: EventArtworkSlot(
-                key: ValueKey('event_artwork_slot_$premiumVariant'),
-                variantId: premiumVariant,
-                collectedCard: premiumOwned.firstOrNull,
-                premium: true,
-                locked: premiumLocked,
-                onOpen: premiumOwned.isEmpty
-                    ? null
-                    : () => onOpenCard(premiumOwned.first),
-                onPremium: premiumLocked ? onOpenPremium : null,
+            GridView.builder(
+              key: const Key('event_premium_artwork_preview_grid'),
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: premiumVariants.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                crossAxisSpacing: AppSpacing.md,
+                mainAxisSpacing: AppSpacing.md,
+                childAspectRatio: 0.67,
               ),
+              itemBuilder: (context, index) {
+                final variant = premiumVariants[index];
+                final owned = state.cardsForVariant(variant);
+                final locked = !state.isPremium && owned.isEmpty;
+                return EventArtworkSlot(
+                  key: ValueKey('event_artwork_slot_$variant'),
+                  variantId: variant,
+                  collectedCard: owned.firstOrNull,
+                  premium: true,
+                  locked: locked,
+                  selectable: state.isPremium,
+                  selected: selectedVariantId == variant,
+                  onSelect: state.isPremium
+                      ? () => onSelectVariant?.call(variant)
+                      : null,
+                  onOpen: owned.isEmpty ? null : () => onOpenCard(owned.first),
+                  onPremium: locked ? onOpenPremium : null,
+                );
+              },
             ),
           ],
         );
@@ -567,6 +675,9 @@ class EventArtworkSlot extends StatelessWidget {
     required this.collectedCard,
     required this.premium,
     required this.locked,
+    this.selectable = false,
+    this.selected = false,
+    this.onSelect,
     this.onOpen,
     this.onPremium,
     super.key,
@@ -576,6 +687,9 @@ class EventArtworkSlot extends StatelessWidget {
   final CatCardRecord? collectedCard;
   final bool premium;
   final bool locked;
+  final bool selectable;
+  final bool selected;
+  final VoidCallback? onSelect;
   final VoidCallback? onOpen;
   final VoidCallback? onPremium;
 
@@ -589,18 +703,22 @@ class EventArtworkSlot extends StatelessWidget {
           '${details.name}. '
           '${collected ? l10n.eventCollected : l10n.eventNotCollected}. '
           '${premium ? l10n.eventPremiumBadge : l10n.eventFreeBadge}',
-      button: onOpen != null || onPremium != null,
+      button: selectable || onOpen != null || onPremium != null,
+      selected: selectable && selected,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
-          onTap: onOpen ?? onPremium,
+          onTap: selectable ? onSelect : onOpen ?? onPremium,
           child: Ink(
             decoration: _eventPanelDecoration(
               context,
               borderColor: premium
                   ? const Color(0xFFF6C453)
+                  : selected
+                  ? const Color(0xFF54D2A5)
                   : const Color(0xFF8B5CF6),
+              borderWidth: selected ? 3 : 1,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -610,15 +728,34 @@ class EventArtworkSlot extends StatelessWidget {
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(17),
                     ),
-                    child: collected
-                        ? _EventNetworkArtwork(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (collected)
+                          _EventNetworkArtwork(
                             url: collectedCard!.finalCardUrl,
                             placeholderIcon: details.icon,
                           )
-                        : _EventArtworkPlaceholder(
-                            icon: locked ? Icons.lock_rounded : details.icon,
+                        else
+                          _EventArtworkPlaceholder(
+                            variantId: variantId,
+                            icon: details.icon,
                             premium: premium,
                           ),
+                        if (locked)
+                          const Positioned(
+                            right: 10,
+                            top: 10,
+                            child: _LockedArtworkBadge(),
+                          ),
+                        if (selected)
+                          const Positioned(
+                            right: 10,
+                            top: 10,
+                            child: _SelectedArtworkCheck(),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
                 Padding(
@@ -825,6 +962,9 @@ class EventGenerationPanel extends StatelessWidget {
     required this.onRetry,
     required this.onOpenCard,
     required this.onBackToEvent,
+    this.selectedVariantId,
+    this.existingSelectedVariantCard,
+    this.onOpenExistingCard,
     super.key,
   });
 
@@ -836,6 +976,9 @@ class EventGenerationPanel extends StatelessWidget {
   final Future<void> Function()? onRetry;
   final VoidCallback? onOpenCard;
   final VoidCallback? onBackToEvent;
+  final String? selectedVariantId;
+  final CatCardRecord? existingSelectedVariantCard;
+  final VoidCallback? onOpenExistingCard;
 
   @override
   Widget build(BuildContext context) {
@@ -865,7 +1008,9 @@ class EventGenerationPanel extends StatelessWidget {
       );
     }
 
-    final unavailableMessage = !state.active
+    final unavailableMessage = existingSelectedVariantCard != null
+        ? l10n.eventVariantAlreadyOwned
+        : !state.active
         ? l10n.eventEnded
         : !state.rendererConfigured
         ? l10n.eventRendererUnavailable
@@ -875,6 +1020,8 @@ class EventGenerationPanel extends StatelessWidget {
               : l10n.eventFreeLimitError
         : selectedDiscovery == null
         ? l10n.eventDiscoverCatFirst
+        : state.isPremium && selectedVariantId == null
+        ? l10n.eventSelectArtworkFirst
         : null;
     final enabled = unavailableMessage == null && onGenerate != null;
     return Container(
@@ -898,17 +1045,31 @@ class EventGenerationPanel extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
           ],
-          FilledButton.icon(
-            key: const Key('event_generate_button'),
-            onPressed: enabled ? onGenerate : null,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              backgroundColor: const Color(0xFF7C3AED),
-              foregroundColor: Colors.white,
+          if (existingSelectedVariantCard != null)
+            OutlinedButton.icon(
+              key: const Key('event_open_existing_variant_button'),
+              onPressed: onOpenExistingCard,
+              icon: const Icon(Icons.open_in_new_rounded),
+              label: Text(l10n.eventOpenExistingCard),
+            )
+          else
+            FilledButton.icon(
+              key: const Key('event_generate_button'),
+              onPressed: enabled ? onGenerate : null,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+                backgroundColor: const Color(0xFF7C3AED),
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.auto_awesome_rounded),
+              label: Text(
+                state.isPremium && selectedVariantId != null
+                    ? l10n.eventGenerateVariant(
+                        _variantDetails(l10n, selectedVariantId!).name,
+                      )
+                    : l10n.eventGenerateCard,
+              ),
             ),
-            icon: const Icon(Icons.auto_awesome_rounded),
-            label: Text(l10n.eventGenerateCard),
-          ),
         ],
       ),
     );
@@ -1186,6 +1347,7 @@ class _EventNetworkArtwork extends StatelessWidget {
       errorBuilder: (_, error, _) {
         debugPrint('CATDEX_EVENT_UI_ERROR reason=artwork_image_load');
         return _EventArtworkPlaceholder(
+          variantId: '',
           icon: placeholderIcon,
           premium: false,
         );
@@ -1196,15 +1358,26 @@ class _EventNetworkArtwork extends StatelessWidget {
 
 class _EventArtworkPlaceholder extends StatelessWidget {
   const _EventArtworkPlaceholder({
+    required this.variantId,
     required this.icon,
     required this.premium,
   });
 
+  final String variantId;
   final IconData icon;
   final bool premium;
 
   @override
   Widget build(BuildContext context) {
+    if (variantId == 'halloween_haunted_frame') {
+      return const _HauntedHouseArtworkPlaceholder();
+    }
+    if (variantId == 'halloween_pumpkin_king') {
+      return const _PumpkinKingArtworkPlaceholder();
+    }
+    if (variantId == 'halloween_night_spirit') {
+      return const _NightSpiritArtworkPlaceholder();
+    }
     return DecoratedBox(
       key: const Key('event_artwork_placeholder'),
       decoration: BoxDecoration(
@@ -1228,6 +1401,283 @@ class _EventArtworkPlaceholder extends StatelessWidget {
             ),
           ),
           Icon(icon, color: const Color(0xFFFDE68A), size: 46),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectedArtworkCheck extends StatelessWidget {
+  const _SelectedArtworkCheck();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      key: const Key('event_artwork_selected_check'),
+      decoration: BoxDecoration(
+        color: const Color(0xFF54D2A5),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.all(5),
+        child: Icon(Icons.check_rounded, size: 18, color: Color(0xFF172033)),
+      ),
+    );
+  }
+}
+
+class _LockedArtworkBadge extends StatelessWidget {
+  const _LockedArtworkBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF241A45).withValues(alpha: 0.92),
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFF6C453), width: 1.5),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.all(7),
+        child: Icon(Icons.lock_rounded, size: 18, color: Colors.white),
+      ),
+    );
+  }
+}
+
+class _HauntedHouseArtworkPlaceholder extends StatelessWidget {
+  const _HauntedHouseArtworkPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      key: const Key('event_artwork_placeholder'),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF15143F), Color(0xFF283B78), Color(0xFF173F45)],
+        ),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Positioned(
+            right: 12,
+            top: 12,
+            child: Icon(
+              Icons.nightlight_round,
+              color: Color(0xFFD8C8FF),
+              size: 28,
+            ),
+          ),
+          const Positioned(
+            left: 18,
+            top: 34,
+            child: Icon(
+              Icons.flutter_dash_rounded,
+              color: Color(0xFFB8C7FF),
+              size: 18,
+            ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.cottage_rounded,
+                color: Color(0xFFB5DCC8),
+                size: 66,
+              ),
+              const SizedBox(height: 2),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(
+                  3,
+                  (_) => Container(
+                    width: 9,
+                    height: 12,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFD66B),
+                      borderRadius: BorderRadius.circular(2),
+                      boxShadow: const [
+                        BoxShadow(color: Color(0x99FFD66B), blurRadius: 8),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Positioned(
+            left: 10,
+            right: 10,
+            bottom: 20,
+            child: Column(
+              children: [
+                Container(
+                  height: 13,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFC5D7E8).withValues(alpha: 0.28),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    Icon(
+                      Icons.local_florist_rounded,
+                      color: Color(0xFFFFA63D),
+                      size: 22,
+                    ),
+                    Icon(
+                      Icons.light_rounded,
+                      color: Color(0xFFFFD66B),
+                      size: 21,
+                    ),
+                    Icon(
+                      Icons.local_florist_rounded,
+                      color: Color(0xFFFFA63D),
+                      size: 22,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PumpkinKingArtworkPlaceholder extends StatelessWidget {
+  const _PumpkinKingArtworkPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      key: const Key('event_artwork_placeholder'),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF251044), Color(0xFF6D2475), Color(0xFF9A3F13)],
+        ),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFFFFC857).withValues(alpha: 0.35),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const Positioned(
+            top: 18,
+            child: Icon(
+              Icons.workspace_premium_rounded,
+              color: Color(0xFFFFD76A),
+              size: 48,
+            ),
+          ),
+          const Icon(
+            Icons.chair_alt_rounded,
+            color: Color(0xFF4A194F),
+            size: 86,
+          ),
+          const Positioned(
+            bottom: 18,
+            left: 16,
+            child: Icon(
+              Icons.local_florist_rounded,
+              color: Color(0xFFFF9B35),
+              size: 36,
+            ),
+          ),
+          const Positioned(
+            bottom: 18,
+            right: 16,
+            child: Icon(
+              Icons.local_florist_rounded,
+              color: Color(0xFFFFB347),
+              size: 36,
+            ),
+          ),
+          const Positioned(
+            right: 16,
+            top: 54,
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              color: Color(0xFFFFE4A3),
+              size: 22,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NightSpiritArtworkPlaceholder extends StatelessWidget {
+  const _NightSpiritArtworkPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      key: const Key('event_artwork_placeholder'),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF090D35), Color(0xFF312B81), Color(0xFF075A78)],
+        ),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Positioned(
+            top: 14,
+            right: 18,
+            child: Icon(
+              Icons.nightlight_round,
+              color: Color(0xFFD9E7FF),
+              size: 46,
+            ),
+          ),
+          Icon(
+            Icons.local_fire_department_rounded,
+            color: const Color(0xFF67E8F9).withValues(alpha: 0.78),
+            size: 88,
+          ),
+          const Positioned(
+            left: 20,
+            top: 34,
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              color: Color(0xFFC4B5FD),
+              size: 24,
+            ),
+          ),
+          const Positioned(
+            left: 35,
+            bottom: 28,
+            child: Icon(Icons.star_rounded, color: Color(0xFF9FE7FF), size: 20),
+          ),
+          const Positioned(
+            right: 38,
+            bottom: 38,
+            child: Icon(Icons.star_rounded, color: Color(0xFFD8C8FF), size: 16),
+          ),
         ],
       ),
     );
@@ -1502,6 +1952,16 @@ _VariantDetails _variantDetails(CatDexLocalizations l10n, String variantId) {
       l10n.eventWitchDescription,
       Icons.auto_fix_high_rounded,
     ),
+    'halloween_pumpkin_king' => _VariantDetails(
+      l10n.eventPumpkinKingName,
+      l10n.eventPumpkinKingDescription,
+      Icons.workspace_premium_rounded,
+    ),
+    'halloween_night_spirit' => _VariantDetails(
+      l10n.eventNightSpiritName,
+      l10n.eventNightSpiritDescription,
+      Icons.local_fire_department_rounded,
+    ),
     _ => _VariantDetails(
       l10n.eventHalloweenTitle,
       l10n.eventHalloweenDescription,
@@ -1528,7 +1988,20 @@ String _failureMessage(
     EventUiFailureReason.eventGenerationPending => l10n.eventAlreadyCreating,
     EventUiFailureReason.eventArtworkValidationFailed => l10n.eventQualityError,
     EventUiFailureReason.eventPersistenceFailed => l10n.eventPersistenceError,
+    EventUiFailureReason.variantSelectionRequired =>
+      l10n.eventSelectArtworkFirst,
+    EventUiFailureReason.selectedVariantInvalid =>
+      l10n.eventSelectedVariantInvalid,
+    EventUiFailureReason.selectedVariantDisabled =>
+      l10n.eventSelectedVariantDisabled,
+    EventUiFailureReason.selectedVariantAlreadyOwned =>
+      l10n.eventVariantAlreadyOwned,
     EventUiFailureReason.rendererUnavailable => l10n.eventRendererUnavailable,
+    EventUiFailureReason.missingPhoto => l10n.eventMissingPhotoError,
+    EventUiFailureReason.photoUploadFailed => l10n.eventPhotoUploadError,
+    EventUiFailureReason.storagePermissionDenied =>
+      l10n.eventStoragePermissionError,
+    EventUiFailureReason.signedUrlFailed => l10n.eventSignedUrlError,
     EventUiFailureReason.network ||
     EventUiFailureReason.unknown ||
     null => l10n.eventNetworkError,
@@ -1542,6 +2015,10 @@ bool _canRetry(EventUiFailureReason? reason) {
     EventUiFailureReason.eventPersistenceFailed ||
     EventUiFailureReason.premiumVerificationUnavailable ||
     EventUiFailureReason.rendererUnavailable ||
+    EventUiFailureReason.missingPhoto ||
+    EventUiFailureReason.photoUploadFailed ||
+    EventUiFailureReason.storagePermissionDenied ||
+    EventUiFailureReason.signedUrlFailed ||
     EventUiFailureReason.unknown => true,
     _ => false,
   };

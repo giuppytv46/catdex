@@ -13,7 +13,6 @@ import 'package:catdex/features/events/application/event_providers.dart';
 import 'package:catdex/features/events/domain/entities/catdex_event.dart';
 import 'package:catdex/features/events/domain/entities/event_card_generation.dart';
 import 'package:catdex/features/events/domain/repositories/event_usage_repository.dart';
-import 'package:catdex/features/events/domain/services/event_policy.dart';
 import 'package:catdex/features/premium/application/local_monetization_service.dart';
 import 'package:catdex/features/premium/domain/entities/premium_status.dart';
 import 'package:flutter/foundation.dart';
@@ -168,6 +167,7 @@ class CardGenerationPipeline {
     required CatDisplayData displayData,
     required int collectionNumber,
     required String? debugRarityOverride,
+    required String? selectedVariantId,
     required ValueChanged<CardGenerationStage>? onStageChanged,
   }) async {
     final runtime = _ref.read(eventRuntimeConfigurationProvider);
@@ -178,6 +178,22 @@ class CardGenerationPipeline {
         runtime.premiumTestEntitlementEnabled || hasCanonicalPremium
         ? const PremiumStatus.premium()
         : const PremiumStatus.free();
+    final premiumSelection = premiumStatus.isPremium
+        ? selectedVariantId?.trim()
+        : null;
+    debugPrint(
+      'CATDEX_EVENT_VARIANT_SELECTION_MODE '
+      '${premiumStatus.isPremium ? 'manual' : 'automatic'}',
+    );
+    if (premiumStatus.isPremium &&
+        (premiumSelection == null || premiumSelection.isEmpty)) {
+      debugPrint('CATDEX_EVENT_VARIANT_SELECTION_REQUIRED');
+      return CardGenerationResult(
+        generatedCardPathOrUrl: null,
+        discovery: discovery,
+        eventFailure: EventCardGenerationFailure.variantSelectionRequired,
+      );
+    }
     final coordinator = _ref.read(eventGenerationCoordinatorProvider);
     await _ref.read(catCardLegacyMigrationProvider.future);
     await _repairEventUsageFromCardRecords(
@@ -192,6 +208,7 @@ class CardGenerationPipeline {
       playerId: discovery.playerId,
       requestId: requestId,
       now: runtime.debugModeEnabled ? event.startsAt : DateTime.now().toUtc(),
+      selectedVariantId: selectedVariantId,
     );
     if (reservationResult is EventReservationRejected) {
       final failure = _eventFailureForReservation(reservationResult.reason);
@@ -210,7 +227,7 @@ class CardGenerationPipeline {
       eventKey: event.id,
       eventEdition: event.edition,
       variantId: reservation.variantId,
-      tier: reservation.accessTier == EventAccessTier.premium
+      tier: event.isPremiumVariant(reservation.variantId)
           ? EventArtworkTier.premium
           : EventArtworkTier.free,
       templateKey: reservation.templateKey,
@@ -229,9 +246,11 @@ class CardGenerationPipeline {
     if (existingRecord?.isCompleted == true) {
       coordinator.release(reservation);
       debugPrint('CATDEX_EVENT_CARD_EXISTING_ARTWORK_USED');
+      debugPrint('CATDEX_EVENT_SELECTED_VARIANT_ALREADY_OWNED');
       return CardGenerationResult(
-        generatedCardPathOrUrl: existingRecord!.finalCardUrl,
+        generatedCardPathOrUrl: null,
         discovery: discovery,
+        eventFailure: EventCardGenerationFailure.selectedVariantAlreadyOwned,
       );
     }
 
@@ -263,6 +282,20 @@ class CardGenerationPipeline {
               EventCardGenerationFailure.rendererFailure,
         );
       }
+      if (!_generatedEventResponseMatches(
+        generated: generated,
+        request: eventRequest,
+      )) {
+        coordinator.release(reservation);
+        reservationOpen = false;
+        debugPrint('CATDEX_EVENT_CARD_USAGE_RELEASED');
+        debugPrint('CATDEX_EVENT_CARD_RESPONSE_METADATA_MISMATCH');
+        return CardGenerationResult(
+          generatedCardPathOrUrl: null,
+          discovery: discovery,
+          eventFailure: EventCardGenerationFailure.eventArtworkValidationFailed,
+        );
+      }
 
       onStageChanged?.call(CardGenerationStage.render);
       debugPrint('CATDEX_EVENT_CARD_PERSISTENCE_STARTED');
@@ -290,6 +323,10 @@ class CardGenerationPipeline {
       }
 
       debugPrint('CATDEX_EVENT_CARD_PERSISTENCE_VERIFIED');
+      debugPrint(
+        'CATDEX_EVENT_SELECTED_VARIANT_PERSISTED '
+        'variant=${eventRequest.variantId}',
+      );
       debugPrint('CATDEX_EVENT_CARD_NORMAL_CARD_PRESERVED');
       debugPrint('CATDEX_EVENT_CARD_ADDED_TO_COLLECTION');
       if (!await coordinator.commit(reservation)) {
@@ -319,6 +356,7 @@ class CardGenerationPipeline {
     required CatDiscovery discovery,
     required CatDisplayData displayData,
     required int collectionNumber,
+    String? selectedVariantId,
     ValueChanged<CardGenerationStage>? onStageChanged,
   }) async {
     final totalTiming = CardGenerationPerformanceSpan.start(
@@ -332,6 +370,7 @@ class CardGenerationPipeline {
         displayData: displayData,
         collectionNumber: collectionNumber,
         debugRarityOverride: null,
+        selectedVariantId: selectedVariantId,
         onStageChanged: onStageChanged,
       );
     } finally {
@@ -349,6 +388,14 @@ class CardGenerationPipeline {
         EventCardGenerationFailure.freeEventLimitReached,
       EventReservationFailure.reservationConflict =>
         EventCardGenerationFailure.eventReservationConflict,
+      EventReservationFailure.variantSelectionRequired =>
+        EventCardGenerationFailure.variantSelectionRequired,
+      EventReservationFailure.selectedVariantInvalid =>
+        EventCardGenerationFailure.selectedVariantInvalid,
+      EventReservationFailure.premiumRequired =>
+        EventCardGenerationFailure.premiumRequired,
+      EventReservationFailure.selectedVariantDisabled =>
+        EventCardGenerationFailure.selectedVariantDisabled,
     };
   }
 
@@ -364,6 +411,18 @@ class CardGenerationPipeline {
         record.eventArtworkVariantId == request.variantId &&
         record.eventArtworkTier == request.tier.wireValue &&
         record.eventTemplateKey == request.templateKey;
+  }
+
+  bool _generatedEventResponseMatches({
+    required RemoteGeneratedCard generated,
+    required EventCardGenerationRequest request,
+  }) {
+    return generated.isEventCard &&
+        generated.eventKey == request.eventKey &&
+        generated.eventEdition == request.eventEdition &&
+        generated.eventArtworkVariantId == request.variantId &&
+        generated.eventArtworkTier == request.tier.wireValue &&
+        generated.eventTemplateKey == request.templateKey;
   }
 
   Future<void> _repairEventUsageFromCardRecords({
@@ -461,7 +520,9 @@ class CardGenerationPipeline {
       displayCoatPattern: displayData.displayCoatPattern,
       displayEyeColor: displayData.displayEyeColor,
       displayPersonality: displayData.displayPersonality,
-      originalPhotoStoragePath: discovery.originalPhotoStoragePath,
+      originalPhotoStoragePath:
+          generated.originalPhotoStoragePath ??
+          discovery.originalPhotoStoragePath,
     );
   }
 
@@ -582,6 +643,11 @@ class CardGenerationPipeline {
       generatedDuringEventAt: generated.isEventCard ? DateTime.now() : null,
     );
 
-    return discovery.copyWithCard(card);
+    final discoveryWithStoragePath = generated.originalPhotoStoragePath == null
+        ? discovery
+        : discovery.copyWithPhotoPaths(
+            originalPhotoStoragePath: generated.originalPhotoStoragePath,
+          );
+    return discoveryWithStoragePath.copyWithCard(card);
   }
 }

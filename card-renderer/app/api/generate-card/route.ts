@@ -172,6 +172,12 @@ export async function POST(request: NextRequest) {
       console.log('CATDEX_RENDER_EVENT_VALIDATED');
       console.log('CATDEX_RENDER_EVENT_VARIANT', eventVariant.variantId);
       console.log('CATDEX_RENDER_EVENT_TIER', eventVariant.tier);
+      if (eventVariant.variantId === 'halloween_haunted_frame') {
+        console.log('CATDEX_RENDER_HAUNTED_ART_DIRECTION_VERSION', 2);
+      }
+      if (eventVariant.tier === 'premium') {
+        console.log('CATDEX_RENDER_PREMIUM_VARIANT', eventVariant.variantId);
+      }
     }
 
     const jobResolution = await resolveRenderJob({

@@ -2,11 +2,16 @@ import 'package:catdex/features/events/domain/entities/catdex_event.dart';
 import 'package:catdex/features/events/domain/repositories/event_usage_repository.dart';
 import 'package:catdex/features/events/domain/services/event_policy.dart';
 import 'package:catdex/features/premium/domain/entities/premium_status.dart';
+import 'package:flutter/foundation.dart';
 
 enum EventReservationFailure {
   eventInactive,
   limitReached,
   reservationConflict,
+  variantSelectionRequired,
+  selectedVariantInvalid,
+  premiumRequired,
+  selectedVariantDisabled,
 }
 
 class EventGenerationReservation {
@@ -61,6 +66,7 @@ class EventGenerationCoordinator {
     required String playerId,
     required String requestId,
     required DateTime now,
+    String? selectedVariantId,
   }) async {
     if (!event.isActiveAt(now)) {
       return const EventReservationRejected(
@@ -73,6 +79,35 @@ class EventGenerationCoordinator {
     }
 
     final tier = entitlementResolver.tierFor(premiumStatus, now: now);
+    final normalizedSelection = selectedVariantId?.trim();
+    if (tier == EventAccessTier.premium) {
+      debugPrint('CATDEX_EVENT_VARIANT_SELECTION_MODE manual');
+      if (normalizedSelection == null || normalizedSelection.isEmpty) {
+        debugPrint('CATDEX_EVENT_VARIANT_SELECTION_REQUIRED');
+        return const EventReservationRejected(
+          EventReservationFailure.variantSelectionRequired,
+        );
+      }
+      if (!event.containsVariant(normalizedSelection)) {
+        return const EventReservationRejected(
+          EventReservationFailure.selectedVariantInvalid,
+        );
+      }
+      if (!event.isVariantEnabled(normalizedSelection)) {
+        return const EventReservationRejected(
+          EventReservationFailure.selectedVariantDisabled,
+        );
+      }
+    } else {
+      debugPrint('CATDEX_EVENT_VARIANT_SELECTION_MODE automatic');
+      if (normalizedSelection != null &&
+          event.isPremiumVariant(normalizedSelection)) {
+        debugPrint('CATDEX_EVENT_VARIANT_SELECTION_PREMIUM_REJECTED');
+        return const EventReservationRejected(
+          EventReservationFailure.premiumRequired,
+        );
+      }
+    }
     final limit = tier == EventAccessTier.premium
         ? event.premiumGenerationLimit
         : event.freeGenerationLimit;
@@ -105,6 +140,9 @@ class EventGenerationCoordinator {
       tier: tier,
       usage: usage,
       reservedVariants: reservedVariants,
+      selectedVariantId: tier == EventAccessTier.premium
+          ? normalizedSelection
+          : null,
     );
     final reservation = EventGenerationReservation(
       requestId: requestId,
@@ -151,6 +189,7 @@ class EventGenerationCoordinator {
     required EventAccessTier tier,
     required EventUsageSnapshot usage,
     required Set<String> reservedVariants,
+    String? selectedVariantId,
   }) {
     final unavailable = {...usage.ownedVariantIds, ...reservedVariants};
     if (tier == EventAccessTier.free) {
@@ -160,14 +199,25 @@ class EventGenerationCoordinator {
       );
     }
 
+    if (selectedVariantId != null) {
+      debugPrint(
+        'CATDEX_EVENT_SELECTED_VARIANT_VALIDATED variant=$selectedVariantId',
+      );
+      return selectedVariantId;
+    }
+
     if (event.premiumGuaranteedOnce &&
-        !unavailable.contains(event.premiumVariantId)) {
-      return event.premiumVariantId;
+        event.enabledPremiumVariantIds.any(
+          (variant) => !unavailable.contains(variant),
+        )) {
+      return event.enabledPremiumVariantIds.firstWhere(
+        (variant) => !unavailable.contains(variant),
+      );
     }
 
     final eligible = <String>[
       ...event.enabledStandardVariantIds,
-      event.premiumVariantId,
+      ...event.enabledPremiumVariantIds,
     ];
     final weighted = <String>[];
     for (final variant in eligible) {

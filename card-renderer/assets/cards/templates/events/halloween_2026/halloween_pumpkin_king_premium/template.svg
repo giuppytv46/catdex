@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="2100" viewBox="0 0 1500 2100">
+  <defs>
+    <linearGradient id="royalNight" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#180728"/>
+      <stop offset="0.48" stop-color="#54205F"/>
+      <stop offset="1" stop-color="#2B0B32"/>
+    </linearGradient>
+    <linearGradient id="royalGold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFF0A6"/>
+      <stop offset="0.45" stop-color="#E9B84A"/>
+      <stop offset="1" stop-color="#B96A20"/>
+    </linearGradient>
+    <radialGradient id="orangeGlow" cx="0.5" cy="0.58" r="0.58">
+      <stop offset="0" stop-color="#FF9F32" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#FF7A18" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="13"/>
+    </filter>
+  </defs>
+  <rect width="1500" height="2100" rx="72" fill="url(#royalNight)"/>
+  <ellipse cx="750" cy="1090" rx="650" ry="780" fill="url(#orangeGlow)"/>
+
+  <g opacity="0.36" fill="none" stroke="#D58A32" stroke-width="13">
+    <path d="M102 1430c140-60 215-190 176-356c132 65 203 190 163 356"/>
+    <path d="M1398 1430c-140-60-215-190-176-356c-132 65-203 190-163 356"/>
+    <path d="M112 1530c166-42 264-142 276-300M1388 1530c-166-42-264-142-276-300"/>
+  </g>
+  <g fill="#F39A34" opacity="0.72">
+    <ellipse cx="180" cy="1570" rx="78" ry="62"/>
+    <ellipse cx="1320" cy="1570" rx="78" ry="62"/>
+  </g>
+  <g fill="#FFE08A" opacity="0.35" filter="url(#glow)">
+    <ellipse cx="180" cy="1570" rx="110" ry="88"/>
+    <ellipse cx="1320" cy="1570" rx="110" ry="88"/>
+  </g>
+
+  <g transform="translate(655 68)" fill="url(#royalGold)">
+    <path d="M0 96l34-70l58 50l58-68l58 68l58-50l34 70l-30 70H30z"/>
+    <circle cx="92" cy="92" r="12" fill="#7A245C"/>
+    <circle cx="150" cy="75" r="14" fill="#7A245C"/>
+    <circle cx="208" cy="92" r="12" fill="#7A245C"/>
+  </g>
+
+  <g fill="#F7C75D">
+    <circle cx="230" cy="280" r="8"/><circle cx="1280" cy="270" r="8"/>
+    <circle cx="175" cy="430" r="5"/><circle cx="1332" cy="450" r="5"/>
+    <path d="M280 180l10 25l25 10l-25 10l-10 25l-10-25l-25-10l25-10z"/>
+    <path d="M1230 180l10 25l25 10l-25 10l-10 25l-10-25l-25-10l25-10z"/>
+  </g>
+
+  <path d="M100 1760q175-145 340-12q140-170 310-12q160-180 320 5q145-140 330 18v242H100z" fill="#210B2E" opacity="0.94"/>
+  <rect x="42" y="42" width="1416" height="2016" rx="68" fill="none" stroke="#2A091E" stroke-width="34"/>
+  <rect x="68" y="68" width="1364" height="1964" rx="58" fill="none" stroke="url(#royalGold)" stroke-width="18"/>
+  <rect x="96" y="96" width="1308" height="1908" rx="42" fill="none" stroke="#F7A33A" stroke-width="6" opacity="0.85"/>
+  <path d="M145 340h1210" stroke="url(#royalGold)" stroke-width="9"/>
+  <path d="M205 360h1090" stroke="#8D3A72" stroke-width="4"/>
+</svg>

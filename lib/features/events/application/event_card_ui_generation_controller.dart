@@ -33,6 +33,14 @@ enum EventUiFailureReason {
   eventArtworkValidationFailed,
   eventPersistenceFailed,
   rendererUnavailable,
+  missingPhoto,
+  photoUploadFailed,
+  storagePermissionDenied,
+  signedUrlFailed,
+  variantSelectionRequired,
+  selectedVariantInvalid,
+  selectedVariantDisabled,
+  selectedVariantAlreadyOwned,
   network,
   unknown,
 }
@@ -91,6 +99,7 @@ class EventCardUiGenerationController
     required CatDexEvent event,
     required CatDiscovery discovery,
     required int collectionNumber,
+    String? selectedVariantId,
   }) {
     final key = keyFor(event.id, discovery.id);
     final current = _inFlight[key];
@@ -103,6 +112,7 @@ class EventCardUiGenerationController
       event: event,
       discovery: discovery,
       collectionNumber: collectionNumber,
+      selectedVariantId: selectedVariantId,
     );
     _inFlight[key] = operation;
     unawaited(
@@ -124,6 +134,7 @@ class EventCardUiGenerationController
     required CatDexEvent event,
     required CatDiscovery discovery,
     required int collectionNumber,
+    required String? selectedVariantId,
   }) async {
     final runtime = ref.read(eventRuntimeConfigurationProvider);
     if (runtime.activeEvent(DateTime.now().toUtc())?.id != event.id) {
@@ -168,6 +179,7 @@ class EventCardUiGenerationController
             discovery: discovery,
             displayData: display,
             collectionNumber: collectionNumber,
+            selectedVariantId: selectedVariantId,
             onStageChanged: (stage) {
               final phase = switch (stage) {
                 CardGenerationStage.illustration =>
@@ -311,6 +323,14 @@ class EventCardUiGenerationController
           EventUiFailureReason.eventArtworkValidationFailed,
         EventCardGenerationFailure.eventPersistenceFailed =>
           EventUiFailureReason.eventPersistenceFailed,
+        EventCardGenerationFailure.variantSelectionRequired =>
+          EventUiFailureReason.variantSelectionRequired,
+        EventCardGenerationFailure.selectedVariantInvalid =>
+          EventUiFailureReason.selectedVariantInvalid,
+        EventCardGenerationFailure.selectedVariantDisabled =>
+          EventUiFailureReason.selectedVariantDisabled,
+        EventCardGenerationFailure.selectedVariantAlreadyOwned =>
+          EventUiFailureReason.selectedVariantAlreadyOwned,
         EventCardGenerationFailure.eventVariantInvalid ||
         EventCardGenerationFailure.eventVariantDisabled ||
         EventCardGenerationFailure.rendererFailure =>
@@ -321,8 +341,17 @@ class EventCardUiGenerationController
       RemoteCardGenerationFailureReason.missingEndpoint =>
         EventUiFailureReason.rendererUnavailable,
       RemoteCardGenerationFailureReason.invalidPhotoUrl ||
+      RemoteCardGenerationFailureReason.missingPhoto =>
+        EventUiFailureReason.missingPhoto,
+      RemoteCardGenerationFailureReason.photoUploadFailed =>
+        EventUiFailureReason.photoUploadFailed,
+      RemoteCardGenerationFailureReason.storagePermissionDenied =>
+        EventUiFailureReason.storagePermissionDenied,
+      RemoteCardGenerationFailureReason.signedUrlFailed =>
+        EventUiFailureReason.signedUrlFailed,
+      RemoteCardGenerationFailureReason.network => EventUiFailureReason.network,
       RemoteCardGenerationFailureReason.remoteApiFailure ||
-      null => EventUiFailureReason.network,
+      null => EventUiFailureReason.unknown,
     };
   }
 
@@ -337,6 +366,16 @@ class EventCardUiGenerationController
       'artwork_validation_failed',
     EventUiFailureReason.eventPersistenceFailed => 'persistence_failed',
     EventUiFailureReason.rendererUnavailable => 'renderer_unavailable',
+    EventUiFailureReason.missingPhoto => 'missing_photo',
+    EventUiFailureReason.photoUploadFailed => 'photo_upload_failed',
+    EventUiFailureReason.storagePermissionDenied => 'storage_permission_denied',
+    EventUiFailureReason.signedUrlFailed => 'signed_url_failed',
+    EventUiFailureReason.variantSelectionRequired =>
+      'variant_selection_required',
+    EventUiFailureReason.selectedVariantInvalid => 'selected_variant_invalid',
+    EventUiFailureReason.selectedVariantDisabled => 'selected_variant_disabled',
+    EventUiFailureReason.selectedVariantAlreadyOwned =>
+      'selected_variant_already_owned',
     EventUiFailureReason.network => 'network',
     EventUiFailureReason.unknown => 'unknown',
   };

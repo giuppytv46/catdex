@@ -93,22 +93,222 @@ void main() {
     expect(find.text('Casa infestata'), findsOneWidget);
   });
 
-  testWidgets('Premium witch slot is visible and locked for Free', (
+  testWidgets('all three Premium slots are visible and locked for Free', (
     tester,
   ) async {
     await _pump(tester, _previewGrid(_state()));
 
     expect(find.text('Gatto stregone'), findsOneWidget);
-    expect(find.text('Scopri Premium'), findsOneWidget);
-    expect(find.byIcon(Icons.lock_rounded), findsOneWidget);
+    expect(find.text('Re delle zucche'), findsOneWidget);
+    expect(find.text('Spirito della notte'), findsOneWidget);
+    expect(find.text('Scopri Premium'), findsNWidgets(3));
+    expect(find.byIcon(Icons.lock_rounded), findsNWidgets(3));
   });
 
-  testWidgets('Premium witch slot is unlocked for Premium', (tester) async {
+  testWidgets('all Premium slots are unlocked for Premium', (tester) async {
     await _pump(tester, _previewGrid(_state(premium: true)));
 
     expect(find.text('Gatto stregone'), findsOneWidget);
+    expect(find.text('Re delle zucche'), findsOneWidget);
+    expect(find.text('Spirito della notte'), findsOneWidget);
     expect(find.text('Scopri Premium'), findsNothing);
     expect(find.byIcon(Icons.lock_rounded), findsNothing);
+  });
+
+  testWidgets('Free cannot select either new Premium variant', (tester) async {
+    final selected = <String>[];
+    var premiumOpens = 0;
+    await _pump(
+      tester,
+      EventArtworkPreviewGrid(
+        state: _state(),
+        onOpenCard: (_) {},
+        onOpenPremium: () => premiumOpens += 1,
+        onSelectVariant: selected.add,
+      ),
+    );
+
+    for (final variant in const [
+      'halloween_pumpkin_king',
+      'halloween_night_spirit',
+    ]) {
+      final slot = find.byKey(ValueKey('event_artwork_slot_$variant'));
+      final inkWell = tester.widget<InkWell>(
+        find.descendant(of: slot, matching: find.byType(InkWell)).first,
+      );
+      inkWell.onTap!();
+      await tester.pump();
+    }
+
+    expect(selected, isEmpty);
+    expect(premiumOpens, 2);
+  });
+
+  testWidgets('Free artwork previews are not manually selectable', (
+    tester,
+  ) async {
+    await _pump(tester, _previewGrid(_state()));
+
+    final slot = find.byKey(
+      const ValueKey('event_artwork_slot_halloween_haunted_frame'),
+    );
+    final inkWell = tester.widget<InkWell>(
+      find.descendant(of: slot, matching: find.byType(InkWell)),
+    );
+    expect(inkWell.onTap, isNull);
+    expect(
+      find.text('Le varianti gratuite vengono assegnate automaticamente.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Premium exposes all six variants as selectable', (
+    tester,
+  ) async {
+    final selected = <String>[];
+    await _pump(
+      tester,
+      EventArtworkPreviewGrid(
+        state: _state(premium: true),
+        onOpenCard: (_) {},
+        onOpenPremium: () {},
+        onSelectVariant: selected.add,
+      ),
+    );
+
+    for (final variant in const [
+      'halloween_pumpkins',
+      'halloween_moonlight',
+      'halloween_haunted_frame',
+      'halloween_witch_cat',
+      'halloween_pumpkin_king',
+      'halloween_night_spirit',
+    ]) {
+      final slot = find.byKey(ValueKey('event_artwork_slot_$variant'));
+      final inkWell = tester.widget<InkWell>(
+        find.descendant(of: slot, matching: find.byType(InkWell)),
+      );
+      expect(inkWell.onTap, isNotNull, reason: variant);
+      inkWell.onTap!();
+    }
+    expect(selected, const [
+      'halloween_pumpkins',
+      'halloween_moonlight',
+      'halloween_haunted_frame',
+      'halloween_witch_cat',
+      'halloween_pumpkin_king',
+      'halloween_night_spirit',
+    ]);
+  });
+
+  for (final variant in const {
+    'halloween_pumpkin_king': 'Genera: Re delle zucche',
+    'halloween_night_spirit': 'Genera: Spirito della notte',
+  }.entries) {
+    testWidgets('${variant.key} updates the Premium selection and CTA', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        Column(
+          children: [
+            _previewGrid(
+              _state(premium: true),
+              selectedVariantId: variant.key,
+            ),
+            _generationPanel(
+              state: _state(premium: true, discoveries: [_discovery()]),
+              selectedVariantId: variant.key,
+            ),
+          ],
+        ),
+      );
+
+      expect(
+        find.byKey(const Key('event_artwork_selected_check')),
+        findsOneWidget,
+      );
+      expect(find.text(variant.value), findsOneWidget);
+    });
+  }
+
+  testWidgets('Premium selected variant updates CTA and selection marker', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      Column(
+        children: [
+          _previewGrid(
+            _state(premium: true),
+            selectedVariantId: 'halloween_haunted_frame',
+          ),
+          _generationPanel(
+            state: _state(premium: true, discoveries: [_discovery()]),
+            selectedVariantId: 'halloween_haunted_frame',
+          ),
+        ],
+      ),
+    );
+
+    expect(
+      find.byKey(const Key('event_artwork_selected_check')),
+      findsOneWidget,
+    );
+    expect(find.text('Genera: Casa infestata'), findsOneWidget);
+  });
+
+  testWidgets('Premium generation is disabled until artwork is selected', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _generationPanel(
+        state: _state(premium: true, discoveries: [_discovery()]),
+      ),
+    );
+
+    final button = tester.widget<FilledButton>(
+      find.byKey(const Key('event_generate_button')),
+    );
+    expect(button.onPressed, isNull);
+    expect(
+      find.text('Seleziona un artwork prima di continuare.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('owned cat variant opens existing card without generation', (
+    tester,
+  ) async {
+    var opened = false;
+    var generations = 0;
+    final card = _eventCard(variant: 'halloween_haunted_frame');
+    await _pump(
+      tester,
+      _generationPanel(
+        state: _state(
+          premium: true,
+          discoveries: [_discovery()],
+          cards: [card],
+        ),
+        selectedVariantId: 'halloween_haunted_frame',
+        existingSelectedVariantCard: card,
+        onGenerate: () async => generations++,
+        onOpenExistingCard: () => opened = true,
+      ),
+    );
+
+    expect(
+      find.text('Questo gatto possiede già questa variante.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('event_generate_button')), findsNothing);
+    await tester.tap(
+      find.byKey(const Key('event_open_existing_variant_button')),
+    );
+    expect(opened, isTrue);
+    expect(generations, 0);
   });
 
   testWidgets('selected cat is visually identifiable', (tester) async {
@@ -216,6 +416,33 @@ void main() {
     expect(find.textContaining('non è stato consumato'), findsOneWidget);
   });
 
+  testWidgets('missing event photo shows photo-specific error', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _generationPanel(
+        state: _state(discoveries: [_discovery()]),
+        generation: const EventUiGenerationState(
+          phase: EventUiGenerationPhase.failed,
+          failureReason: EventUiFailureReason.missingPhoto,
+        ),
+      ),
+    );
+
+    expect(
+      find.text(
+        'Non riusciamo a preparare la foto di questo gatto. '
+        'Riprova o scegli un altro gatto.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Connessione non disponibile. Controlla la rete e riprova.'),
+      findsNothing,
+    );
+  });
+
   testWidgets('completed event result opens by cardId', (tester) async {
     final card = _eventCard();
     String? openedCardId;
@@ -269,9 +496,23 @@ void main() {
 
     expect(
       find.byKey(const Key('event_artwork_placeholder')),
-      findsNWidgets(4),
+      findsNWidgets(6),
     );
-    expect(find.text('Non ancora raccolto'), findsNWidgets(4));
+    expect(find.text('Non ancora raccolto'), findsNWidgets(6));
+  });
+
+  testWidgets('haunted-house artwork uses the new localized description', (
+    tester,
+  ) async {
+    await _pump(tester, _previewGrid(_state(premium: true)));
+
+    expect(
+      find.text(
+        'Una villa stregata illuminata, avvolta da nebbia viola, '
+        'lanterne e magia di Halloween.',
+      ),
+      findsOneWidget,
+    );
   });
 
   test('event cards do not alter normal rarity counts', () {
@@ -320,7 +561,7 @@ void main() {
 
     expect(find.text('Gatto stregone'), findsOneWidget);
     expect(find.text('Raccolto'), findsOneWidget);
-    expect(find.text('Scopri Premium'), findsNothing);
+    expect(find.text('Scopri Premium'), findsNWidgets(2));
   });
 
   testWidgets('debug badge appears only in explicit event debug mode', (
@@ -428,11 +669,17 @@ void main() {
   });
 }
 
-Widget _previewGrid(EventUiState state) {
+Widget _previewGrid(
+  EventUiState state, {
+  String? selectedVariantId,
+  ValueChanged<String>? onSelectVariant,
+}) {
   return EventArtworkPreviewGrid(
     state: state,
     onOpenCard: (_) {},
     onOpenPremium: () {},
+    selectedVariantId: selectedVariantId,
+    onSelectVariant: onSelectVariant,
   );
 }
 
@@ -440,6 +687,9 @@ Widget _generationPanel({
   required EventUiState state,
   EventUiGenerationState generation = EventUiGenerationState.idle,
   Future<void> Function()? onGenerate,
+  String? selectedVariantId,
+  CatCardRecord? existingSelectedVariantCard,
+  VoidCallback? onOpenExistingCard,
 }) {
   final discovery = state.discoveries.firstOrNull;
   return EventGenerationPanel(
@@ -451,6 +701,9 @@ Widget _generationPanel({
     onRetry: () async {},
     onOpenCard: null,
     onBackToEvent: null,
+    selectedVariantId: selectedVariantId,
+    existingSelectedVariantCard: existingSelectedVariantCard,
+    onOpenExistingCard: onOpenExistingCard,
   );
 }
 

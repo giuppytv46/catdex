@@ -1936,14 +1936,38 @@ class CatDexLocalizations {
   String get eventHauntedName =>
       _eventValue(en: 'Haunted house', it: 'Casa infestata');
   String get eventHauntedDescription => _eventValue(
-    en: 'A playful haunted frame full of surprises.',
-    it: 'Una cornice infestata e giocosa, piena di sorprese.',
+    en:
+        'An illuminated haunted mansion wrapped in purple fog, '
+        'lanterns and Halloween magic.',
+    it:
+        'Una villa stregata illuminata, avvolta da nebbia viola, '
+        'lanterne e magia di Halloween.',
   );
   String get eventWitchName =>
       _eventValue(en: 'Witch cat', it: 'Gatto stregone');
   String get eventWitchDescription => _eventValue(
     en: 'An exclusive magical portrait with hat and cape.',
     it: 'Un ritratto magico esclusivo con cappello e mantello.',
+  );
+  String get eventPumpkinKingName =>
+      _eventValue(en: 'Pumpkin King', it: 'Re delle zucche');
+  String get eventPumpkinKingDescription => _eventValue(
+    en:
+        'A royal version with a crown, cape and a throne of '
+        'illuminated pumpkins.',
+    it:
+        'Una versione regale con corona, mantello e un trono di '
+        'zucche illuminate.',
+  );
+  String get eventNightSpiritName =>
+      _eventValue(en: 'Night Spirit', it: 'Spirito della notte');
+  String get eventNightSpiritDescription => _eventValue(
+    en:
+        'A mystical artwork with moonlight, spirit flames and '
+        'violet and cyan glows.',
+    it:
+        'Un artwork mistico con luna, fiamme spirituali e '
+        'bagliori viola e azzurri.',
   );
   String get eventCollected => _eventValue(en: 'Collected', it: 'Raccolto');
   String get eventNotCollected =>
@@ -1952,6 +1976,36 @@ class CatDexLocalizations {
   String get eventPremiumBadge => _eventValue(en: 'PREMIUM', it: 'PREMIUM');
   String get eventChooseCat =>
       _eventValue(en: 'Choose your cat', it: 'Scegli il gatto');
+  String get eventFreeVariantsAutomatic => _eventValue(
+    en: 'Free variants are assigned automatically.',
+    it: 'Le varianti gratuite vengono assegnate automaticamente.',
+  );
+  String get eventChooseArtwork =>
+      _eventValue(en: 'Choose your artwork', it: 'Scegli il tuo artwork');
+  String get eventArtworkSelected =>
+      _eventValue(en: 'Artwork selected', it: 'Artwork selezionato');
+  String eventGenerateVariant(String variantName) => _eventValue(
+    en: 'Generate: $variantName',
+    it: 'Genera: $variantName',
+  );
+  String get eventSelectArtworkFirst => _eventValue(
+    en: 'Select an artwork before continuing.',
+    it: 'Seleziona un artwork prima di continuare.',
+  );
+  String get eventVariantAlreadyOwned => _eventValue(
+    en: 'This cat already owns this variant.',
+    it: 'Questo gatto possiede già questa variante.',
+  );
+  String get eventOpenExistingCard =>
+      _eventValue(en: 'Open existing card', it: 'Apri la carta esistente');
+  String get eventSelectedVariantInvalid => _eventValue(
+    en: 'The selected artwork is not valid for this event.',
+    it: "L'artwork selezionato non è valido per questo evento.",
+  );
+  String get eventSelectedVariantDisabled => _eventValue(
+    en: 'The selected artwork is not available right now.',
+    it: "L'artwork selezionato non è disponibile in questo momento.",
+  );
   String get eventGenerateCard => _eventValue(
     en: 'Generate event card',
     it: 'Genera carta evento',
@@ -2055,6 +2109,32 @@ class CatDexLocalizations {
     en: 'We could not save the card. The attempt was not consumed.',
     it:
         'Non siamo riusciti a salvare la carta. '
+        'Il tentativo non è stato consumato.',
+  );
+  String get eventMissingPhotoError => _eventValue(
+    en: 'We cannot prepare this cat photo. Try again or choose another cat.',
+    it:
+        'Non riusciamo a preparare la foto di questo gatto. '
+        'Riprova o scegli un altro gatto.',
+  );
+  String get eventPhotoUploadError => _eventValue(
+    en: 'We could not upload the cat photo. The attempt was not consumed.',
+    it:
+        'Non siamo riusciti a caricare la foto del gatto. '
+        'Il tentativo non è stato consumato.',
+  );
+  String get eventStoragePermissionError => _eventValue(
+    en: 'We cannot upload this photo right now. Check access and try again.',
+    it:
+        'Non possiamo caricare questa foto in questo momento. '
+        "Controlla l'accesso e riprova.",
+  );
+  String get eventSignedUrlError => _eventValue(
+    en:
+        'We could not prepare the photo for the card. '
+        'The attempt was not consumed.',
+    it:
+        'Non siamo riusciti a preparare la foto per la carta. '
         'Il tentativo non è stato consumato.',
   );
   String get eventNetworkError => _eventValue(

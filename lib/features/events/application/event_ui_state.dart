@@ -138,8 +138,11 @@ class EventUiState {
       .where((variant) => cardsForVariant(variant).isNotEmpty)
       .length;
 
-  bool get premiumArtworkCollected =>
-      cardsForVariant(event.premiumVariantId).isNotEmpty;
+  int get collectedPremiumArtworkCount => event.enabledPremiumVariantIds
+      .where((variant) => cardsForVariant(variant).isNotEmpty)
+      .length;
+
+  bool get premiumArtworkCollected => collectedPremiumArtworkCount > 0;
 
   int eventCardCountForDiscovery(String discoveryId) =>
       ownedCards.where((card) => card.discoveryId == discoveryId).length;

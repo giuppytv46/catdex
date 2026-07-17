@@ -26,7 +26,7 @@ class _HomeActiveEventSectionState
         _logVisibility(state != null);
         if (state == null) return const SizedBox.shrink();
         return Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.lg),
+          padding: const EdgeInsets.only(bottom: AppSpacing.lg),
           child: HomeEventBanner(
             state: state,
             onOpen: () => widget.onOpen(state.event.id),

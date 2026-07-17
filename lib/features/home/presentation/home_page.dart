@@ -43,6 +43,7 @@ class HomePage extends ConsumerWidget {
         ],
       ),
       body: ListView(
+        key: const Key('home_scroll_view'),
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.md,
           AppSpacing.md,
@@ -50,6 +51,22 @@ class HomePage extends ConsumerWidget {
           120,
         ),
         children: [
+          HomeActiveEventSection(
+            onOpen: (eventKey) => context.pushNamed(
+              AppRoute.event.name,
+              pathParameters: {'eventKey': eventKey},
+            ),
+          ),
+          _SectionTitle(
+            key: const Key('home_recent_discoveries_title'),
+            title: l10n.recentDiscoveriesTitle,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _RecentDiscoveries(
+            discoveries: dashboard.recentDiscoveries,
+            onOpen: (discovery) => _openDiscovery(context, discovery),
+          ),
+          const SizedBox(height: AppSpacing.lg),
           _PlayerHeader(dashboard: dashboard),
           const SizedBox(height: AppSpacing.lg),
           _SectionTitle(title: l10n.dailyMissionsTitle),
@@ -59,20 +76,10 @@ class HomePage extends ConsumerWidget {
             const SizedBox(height: AppSpacing.sm),
           ],
           const SizedBox(height: AppSpacing.md),
-          _SectionTitle(title: l10n.recentDiscoveriesTitle),
-          const SizedBox(height: AppSpacing.md),
-          _RecentDiscoveries(
-            discoveries: dashboard.recentDiscoveries,
-            onOpen: (discovery) => _openDiscovery(context, discovery),
+          _SectionTitle(
+            key: const Key('home_quick_actions_title'),
+            title: l10n.quickActionsTitle,
           ),
-          HomeActiveEventSection(
-            onOpen: (eventKey) => context.pushNamed(
-              AppRoute.event.name,
-              pathParameters: {'eventKey': eventKey},
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          _SectionTitle(title: l10n.quickActionsTitle),
           const SizedBox(height: AppSpacing.md),
           const _QuickActions(),
           const CatDexBannerAdWidget(
@@ -869,7 +876,7 @@ class _SecondaryActionButton extends StatelessWidget {
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title});
+  const _SectionTitle({required this.title, super.key});
 
   final String title;
 

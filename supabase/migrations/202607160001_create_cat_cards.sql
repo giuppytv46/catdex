@@ -1,7 +1,12 @@
 create table if not exists public.cat_cards (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
-  discovery_id text not null references public.discoveries(id) on delete cascade,
+  -- Discoveries are currently local-first and the active remote project does
+  -- not expose a canonical public discovery table. Ownership is enforced by
+  -- user_id and discovery_id remains the stable application-level identifier.
+  -- A foreign key can be added later by an explicit migration once a canonical
+  -- remote discovery table is part of the active Supabase migration history.
+  discovery_id text not null,
   card_type text not null check (card_type in ('normal', 'event')),
   rarity text not null check (
     rarity in ('common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic')

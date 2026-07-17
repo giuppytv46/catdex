@@ -7,11 +7,18 @@ import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_species.dart';
 import 'package:catdex/features/catdex/domain/entities/catdex_collection.dart';
+import 'package:catdex/features/catdex/domain/entities/player_progress.dart';
+import 'package:catdex/features/events/application/event_ui_state.dart';
+import 'package:catdex/features/events/domain/repositories/event_usage_repository.dart';
+import 'package:catdex/features/events/domain/services/halloween_event_catalog.dart';
+import 'package:catdex/features/events/presentation/home_event_banner.dart';
+import 'package:catdex/features/home/application/home_controller.dart';
 import 'package:catdex/features/home/domain/entities/home_dashboard.dart';
 import 'package:catdex/features/home/presentation/home_page.dart';
 import 'package:catdex/shared/images/catdex_image_resolver.dart';
 import 'package:catdex/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -24,6 +31,115 @@ void main() {
 
   tearDownAll(() {
     HttpOverrides.global = previousHttpOverrides;
+  });
+
+  testWidgets('active event banner appears before recent discoveries', (
+    tester,
+  ) async {
+    await _pumpHomePage(tester, eventActive: true);
+
+    final listRect = tester.getRect(find.byKey(const Key('home_scroll_view')));
+    final bannerRect = tester.getRect(
+      find.byKey(const Key('home_event_banner')),
+    );
+    final recentTitleRect = tester.getRect(
+      find.byKey(const Key('home_recent_discoveries_title')),
+    );
+
+    expect(bannerRect.top, closeTo(listRect.top + 16, 0.1));
+    expect(bannerRect.bottom, lessThan(recentTitleRect.top));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('inactive event leaves no empty section gap', (tester) async {
+    await _pumpHomePage(tester, eventActive: false);
+
+    final listRect = tester.getRect(find.byKey(const Key('home_scroll_view')));
+    final recentTitleRect = tester.getRect(
+      find.byKey(const Key('home_recent_discoveries_title')),
+    );
+
+    expect(find.byKey(const Key('home_event_banner')), findsNothing);
+    expect(recentTitleRect.top, closeTo(listRect.top + 16, 0.1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('recent discoveries title starts below the app bar', (
+    tester,
+  ) async {
+    await _pumpHomePage(tester, eventActive: false);
+
+    final appBarBottom = tester.getRect(find.byType(AppBar)).bottom;
+    final recentTitleTop = tester
+        .getRect(find.byKey(const Key('home_recent_discoveries_title')))
+        .top;
+
+    expect(recentTitleTop, greaterThanOrEqualTo(appBarBottom + 16));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('active event Home has no overflow on a small viewport', (
+    tester,
+  ) async {
+    await _pumpHomePage(
+      tester,
+      eventActive: true,
+      size: const Size(320, 400),
+    );
+
+    expect(find.byKey(const Key('home_event_banner')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('active Home banner supports text scale 1.3', (tester) async {
+    await _pumpHomeBanner(
+      tester,
+      size: const Size(320, 568),
+      textScale: 1.3,
+    );
+
+    expect(find.byKey(const Key('home_event_banner')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('bottom Home content remains scrollable above navigation space', (
+    tester,
+  ) async {
+    await _pumpHomePage(
+      tester,
+      eventActive: true,
+    );
+
+    final scrollable = find.descendant(
+      of: find.byKey(const Key('home_scroll_view')),
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      ),
+    );
+    expect(scrollable, findsOneWidget);
+    final position = tester.state<ScrollableState>(scrollable).position;
+    expect(position.maxScrollExtent, greaterThan(0));
+
+    final quickActions = find.byKey(const Key('home_quick_actions_title'));
+    for (var index = 0; index < 8 && quickActions.evaluate().isEmpty; index++) {
+      await tester.drag(
+        find.byKey(const Key('home_scroll_view')),
+        const Offset(0, -300),
+      );
+      await tester.pump();
+    }
+    expect(quickActions, findsOneWidget);
+
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pump();
+
+    final listBottom = tester
+        .getRect(find.byKey(const Key('home_scroll_view')))
+        .bottom;
+    final quickActionsBottom = tester.getRect(quickActions).bottom;
+    expect(quickActionsBottom, lessThan(listBottom));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('valid local photo is displayed with FileImage', (tester) async {
@@ -369,6 +485,124 @@ Future<void> _pumpCard(
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 100));
   await tester.pump(const Duration(milliseconds: 100));
+}
+
+Future<void> _pumpHomePage(
+  WidgetTester tester, {
+  required bool eventActive,
+  Size size = const Size(390, 844),
+  double textScale = 1,
+}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        homeControllerProvider.overrideWith(
+          () => _TestHomeController(_homeDashboard()),
+        ),
+        activeEventUiStateProvider.overrideWith(
+          (_) async => eventActive ? _activeEventState() : null,
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        locale: const Locale('it'),
+        localizationsDelegates: CatDexLocalizations.localizationsDelegates,
+        supportedLocales: CatDexLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
+        home: const HomePage(),
+      ),
+    ),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 100));
+}
+
+Future<void> _pumpHomeBanner(
+  WidgetTester tester, {
+  required Size size,
+  required double textScale,
+}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: AppTheme.light(),
+      locale: const Locale('it'),
+      localizationsDelegates: CatDexLocalizations.localizationsDelegates,
+      supportedLocales: CatDexLocalizations.supportedLocales,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
+      home: Scaffold(
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: HomeEventBanner(
+              state: _activeEventState(),
+              onOpen: () {},
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+}
+
+HomeDashboard _homeDashboard() {
+  return HomeDashboard(
+    playerName: 'Explorer',
+    playerProgress: PlayerProgress.empty('local-explorer'),
+    currentLevelXp: 0,
+    nextLevelXp: 100,
+    pawPoints: 0,
+    collectionCompletion: 0.1,
+    dailyMissions: const [],
+    recentDiscoveries: [_recentDiscovery()],
+    currentEvent: const CurrentEvent(
+      title: 'Halloween CatDex',
+      dateRange: 'October 2026',
+      badgeName: 'Halloween',
+    ),
+  );
+}
+
+EventUiState _activeEventState() {
+  return EventUiState(
+    event: halloween2026Event,
+    active: true,
+    debugMode: false,
+    isPremium: false,
+    usage: const EventUsageSnapshot(),
+    discoveries: const [],
+    ownedCards: const [],
+    rendererConfigured: true,
+  );
+}
+
+class _TestHomeController extends HomeController {
+  _TestHomeController(this.dashboard);
+
+  final HomeDashboard dashboard;
+
+  @override
+  HomeDashboard build() => dashboard;
 }
 
 double _contrastRatio(Color foreground, Color background) {

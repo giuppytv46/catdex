@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:catdex/features/analysis/presentation/cat_display_data.dart';
 import 'package:catdex/features/cards/application/remote_card_generation_service.dart';
@@ -9,6 +10,7 @@ import 'package:catdex/features/events/domain/entities/event_card_generation.dar
 import 'package:catdex/features/premium/application/local_monetization_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -71,13 +73,14 @@ void main() {
       ),
       displayData: _displayData,
       collectionNumber: 1,
+      eventRequest: _eventRequest,
     );
 
     expect(generated, isNull);
     expect(rendererCalls, 0);
     expect(
       service.lastFailureReason,
-      RemoteCardGenerationFailureReason.invalidPhotoUrl,
+      RemoteCardGenerationFailureReason.missingPhoto,
     );
   });
 
@@ -180,6 +183,206 @@ void main() {
     expect(requestPayload.containsKey('prompt'), isFalse);
     expect(requestPayload.containsKey('artworkInstructions'), isFalse);
   });
+
+  test('event generation signs originalPhotoStoragePath', () async {
+    String? signedPath;
+    Map<String, Object?>? postedPayload;
+    final service = RemoteCardGenerationService(
+      endpoint: _endpoint,
+      signedPhotoUrlProvider: (storagePath) async {
+        signedPath = storagePath;
+        return _signedPhotoUrl;
+      },
+      postJson: ({required uri, required payload}) async {
+        postedPayload = Map<String, Object?>.from(payload);
+        return _successfulEventResponse();
+      },
+    );
+
+    final generated = await service.generateCard(
+      discovery: _discovery(
+        originalPhotoStoragePath:
+            'catdex/originals/local-explorer/discovery-1.jpg',
+      ),
+      displayData: _displayData,
+      collectionNumber: 1,
+      eventRequest: _eventRequest,
+    );
+
+    expect(generated, isNotNull);
+    expect(
+      signedPath,
+      'catdex/originals/local-explorer/discovery-1.jpg',
+    );
+    expect(postedPayload?['photoUrl'], _signedPhotoUrl);
+  });
+
+  test('event local photo upload persists stable storage path', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'catdex_event_photo_',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final photo = File('${directory.path}/luna.jpg');
+    await photo.writeAsBytes(const [1, 2, 3]);
+    String? persistedStoragePath;
+    String? postedPhotoUrl;
+    final service = RemoteCardGenerationService(
+      endpoint: _endpoint,
+      localPhotoUploadProvider:
+          ({required discovery, required sourcePath}) async {
+            expect(sourcePath, photo.path);
+            return _signedPhotoUrl;
+          },
+      persistPhotoStoragePath:
+          ({required discovery, required storagePath}) async {
+            persistedStoragePath = storagePath;
+            return true;
+          },
+      postJson: ({required uri, required payload}) async {
+        postedPhotoUrl = payload['photoUrl'] as String?;
+        return _successfulEventResponse();
+      },
+    );
+
+    final generated = await service.generateCard(
+      discovery: _discovery(displayPhotoPath: photo.path),
+      displayData: _displayData,
+      collectionNumber: 1,
+      eventRequest: _eventRequest,
+    );
+
+    expect(generated, isNotNull);
+    expect(postedPhotoUrl, _signedPhotoUrl);
+    expect(
+      persistedStoragePath,
+      'catdex/originals/local-explorer/discovery-1.jpg',
+    );
+    expect(generated?.originalPhotoStoragePath, persistedStoragePath);
+  });
+
+  test('relative local photo is rebuilt before event upload', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'catdex_relative_photo_',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final photo = File('${directory.path}/original_discovery-1.jpg');
+    await photo.writeAsBytes(const [1, 2, 3]);
+    String? uploadedSource;
+    final service = RemoteCardGenerationService(
+      endpoint: _endpoint,
+      localPhotoPathResolver: (storedPath) async {
+        expect(storedPath, 'catdex/originals/original_discovery-1.jpg');
+        return photo.path;
+      },
+      localPhotoUploadProvider:
+          ({required discovery, required sourcePath}) async {
+            uploadedSource = sourcePath;
+            return _signedPhotoUrl;
+          },
+      persistPhotoStoragePath:
+          ({required discovery, required storagePath}) async => true,
+      postJson: ({required uri, required payload}) async =>
+          _successfulEventResponse(),
+    );
+
+    final generated = await service.generateCard(
+      discovery: _discovery(
+        displayPhotoPath: 'catdex/originals/original_discovery-1.jpg',
+      ),
+      displayData: _displayData,
+      collectionNumber: 1,
+      eventRequest: _eventRequest,
+    );
+
+    expect(generated, isNotNull);
+    expect(uploadedSource, photo.path);
+  });
+
+  test('repeated generation reuses persisted photo object', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'catdex_reused_photo_',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final photo = File('${directory.path}/luna.jpg');
+    await photo.writeAsBytes(const [1, 2, 3]);
+    var uploadCalls = 0;
+    var rendererCalls = 0;
+    String? persistedStoragePath;
+    final service = RemoteCardGenerationService(
+      endpoint: _endpoint,
+      signedPhotoUrlProvider: (_) async => _signedPhotoUrl,
+      localPhotoUploadProvider:
+          ({required discovery, required sourcePath}) async {
+            uploadCalls += 1;
+            return _signedPhotoUrl;
+          },
+      persistPhotoStoragePath:
+          ({required discovery, required storagePath}) async {
+            persistedStoragePath = storagePath;
+            return true;
+          },
+      postJson: ({required uri, required payload}) async {
+        rendererCalls += 1;
+        return _successfulEventResponse();
+      },
+    );
+
+    await service.generateCard(
+      discovery: _discovery(displayPhotoPath: photo.path),
+      displayData: _displayData,
+      collectionNumber: 1,
+      eventRequest: _eventRequest,
+    );
+    await service.generateCard(
+      discovery: _discovery(
+        originalPhotoStoragePath: persistedStoragePath,
+      ),
+      displayData: _displayData,
+      collectionNumber: 1,
+      eventRequest: _eventRequest,
+    );
+
+    expect(uploadCalls, 1);
+    expect(rendererCalls, 2);
+  });
+
+  test(
+    'guest upload permission failure blocks renderer with typed error',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'catdex_denied_photo_',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final photo = File('${directory.path}/luna.jpg');
+      await photo.writeAsBytes(const [1, 2, 3]);
+      var rendererCalls = 0;
+      final service = RemoteCardGenerationService(
+        endpoint: _endpoint,
+        localPhotoUploadProvider:
+            ({required discovery, required sourcePath}) async {
+              throw const StorageException('Forbidden', statusCode: '403');
+            },
+        postJson: ({required uri, required payload}) async {
+          rendererCalls += 1;
+          return _successfulEventResponse();
+        },
+      );
+
+      final generated = await service.generateCard(
+        discovery: _discovery(displayPhotoPath: photo.path),
+        displayData: _displayData,
+        collectionNumber: 1,
+        eventRequest: _eventRequest,
+      );
+
+      expect(generated, isNull);
+      expect(rendererCalls, 0);
+      expect(
+        service.lastFailureReason,
+        RemoteCardGenerationFailureReason.storagePermissionDenied,
+      );
+    },
+  );
 
   test('event response metadata mismatch is rejected', () async {
     final service = RemoteCardGenerationService(

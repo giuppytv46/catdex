@@ -6,8 +6,10 @@ import 'package:catdex/features/capture/data/supabase_cat_photo_storage_reposito
 import 'package:catdex/features/cards/application/card_generation_performance.dart';
 import 'package:catdex/features/cards/presentation/card_image_cache_buster.dart';
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
+import 'package:catdex/features/catdex/application/local_discovery_session_controller.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/events/domain/entities/event_card_generation.dart';
+import 'package:catdex/shared/images/catdex_persisted_photo_path.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -22,6 +24,15 @@ typedef CardPhotoLocalUploadProvider =
       required CatDiscovery discovery,
       required String sourcePath,
     });
+
+typedef CardPhotoStoragePathPersister =
+    Future<bool> Function({
+      required CatDiscovery discovery,
+      required String storagePath,
+    });
+
+typedef CardPhotoLocalPathResolver =
+    Future<String?> Function(String storedPath);
 
 typedef RemoteCardPostJson =
     Future<RemoteCardGenerationHttpResponse> Function({
@@ -43,8 +54,45 @@ final remoteCardGenerationServiceProvider =
         supabaseClient: supabaseConfigured
             ? ref.watch(supabaseClientProvider)
             : null,
+        persistPhotoStoragePath: ({required discovery, required storagePath}) {
+          return _persistResolvedPhotoStoragePath(
+            ref,
+            discovery: discovery,
+            storagePath: storagePath,
+          );
+        },
       );
     });
+
+Future<bool> _persistResolvedPhotoStoragePath(
+  Ref ref, {
+  required CatDiscovery discovery,
+  required String storagePath,
+}) async {
+  final updated = discovery.copyWithPhotoPaths(
+    originalPhotoStoragePath: storagePath,
+  );
+  final repository = ref.read(discoveryRepositoryProvider);
+  try {
+    await repository.saveDiscovery(updated);
+    final readBack = await repository.getDiscoveryById(discovery.id);
+    if (readBack?.originalPhotoStoragePath != storagePath) {
+      debugPrint('CATDEX_EVENT_PHOTO_STORAGE_PATH_PERSISTED false');
+      return false;
+    }
+    ref
+        .read(localDiscoverySessionProvider.notifier)
+        .replaceDiscovery(readBack!);
+    debugPrint('CATDEX_EVENT_PHOTO_STORAGE_PATH_PERSISTED true');
+    return true;
+  } on Object catch (error) {
+    debugPrint(
+      'CATDEX_EVENT_PHOTO_STORAGE_PATH_PERSISTED false '
+      'error=${error.runtimeType}',
+    );
+    return false;
+  }
+}
 
 class RemoteGeneratedCard {
   const RemoteGeneratedCard({
@@ -58,6 +106,7 @@ class RemoteGeneratedCard {
     this.eventArtworkTier,
     this.eventTemplateKey,
     this.generationStatus,
+    this.originalPhotoStoragePath,
     this.isEventCard = false,
   });
 
@@ -71,13 +120,59 @@ class RemoteGeneratedCard {
   final String? eventArtworkTier;
   final String? eventTemplateKey;
   final String? generationStatus;
+  final String? originalPhotoStoragePath;
   final bool isEventCard;
 }
 
 enum RemoteCardGenerationFailureReason {
   missingEndpoint,
   invalidPhotoUrl,
+  missingPhoto,
+  photoUploadFailed,
+  storagePermissionDenied,
+  signedUrlFailed,
+  network,
   remoteApiFailure,
+}
+
+enum RemoteCardPhotoSource { existingHttps, storagePath, localUpload }
+
+enum RemoteCardPhotoFailureReason {
+  missingPhoto,
+  photoUploadFailed,
+  storagePermissionDenied,
+  signedUrlFailed,
+  network,
+}
+
+class RemoteCardPhotoResolution {
+  const RemoteCardPhotoResolution._({
+    this.httpsUrl,
+    this.source,
+    this.storagePath,
+    this.failureReason,
+  });
+
+  const RemoteCardPhotoResolution.success({
+    required String httpsUrl,
+    required RemoteCardPhotoSource source,
+    String? storagePath,
+  }) : this._(
+         httpsUrl: httpsUrl,
+         source: source,
+         storagePath: storagePath,
+       );
+
+  const RemoteCardPhotoResolution.failure(
+    RemoteCardPhotoFailureReason reason,
+  ) : this._(failureReason: reason);
+
+  final String? httpsUrl;
+  final RemoteCardPhotoSource? source;
+  final String? storagePath;
+  final RemoteCardPhotoFailureReason? failureReason;
+
+  bool get isSuccess => httpsUrl != null && failureReason == null;
 }
 
 class RemoteCardGenerationService {
@@ -86,6 +181,8 @@ class RemoteCardGenerationService {
     String endpoint = const String.fromEnvironment('CARD_GENERATION_API_URL'),
     CardPhotoSignedUrlProvider? signedPhotoUrlProvider,
     CardPhotoLocalUploadProvider? localPhotoUploadProvider,
+    CardPhotoStoragePathPersister? persistPhotoStoragePath,
+    CardPhotoLocalPathResolver? localPhotoPathResolver,
     RemoteCardPostJson? postJson,
     List<Duration> recoveryDelays = const [
       Duration(seconds: 10),
@@ -97,6 +194,10 @@ class RemoteCardGenerationService {
        _supabaseClient = supabaseClient,
        _signedPhotoUrlProvider = signedPhotoUrlProvider,
        _localPhotoUploadProvider = localPhotoUploadProvider,
+       _persistPhotoStoragePath = persistPhotoStoragePath,
+       _localPhotoPathResolver =
+           localPhotoPathResolver ??
+           CatDexPersistedPhotoPath.rebuildAbsolutePath,
        _postJsonOverride = postJson,
        _recoveryDelays = List<Duration>.unmodifiable(recoveryDelays),
        _recoveryDelay = recoveryDelay ?? Future<void>.delayed;
@@ -108,6 +209,8 @@ class RemoteCardGenerationService {
   final SupabaseClient? _supabaseClient;
   final CardPhotoSignedUrlProvider? _signedPhotoUrlProvider;
   final CardPhotoLocalUploadProvider? _localPhotoUploadProvider;
+  final CardPhotoStoragePathPersister? _persistPhotoStoragePath;
+  final CardPhotoLocalPathResolver _localPhotoPathResolver;
   final RemoteCardPostJson? _postJsonOverride;
   final List<Duration> _recoveryDelays;
   final CardGenerationRecoveryDelay _recoveryDelay;
@@ -150,24 +253,59 @@ class RemoteCardGenerationService {
 
     try {
       final endpointUri = Uri.parse(_endpoint);
-      final photoUrl = await resolveRendererAccessiblePhotoUrl(discovery);
+      if (eventRequest != null) {
+        debugPrint(
+          'CATDEX_EVENT_PHOTO_RESOLUTION_STARTED discoveryId=${discovery.id}',
+        );
+      }
+      final photoResolution = await resolveRendererPhoto(
+        discovery,
+        eventGeneration: eventRequest != null,
+      );
+      final photoUrl = photoResolution.httpsUrl;
       final photoUrlValid = _isValidRendererPhotoUrl(photoUrl);
       debugPrint(
-        'CATDEX_REMOTE_GENERATE_CARD_PHOTO_URL ${_logValue(photoUrl)}',
+        'CATDEX_REMOTE_GENERATE_CARD_PHOTO_URL ${_logUrl(photoUrl)}',
       );
       debugPrint(
         'CATDEX_REMOTE_GENERATE_CARD_PHOTO_URL_VALID $photoUrlValid',
       );
 
       if (!photoUrlValid) {
-        _lastFailureReason = RemoteCardGenerationFailureReason.invalidPhotoUrl;
-        debugPrint('CATDEX_REMOTE_GENERATE_CARD_ERROR missingPhoto');
+        final safeReason =
+            photoResolution.failureReason ??
+            RemoteCardPhotoFailureReason.missingPhoto;
+        _lastFailureReason = _generationFailureForPhoto(safeReason);
+        debugPrint('CATDEX_REMOTE_GENERATE_CARD_ERROR ${safeReason.name}');
         debugPrint(
           'CATDEX_CARD_RENDERER_REQUEST_BLOCKED_NO_REMOTE_PHOTO '
-          'reason=no_valid_https_photo',
+          'reason=${safeReason.name}',
         );
+        if (eventRequest != null) {
+          debugPrint(
+            'CATDEX_EVENT_PHOTO_RESOLUTION_FAILED reason=${safeReason.name}',
+          );
+          debugPrint(
+            'CATDEX_EVENT_RENDERER_CALL_BLOCKED reason=${safeReason.name}',
+          );
+        }
         debugPrint('CATDEX_REMOTE_GENERATE_CARD_SUCCESS false');
         return null;
+      }
+
+      if (eventRequest != null) {
+        debugPrint(
+          'CATDEX_EVENT_PHOTO_SOURCE '
+          '${_photoSourceName(photoResolution.source!)}',
+        );
+        debugPrint(
+          'CATDEX_EVENT_PHOTO_STORAGE_PATH '
+          '${_logValue(photoResolution.storagePath)}',
+        );
+        if (photoResolution.source == RemoteCardPhotoSource.storagePath ||
+            photoResolution.source == RemoteCardPhotoSource.localUpload) {
+          debugPrint('CATDEX_EVENT_PHOTO_SIGNED_URL_SUCCESS true');
+        }
       }
 
       final rarity = _rarity(discovery, debugRarityOverride);
@@ -184,7 +322,7 @@ class RemoteCardGenerationService {
       );
       debugPrint(
         'CATDEX_REMOTE_CARD_GENERATION_ORIGINAL_PHOTO '
-        '${_logValue(discovery.originalPhotoPath ?? discovery.photoPath)}',
+        '${_logUrl(discovery.originalPhotoPath ?? discovery.photoPath)}',
       );
       debugPrint('CATDEX_REMOTE_CARD_GENERATION_RARITY $rarity');
       debugPrint(
@@ -234,7 +372,8 @@ class RemoteCardGenerationService {
         '${displayData.displayCoatPattern}',
       );
       debugPrint(
-        'CATDEX_REMOTE_GENERATE_CARD_PAYLOAD ${jsonEncode(payload)}',
+        'CATDEX_REMOTE_GENERATE_CARD_PAYLOAD '
+        '${jsonEncode(_payloadForLog(payload))}',
       );
 
       final recoveredResponse = await _postJsonWithRecovery(
@@ -349,10 +488,13 @@ class RemoteCardGenerationService {
         eventArtworkTier: responseTier,
         eventTemplateKey: responseTemplateKey,
         generationStatus: generationStatus,
+        originalPhotoStoragePath: photoResolution.storagePath,
         isEventCard: responseIsEventCard,
       );
     } on Object catch (error) {
-      _lastFailureReason = RemoteCardGenerationFailureReason.remoteApiFailure;
+      _lastFailureReason = error is SocketException || error is HttpException
+          ? RemoteCardGenerationFailureReason.network
+          : RemoteCardGenerationFailureReason.remoteApiFailure;
       debugPrint('CATDEX_REMOTE_GENERATE_CARD_ERROR $error');
       debugPrint('CATDEX_REMOTE_GENERATE_CARD_SUCCESS false');
       return null;
@@ -381,6 +523,13 @@ class RemoteCardGenerationService {
   Future<String?> resolveRendererAccessiblePhotoUrl(
     CatDiscovery discovery,
   ) async {
+    return (await resolveRendererPhoto(discovery)).httpsUrl;
+  }
+
+  Future<RemoteCardPhotoResolution> resolveRendererPhoto(
+    CatDiscovery discovery, {
+    bool eventGeneration = false,
+  }) async {
     final cardOriginal = discovery.card?.originalPhotoPath;
     final display = discovery.displayPhotoPath;
     final original = discovery.originalPhotoPath;
@@ -389,16 +538,16 @@ class RemoteCardGenerationService {
 
     debugPrint(
       'CATDEX_REMOTE_PHOTO_SOURCE_CARD_ORIGINAL '
-      '${_logValue(cardOriginal)}',
+      '${_logUrl(cardOriginal)}',
     );
     debugPrint(
-      'CATDEX_REMOTE_PHOTO_SOURCE_DISPLAY ${_logValue(display)}',
+      'CATDEX_REMOTE_PHOTO_SOURCE_DISPLAY ${_logUrl(display)}',
     );
     debugPrint(
-      'CATDEX_REMOTE_PHOTO_SOURCE_ORIGINAL ${_logValue(original)}',
+      'CATDEX_REMOTE_PHOTO_SOURCE_ORIGINAL ${_logUrl(original)}',
     );
     debugPrint(
-      'CATDEX_REMOTE_PHOTO_SOURCE_PHOTO_PATH ${_logValue(photoPath)}',
+      'CATDEX_REMOTE_PHOTO_SOURCE_PHOTO_PATH ${_logUrl(photoPath)}',
     );
     debugPrint(
       'CATDEX_CARD_PHOTO_STORAGE_PATH ${_logValue(originalStoragePath)}',
@@ -416,10 +565,14 @@ class RemoteCardGenerationService {
       if (_isValidRendererPhotoUrl(value)) {
         final selected = value!.trim();
         _logSelectedPhoto(selected, source: candidate.kind);
-        return selected;
+        return RemoteCardPhotoResolution.success(
+          httpsUrl: selected,
+          source: RemoteCardPhotoSource.existingHttps,
+        );
       }
     }
 
+    RemoteCardPhotoFailureReason? strongestFailure;
     final storageCandidates = <String?>[
       originalStoragePath,
       ...directCandidates.map((candidate) => candidate.value),
@@ -433,36 +586,72 @@ class RemoteCardGenerationService {
         continue;
       }
       debugPrint('CATDEX_CARD_PHOTO_STORAGE_PATH $normalized');
-      final signedUrl = await _tryCreateSignedPhotoUrl(normalized);
-      if (_isValidRendererPhotoUrl(signedUrl)) {
-        _logSelectedPhoto(signedUrl!, source: 'signed_url');
-        return signedUrl;
+      final signed = await _tryCreateSignedPhotoUrl(normalized);
+      if (signed.url != null) {
+        if (eventGeneration) {
+          debugPrint('CATDEX_EVENT_PHOTO_UPLOAD_REUSED_EXISTING true');
+        }
+        _logSelectedPhoto(signed.url!, source: 'signed_url');
+        return RemoteCardPhotoResolution.success(
+          httpsUrl: signed.url!,
+          source: RemoteCardPhotoSource.storagePath,
+          storagePath: normalized,
+        );
       }
+      strongestFailure = _strongerPhotoFailure(
+        strongestFailure,
+        signed.failureReason,
+      );
     }
 
     for (final candidate in directCandidates) {
-      final uploadedUrl = await _tryUploadLocalPhoto(
-        discovery: discovery,
-        sourcePath: candidate.value,
+      final localPath = await _resolveLocalFilePath(candidate.value);
+      if (localPath == null) continue;
+      final file = File(localPath);
+      final exists = file.existsSync();
+      debugPrint(
+        'CATDEX_REMOTE_PHOTO_LOCAL_FILE_EXISTS $exists path=$localPath',
       );
-      if (_isValidRendererPhotoUrl(uploadedUrl)) {
-        _logSelectedPhoto(uploadedUrl!, source: 'uploaded_local_file');
-        return uploadedUrl;
+      if (!exists) continue;
+
+      final uploaded = await _tryUploadLocalPhoto(
+        discovery: discovery,
+        sourcePath: localPath,
+        eventGeneration: eventGeneration,
+      );
+      if (uploaded.isSuccess) {
+        _logSelectedPhoto(
+          uploaded.httpsUrl!,
+          source: 'uploaded_local_file',
+        );
+        return uploaded;
       }
+      strongestFailure = _strongerPhotoFailure(
+        strongestFailure,
+        uploaded.failureReason,
+      );
     }
 
     debugPrint('CATDEX_CARD_PHOTO_SELECTED -');
     debugPrint('CATDEX_CARD_PHOTO_SELECTED_VALID false');
-    return null;
+    return RemoteCardPhotoResolution.failure(
+      strongestFailure ?? RemoteCardPhotoFailureReason.missingPhoto,
+    );
   }
 
-  Future<String?> _tryCreateSignedPhotoUrl(String? storagePath) async {
+  Future<_PhotoUrlAttempt> _tryCreateSignedPhotoUrl(
+    String? storagePath,
+  ) async {
     if (storagePath == null || storagePath.trim().isEmpty) {
-      return null;
+      return const _PhotoUrlAttempt.failure(
+        RemoteCardPhotoFailureReason.signedUrlFailed,
+      );
     }
     final normalized = storagePath.trim();
     if (!_isSupabaseStorageObjectPath(normalized)) {
-      return null;
+      return const _PhotoUrlAttempt.failure(
+        RemoteCardPhotoFailureReason.signedUrlFailed,
+      );
     }
 
     debugPrint('CATDEX_CARD_PHOTO_SIGNED_URL_STARTED $normalized');
@@ -484,112 +673,144 @@ class RemoteCardGenerationService {
       final valid = _isValidRendererPhotoUrl(signedUrl);
       debugPrint(
         'CATDEX_CARD_PHOTO_SIGNED_URL_SUCCESS '
-        '${valid ? signedUrl : 'false'}',
+        '${valid ? 'true' : 'false'}',
       );
-      debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL_SUCCESS true');
-      debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL ${_logValue(signedUrl)}');
+      debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL_SUCCESS $valid');
+      debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL ${_logUrl(signedUrl)}');
       debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL_ERROR -');
-      return valid ? signedUrl : null;
+      return valid
+          ? _PhotoUrlAttempt.success(signedUrl!)
+          : const _PhotoUrlAttempt.failure(
+              RemoteCardPhotoFailureReason.signedUrlFailed,
+            );
     } on Object catch (error) {
+      final reason = _photoFailureForError(
+        error,
+        fallback: RemoteCardPhotoFailureReason.signedUrlFailed,
+      );
       debugPrint('CATDEX_CARD_PHOTO_SIGNED_URL_SUCCESS false');
       debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL_SUCCESS false');
       debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL -');
-      debugPrint('CATDEX_REMOTE_PHOTO_SIGNED_URL_ERROR $error');
-      return null;
+      debugPrint(
+        'CATDEX_REMOTE_PHOTO_SIGNED_URL_ERROR reason=${reason.name} '
+        'type=${error.runtimeType}',
+      );
+      return _PhotoUrlAttempt.failure(reason);
     } finally {
       signedUrlTiming.finish();
     }
   }
 
-  Future<String?> _tryUploadLocalPhoto({
+  Future<RemoteCardPhotoResolution> _tryUploadLocalPhoto({
     required CatDiscovery discovery,
-    required String? sourcePath,
+    required String sourcePath,
+    required bool eventGeneration,
   }) async {
-    final normalized = _localFilePath(sourcePath);
-    if (normalized == null) {
-      return null;
-    }
-
-    debugPrint('CATDEX_REMOTE_PHOTO_LOCAL_FILE_FOUND $normalized');
-    final file = File(normalized);
-    final exists = file.existsSync();
-    debugPrint('CATDEX_REMOTE_PHOTO_LOCAL_FILE_EXISTS $exists');
-    if (!exists) {
-      if (normalized.contains('/tmp/image_picker_') ||
-          normalized.contains('/image_picker_')) {
-        debugPrint('CATDEX_REMOTE_PHOTO_TEMP_FILE_MISSING true');
-        debugPrint('CATDEX_REMOTE_PHOTO_TEMP_FILE_MISSING_PATH $normalized');
-      }
-      return null;
-    }
+    final file = File(sourcePath);
 
     final playerId = discovery.playerId.trim().isEmpty
-        ? 'dev'
+        ? 'local-explorer'
         : discovery.playerId.trim();
     final storagePath = 'catdex/originals/$playerId/${discovery.id}.jpg';
-    debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_STARTED $normalized');
+    debugPrint('CATDEX_REMOTE_PHOTO_LOCAL_FILE_FOUND $sourcePath');
+    debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_STARTED $sourcePath');
+    if (eventGeneration) {
+      debugPrint(
+        'CATDEX_EVENT_PHOTO_UPLOAD_STARTED storagePath=$storagePath',
+      );
+    }
     final client = _supabaseClient;
     final uploadProvider = _localPhotoUploadProvider;
-    if (uploadProvider != null) {
-      try {
-        return await uploadProvider(
+    try {
+      String? providerResult;
+      if (uploadProvider != null) {
+        providerResult = await uploadProvider(
           discovery: discovery,
-          sourcePath: normalized,
+          sourcePath: sourcePath,
         );
-      } on Object catch (error) {
-        debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SUCCESS false');
-        debugPrint(
-          'CATDEX_REMOTE_GENERATE_CARD_ERROR local_photo_upload $error',
-        );
-        return null;
+      } else {
+        if (client == null) {
+          debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SUCCESS false');
+          debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SIGNED_URL -');
+          return const RemoteCardPhotoResolution.failure(
+            RemoteCardPhotoFailureReason.photoUploadFailed,
+          );
+        }
+        final bytes = Uint8List.fromList(await file.readAsBytes());
+        await client.storage
+            .from(_bucketName)
+            .uploadBinary(
+              storagePath,
+              bytes,
+              fileOptions: const FileOptions(
+                contentType: 'image/jpeg',
+                upsert: true,
+              ),
+            );
       }
-    }
-    if (client == null) {
+
+      final uploadedStoragePath =
+          providerResult != null &&
+              _isSupabaseStorageObjectPath(providerResult.trim())
+          ? providerResult.trim()
+          : storagePath;
+      var signedUrl = _isValidRendererPhotoUrl(providerResult)
+          ? providerResult!.trim()
+          : null;
+      if (signedUrl == null) {
+        final signed = await _tryCreateSignedPhotoUrl(uploadedStoragePath);
+        if (signed.url == null) {
+          return RemoteCardPhotoResolution.failure(
+            signed.failureReason ??
+                RemoteCardPhotoFailureReason.signedUrlFailed,
+          );
+        }
+        signedUrl = signed.url;
+      }
+
+      final persister = _persistPhotoStoragePath;
+      if (persister != null) {
+        final persisted = await persister(
+          discovery: discovery,
+          storagePath: uploadedStoragePath,
+        );
+        if (!persisted) {
+          return const RemoteCardPhotoResolution.failure(
+            RemoteCardPhotoFailureReason.photoUploadFailed,
+          );
+        }
+      }
+
+      debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SUCCESS true');
+      debugPrint(
+        'CATDEX_REMOTE_PHOTO_UPLOAD_SIGNED_URL ${_logUrl(signedUrl)}',
+      );
+      if (eventGeneration) {
+        debugPrint(
+          'CATDEX_EVENT_PHOTO_UPLOAD_SUCCESS storagePath=$uploadedStoragePath',
+        );
+      }
+      return RemoteCardPhotoResolution.success(
+        httpsUrl: signedUrl!,
+        source: RemoteCardPhotoSource.localUpload,
+        storagePath: uploadedStoragePath,
+      );
+    } on Object catch (error) {
+      final reason = _photoFailureForError(
+        error,
+        fallback: RemoteCardPhotoFailureReason.photoUploadFailed,
+      );
       debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SUCCESS false');
       debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SIGNED_URL -');
       debugPrint(
-        'CATDEX_REMOTE_GENERATE_CARD_ERROR local_photo_upload_no_supabase',
+        'CATDEX_REMOTE_GENERATE_CARD_ERROR local_photo_upload '
+        'reason=${reason.name} type=${error.runtimeType}',
       );
-      return null;
-    }
-
-    try {
-      final bytes = Uint8List.fromList(await file.readAsBytes());
-      await client.storage
-          .from(_bucketName)
-          .uploadBinary(
-            storagePath,
-            bytes,
-            fileOptions: const FileOptions(
-              contentType: 'image/jpeg',
-              upsert: true,
-            ),
-          );
-      final signedUrlTiming = CardGenerationPerformanceSpan.start(
-        'CATDEX_PERF_FLUTTER_SIGNED_URL_CREATION',
-        discoveryId: discovery.id,
-        detail: 'storagePath=$storagePath',
-      );
-      late final String signedUrl;
-      try {
-        signedUrl = await client.storage
-            .from(_bucketName)
-            .createSignedUrl(storagePath, 60 * 60 * 24);
-      } finally {
-        signedUrlTiming.finish();
-      }
-      debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SUCCESS true');
-      debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SIGNED_URL $signedUrl');
-      return signedUrl;
-    } on Object catch (error) {
-      debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SUCCESS false');
-      debugPrint('CATDEX_REMOTE_PHOTO_UPLOAD_SIGNED_URL -');
-      debugPrint('CATDEX_REMOTE_GENERATE_CARD_ERROR local_photo_upload $error');
-      return null;
+      return RemoteCardPhotoResolution.failure(reason);
     }
   }
 
-  String? _localFilePath(String? value) {
+  Future<String?> _resolveLocalFilePath(String? value) async {
     if (value == null || value.trim().isEmpty || value.trim() == '-') {
       return null;
     }
@@ -603,6 +824,11 @@ class RemoteCardGenerationService {
     }
     if (normalized.startsWith('/')) {
       return normalized;
+    }
+
+    if (CatDexPersistedPhotoPath.isRelativeApplicationPath(normalized) &&
+        !_isSupabaseStorageObjectPath(normalized)) {
+      return _localPhotoPathResolver(normalized);
     }
 
     return null;
@@ -825,6 +1051,10 @@ class RemoteCardGenerationService {
       debugPrint('CATDEX_CARD_PHOTO_REJECTED_LOCALHOST $normalized');
       return false;
     }
+    if (_isExpiredSignedUrl(uri)) {
+      debugPrint('CATDEX_CARD_PHOTO_REJECTED_EXPIRED_SIGNED_URL');
+      return false;
+    }
     return true;
   }
 
@@ -846,16 +1076,111 @@ class RemoteCardGenerationService {
       return false;
     }
 
+    if (CatDexPersistedPhotoPath.isPersistedLocalPhotoPath(normalized)) {
+      return false;
+    }
+
     return normalized.startsWith('catdex/originals/') ||
         normalized.startsWith('catdex/photos/') ||
         normalized.startsWith('uploads/');
   }
 
   void _logSelectedPhoto(String value, {required String source}) {
-    debugPrint('CATDEX_CARD_PHOTO_SELECTED $value');
+    debugPrint('CATDEX_CARD_PHOTO_SELECTED ${_logUrl(value)}');
     debugPrint('CATDEX_CARD_PHOTO_SELECTED_VALID true');
-    debugPrint('CATDEX_REMOTE_PHOTO_SOURCE_SELECTED $value');
+    debugPrint('CATDEX_REMOTE_PHOTO_SOURCE_SELECTED ${_logUrl(value)}');
     debugPrint('CATDEX_REMOTE_PHOTO_SOURCE_SELECTED_KIND $source');
+  }
+
+  RemoteCardGenerationFailureReason _generationFailureForPhoto(
+    RemoteCardPhotoFailureReason reason,
+  ) => switch (reason) {
+    RemoteCardPhotoFailureReason.missingPhoto =>
+      RemoteCardGenerationFailureReason.missingPhoto,
+    RemoteCardPhotoFailureReason.photoUploadFailed =>
+      RemoteCardGenerationFailureReason.photoUploadFailed,
+    RemoteCardPhotoFailureReason.storagePermissionDenied =>
+      RemoteCardGenerationFailureReason.storagePermissionDenied,
+    RemoteCardPhotoFailureReason.signedUrlFailed =>
+      RemoteCardGenerationFailureReason.signedUrlFailed,
+    RemoteCardPhotoFailureReason.network =>
+      RemoteCardGenerationFailureReason.network,
+  };
+
+  RemoteCardPhotoFailureReason? _strongerPhotoFailure(
+    RemoteCardPhotoFailureReason? current,
+    RemoteCardPhotoFailureReason? candidate,
+  ) {
+    if (candidate == null) return current;
+    if (current == null) return candidate;
+    const priority = <RemoteCardPhotoFailureReason, int>{
+      RemoteCardPhotoFailureReason.missingPhoto: 0,
+      RemoteCardPhotoFailureReason.signedUrlFailed: 1,
+      RemoteCardPhotoFailureReason.photoUploadFailed: 2,
+      RemoteCardPhotoFailureReason.network: 3,
+      RemoteCardPhotoFailureReason.storagePermissionDenied: 4,
+    };
+    return priority[candidate]! > priority[current]! ? candidate : current;
+  }
+
+  RemoteCardPhotoFailureReason _photoFailureForError(
+    Object error, {
+    required RemoteCardPhotoFailureReason fallback,
+  }) {
+    if (error is SocketException || error is HttpException) {
+      return RemoteCardPhotoFailureReason.network;
+    }
+    if (error is StorageException) {
+      final statusCode = error.statusCode;
+      final message = '${error.message} ${error.error ?? ''}'.toLowerCase();
+      if (statusCode == '401' ||
+          statusCode == '403' ||
+          message.contains('permission') ||
+          message.contains('unauthorized') ||
+          message.contains('forbidden')) {
+        return RemoteCardPhotoFailureReason.storagePermissionDenied;
+      }
+    }
+    return fallback;
+  }
+
+  String _photoSourceName(RemoteCardPhotoSource source) => switch (source) {
+    RemoteCardPhotoSource.existingHttps => 'existing_https',
+    RemoteCardPhotoSource.storagePath => 'storage_path',
+    RemoteCardPhotoSource.localUpload => 'local_upload',
+  };
+
+  bool _isExpiredSignedUrl(Uri uri) {
+    final token = uri.queryParameters['token'];
+    if (token == null || token.split('.').length != 3) return false;
+    try {
+      final payload = utf8.decode(
+        base64Url.decode(base64Url.normalize(token.split('.')[1])),
+      );
+      final decoded = jsonDecode(payload);
+      final expiration = decoded is Map ? decoded['exp'] : null;
+      if (expiration is! num) return false;
+      return DateTime.fromMillisecondsSinceEpoch(
+        expiration.toInt() * 1000,
+        isUtc: true,
+      ).isBefore(DateTime.now().toUtc());
+    } on Object {
+      return false;
+    }
+  }
+
+  Map<String, Object?> _payloadForLog(Map<String, Object?> payload) {
+    final safe = Map<String, Object?>.from(payload);
+    final photoUrl = safe['photoUrl'];
+    if (photoUrl is String) safe['photoUrl'] = _logUrl(photoUrl);
+    return safe;
+  }
+
+  String _logUrl(String? value) {
+    if (value == null || value.trim().isEmpty) return '-';
+    final uri = Uri.tryParse(value.trim());
+    if (uri == null || uri.query.isEmpty) return value.trim();
+    return uri.replace(query: 'redacted').toString();
   }
 
   String? _rawFinalCardUrl(Map<String, Object?> decoded) {
@@ -988,4 +1313,16 @@ class _PhotoSourceCandidate {
 
   final String kind;
   final String? value;
+}
+
+class _PhotoUrlAttempt {
+  const _PhotoUrlAttempt._({this.url, this.failureReason});
+
+  const _PhotoUrlAttempt.success(String url) : this._(url: url);
+
+  const _PhotoUrlAttempt.failure(RemoteCardPhotoFailureReason reason)
+    : this._(failureReason: reason);
+
+  final String? url;
+  final RemoteCardPhotoFailureReason? failureReason;
 }

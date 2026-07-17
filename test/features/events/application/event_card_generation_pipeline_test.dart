@@ -107,6 +107,50 @@ void main() {
     },
   );
 
+  for (final failureReason in [
+    RemoteCardGenerationFailureReason.missingPhoto,
+    RemoteCardGenerationFailureReason.storagePermissionDenied,
+  ]) {
+    test(
+      '${failureReason.name} releases reservation without event usage',
+      () async {
+        const usage = SharedPreferencesEventUsageRepository();
+        final remote = _EventRemoteCardGenerationService(
+          failureReason: failureReason,
+        );
+        final container = _container(
+          repository: _MemoryDiscoveryRepository(_discovery()),
+          cards: _MemoryCatCardRepository(),
+          remote: remote,
+          usage: usage,
+        );
+        addTearDown(container.dispose);
+
+        for (var attempt = 0; attempt < 2; attempt += 1) {
+          final result = await container
+              .read(cardGenerationPipelineProvider)
+              .generateEventCard(
+                event: _activeTestEvent,
+                discovery: _discovery(),
+                displayData: _displayData,
+                collectionNumber: 1,
+              );
+          expect(result.success, isFalse);
+          expect(result.failureReason, failureReason);
+        }
+
+        expect(remote.calls, 2);
+        expect(
+          (await usage.getSnapshot(
+            playerId: 'local-explorer',
+            eventId: 'halloween_2026',
+          )).committedUsage,
+          0,
+        );
+      },
+    );
+  }
+
   test(
     'existing event card is preserved while another variant is added',
     () async {
@@ -213,6 +257,266 @@ void main() {
     const runtime = EventRuntimeConfiguration();
     expect(runtime.premiumTestEntitlementEnabled, isFalse);
   });
+
+  test('Premium generation requires a selected variant', () async {
+    final remote = _EventRemoteCardGenerationService();
+    final container = _container(
+      repository: _MemoryDiscoveryRepository(_discovery()),
+      cards: _MemoryCatCardRepository(),
+      remote: remote,
+      usage: const SharedPreferencesEventUsageRepository(),
+      premium: true,
+    );
+    addTearDown(container.dispose);
+
+    final result = await container
+        .read(cardGenerationPipelineProvider)
+        .generateEventCard(
+          event: _activeTestEvent,
+          discovery: _discovery(),
+          displayData: _displayData,
+          collectionNumber: 1,
+        );
+
+    expect(
+      result.eventFailure,
+      EventCardGenerationFailure.variantSelectionRequired,
+    );
+    expect(remote.calls, 0);
+  });
+
+  test(
+    'selected Premium variant reaches renderer and persisted record',
+    () async {
+      final remote = _EventRemoteCardGenerationService();
+      final cards = _MemoryCatCardRepository();
+      final container = _container(
+        repository: _MemoryDiscoveryRepository(_discovery()),
+        cards: cards,
+        remote: remote,
+        usage: const SharedPreferencesEventUsageRepository(),
+        premium: true,
+      );
+      addTearDown(container.dispose);
+
+      final result = await container
+          .read(cardGenerationPipelineProvider)
+          .generateEventCard(
+            event: _activeTestEvent,
+            discovery: _discovery(),
+            displayData: _displayData,
+            collectionNumber: 1,
+            selectedVariantId: 'halloween_haunted_frame',
+          );
+
+      expect(result.success, isTrue);
+      expect(remote.lastEventRequest?.variantId, 'halloween_haunted_frame');
+      expect(remote.lastEventRequest?.tier, EventArtworkTier.free);
+      expect(
+        cards.savedCards.single.eventArtworkVariantId,
+        'halloween_haunted_frame',
+      );
+    },
+  );
+
+  for (final variant in const [
+    'halloween_pumpkin_king',
+    'halloween_night_spirit',
+  ]) {
+    test('$variant reaches renderer with exact persisted metadata', () async {
+      final remote = _EventRemoteCardGenerationService();
+      final cards = _MemoryCatCardRepository();
+      final container = _container(
+        repository: _MemoryDiscoveryRepository(_discovery()),
+        cards: cards,
+        remote: remote,
+        usage: const SharedPreferencesEventUsageRepository(),
+        premium: true,
+      );
+      addTearDown(container.dispose);
+
+      final result = await container
+          .read(cardGenerationPipelineProvider)
+          .generateEventCard(
+            event: _activeTestEvent,
+            discovery: _discovery(),
+            displayData: _displayData,
+            collectionNumber: 1,
+            selectedVariantId: variant,
+          );
+
+      final expectedTemplate = halloween2026Event.templateKeyFor(variant);
+      expect(result.success, isTrue);
+      expect(remote.lastEventRequest?.variantId, variant);
+      expect(remote.lastEventRequest?.tier, EventArtworkTier.premium);
+      expect(remote.lastEventRequest?.templateKey, expectedTemplate);
+      expect(cards.savedCards.single.eventArtworkVariantId, variant);
+      expect(cards.savedCards.single.eventArtworkTier, 'premium');
+      expect(cards.savedCards.single.eventTemplateKey, expectedTemplate);
+    });
+  }
+
+  test('one Premium cat can collect all six distinct variants', () async {
+    const usage = SharedPreferencesEventUsageRepository();
+    final remote = _EventRemoteCardGenerationService();
+    final cards = _MemoryCatCardRepository();
+    final container = _container(
+      repository: _MemoryDiscoveryRepository(_discovery()),
+      cards: cards,
+      remote: remote,
+      usage: usage,
+      premium: true,
+    );
+    addTearDown(container.dispose);
+
+    for (final variant in _activeTestEvent.allVariantIds) {
+      final result = await container
+          .read(cardGenerationPipelineProvider)
+          .generateEventCard(
+            event: _activeTestEvent,
+            discovery: _discovery(),
+            displayData: _displayData,
+            collectionNumber: 1,
+            selectedVariantId: variant,
+          );
+      expect(result.success, isTrue, reason: variant);
+    }
+
+    expect(
+      cards.savedCards.map((card) => card.logicalIdentity).toSet(),
+      hasLength(6),
+    );
+    expect(
+      cards.savedCards.map((card) => card.eventArtworkVariantId).toSet(),
+      _activeTestEvent.allVariantIds.toSet(),
+    );
+    expect(remote.calls, 6);
+  });
+
+  test(
+    'same cat and variant is blocked without consuming another use',
+    () async {
+      const usage = SharedPreferencesEventUsageRepository();
+      final existing = _eventRecordFor(
+        discoveryId: _discovery().id,
+        variant: 'halloween_haunted_frame',
+      );
+      final remote = _EventRemoteCardGenerationService();
+      final container = _container(
+        repository: _MemoryDiscoveryRepository(_discovery()),
+        cards: _MemoryCatCardRepository(initialCards: [existing]),
+        remote: remote,
+        usage: usage,
+        premium: true,
+      );
+      addTearDown(container.dispose);
+
+      final result = await container
+          .read(cardGenerationPipelineProvider)
+          .generateEventCard(
+            event: _activeTestEvent,
+            discovery: _discovery(),
+            displayData: _displayData,
+            collectionNumber: 1,
+            selectedVariantId: 'halloween_haunted_frame',
+          );
+
+      expect(
+        result.eventFailure,
+        EventCardGenerationFailure.selectedVariantAlreadyOwned,
+      );
+      expect(remote.calls, 0);
+      expect(
+        (await usage.getSnapshot(
+          playerId: 'local-explorer',
+          eventId: 'halloween_2026',
+        )).committedUsage,
+        1,
+      );
+    },
+  );
+
+  test('same selected variant remains available for another cat', () async {
+    const usage = SharedPreferencesEventUsageRepository();
+    final cards = _MemoryCatCardRepository(
+      initialCards: [
+        _eventRecordFor(
+          discoveryId: 'different-cat',
+          variant: 'halloween_haunted_frame',
+        ),
+      ],
+    );
+    final remote = _EventRemoteCardGenerationService();
+    final container = _container(
+      repository: _MemoryDiscoveryRepository(_discovery()),
+      cards: cards,
+      remote: remote,
+      usage: usage,
+      premium: true,
+    );
+    addTearDown(container.dispose);
+
+    final result = await container
+        .read(cardGenerationPipelineProvider)
+        .generateEventCard(
+          event: _activeTestEvent,
+          discovery: _discovery(),
+          displayData: _displayData,
+          collectionNumber: 1,
+          selectedVariantId: 'halloween_haunted_frame',
+        );
+
+    expect(result.success, isTrue);
+    expect(remote.calls, 1);
+    expect(
+      cards.savedCards.where(
+        (card) => card.eventArtworkVariantId == 'halloween_haunted_frame',
+      ),
+      hasLength(2),
+    );
+  });
+
+  test(
+    'renderer variant mismatch releases reservation before persistence',
+    () async {
+      const usage = SharedPreferencesEventUsageRepository();
+      final cards = _MemoryCatCardRepository();
+      final remote = _EventRemoteCardGenerationService(
+        responseVariantOverride: 'halloween_moonlight',
+      );
+      final container = _container(
+        repository: _MemoryDiscoveryRepository(_discovery()),
+        cards: cards,
+        remote: remote,
+        usage: usage,
+        premium: true,
+      );
+      addTearDown(container.dispose);
+
+      final result = await container
+          .read(cardGenerationPipelineProvider)
+          .generateEventCard(
+            event: _activeTestEvent,
+            discovery: _discovery(),
+            displayData: _displayData,
+            collectionNumber: 1,
+            selectedVariantId: 'halloween_haunted_frame',
+          );
+
+      expect(
+        result.eventFailure,
+        EventCardGenerationFailure.eventArtworkValidationFailed,
+      );
+      expect(cards.savedCards, isEmpty);
+      expect(
+        (await usage.getSnapshot(
+          playerId: 'local-explorer',
+          eventId: 'halloween_2026',
+        )).committedUsage,
+        0,
+      );
+    },
+  );
 }
 
 ProviderContainer _container({
@@ -220,6 +524,7 @@ ProviderContainer _container({
   required RemoteCardGenerationService remote,
   required SharedPreferencesEventUsageRepository usage,
   CatCardRepository? cards,
+  bool premium = false,
 }) {
   return ProviderContainer(
     overrides: [
@@ -233,28 +538,39 @@ ProviderContainer _container({
         EventGenerationCoordinator(usageRepository: usage),
       ),
       eventRuntimeConfigurationProvider.overrideWithValue(
-        const _AlwaysActiveEventRuntime(),
+        _AlwaysActiveEventRuntime(premium: premium),
       ),
     ],
   );
 }
 
 class _AlwaysActiveEventRuntime extends EventRuntimeConfiguration {
-  const _AlwaysActiveEventRuntime();
+  const _AlwaysActiveEventRuntime({this.premium = false});
+
+  final bool premium;
 
   @override
   CatDexEvent? activeEvent(DateTime now) => _activeTestEvent;
 
   @override
-  bool get premiumTestEntitlementEnabled => false;
+  bool get premiumTestEntitlementEnabled => premium;
 }
 
 class _EventRemoteCardGenerationService extends RemoteCardGenerationService {
-  _EventRemoteCardGenerationService({this.pendingReason})
-    : super(endpoint: 'https://renderer.example/api/generate-card');
+  _EventRemoteCardGenerationService({
+    this.pendingReason,
+    this.failureReason,
+    this.responseVariantOverride,
+  }) : super(endpoint: 'https://renderer.example/api/generate-card');
 
   final RemoteCardGenerationPendingReason? pendingReason;
+  final RemoteCardGenerationFailureReason? failureReason;
+  final String? responseVariantOverride;
   int calls = 0;
+  EventCardGenerationRequest? lastEventRequest;
+
+  @override
+  RemoteCardGenerationFailureReason? get lastFailureReason => failureReason;
 
   @override
   Future<RemoteGeneratedCard?> generateCard({
@@ -266,9 +582,12 @@ class _EventRemoteCardGenerationService extends RemoteCardGenerationService {
     void Function(RemoteCardGenerationPendingReason)? onPending,
   }) async {
     calls += 1;
+    if (failureReason != null) return null;
     final pending = pendingReason;
     if (pending != null) onPending?.call(pending);
     final request = eventRequest!;
+    lastEventRequest = request;
+    final responseVariant = responseVariantOverride ?? request.variantId;
     return RemoteGeneratedCard(
       finalCardUrl:
           'https://renderer.example/generated/${discovery.id}/final-card.png',
@@ -277,7 +596,7 @@ class _EventRemoteCardGenerationService extends RemoteCardGenerationService {
       selectedTemplateKey: 'events/${request.eventKey}/${request.templateKey}',
       eventKey: request.eventKey,
       eventEdition: request.eventEdition,
-      eventArtworkVariantId: request.variantId,
+      eventArtworkVariantId: responseVariant,
       eventArtworkTier: request.tier.wireValue,
       eventTemplateKey: request.templateKey,
       generationStatus: 'completed',
@@ -442,6 +761,41 @@ CatCardRecord _normalCardRecord() {
   );
 }
 
+CatCardRecord _eventRecordFor({
+  required String discoveryId,
+  required String variant,
+}) {
+  final premium = halloween2026Event.isPremiumVariant(variant);
+  final template = halloween2026Event.templateKeyFor(variant);
+  return CatCardRecord(
+    cardId: eventCardId(
+      discoveryId: discoveryId,
+      eventKey: 'halloween_2026',
+      eventEdition: '2026',
+      eventArtworkVariantId: variant,
+    ),
+    discoveryId: discoveryId,
+    ownerId: 'local-explorer',
+    cardType: CatCardType.event,
+    rarity: CatRarity.common,
+    finalCardUrl:
+        'https://renderer.example/generated/$discoveryId/$variant/final-card.png',
+    templateKey: template,
+    generationStatus: CatCardGenerationStatus.completed,
+    generationRequestId: 'request-$discoveryId-$variant',
+    idempotencyKey: 'idempotency-$discoveryId-$variant',
+    createdAt: DateTime.utc(2026, 10),
+    updatedAt: DateTime.utc(2026, 10),
+    eventKey: 'halloween_2026',
+    eventEdition: '2026',
+    eventArtworkVariantId: variant,
+    eventArtworkTier: premium ? 'premium' : 'free',
+    eventTemplateKey: template,
+    generatedDuringEventAt: DateTime.utc(2026, 10),
+    isPremiumArtwork: premium,
+  );
+}
+
 const _displayData = CatDisplayData(
   displayName: 'Luna',
   displaySpecies: 'Gatto domestico',
@@ -465,8 +819,12 @@ final _activeTestEvent = CatDexEvent(
   standardVariantId: halloween2026Event.standardVariantId,
   standardVariantIds: halloween2026Event.standardVariantIds,
   premiumVariantId: halloween2026Event.premiumVariantId,
+  premiumVariantIds: halloween2026Event.premiumVariantIds,
   premiumGenerationLimit: halloween2026Event.premiumGenerationLimit,
   variantTemplateKeys: halloween2026Event.variantTemplateKeys,
   variantInstructionKeys: halloween2026Event.variantInstructionKeys,
   variantWeights: halloween2026Event.variantWeights,
+  variantSortOrders: halloween2026Event.variantSortOrders,
+  variantTransformsCatAppearance:
+      halloween2026Event.variantTransformsCatAppearance,
 );
