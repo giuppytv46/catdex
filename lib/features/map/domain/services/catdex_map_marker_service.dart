@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
+import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/map/domain/entities/catdex_map_marker_data.dart';
 
 class CatDexMapMarkerService {
@@ -12,15 +13,31 @@ class CatDexMapMarkerService {
     zoom: 5.5,
   );
 
-  CatDexMapMarkerPreparation prepare(List<CatDiscovery> discoveries) {
+  CatDexMapMarkerPreparation prepare(
+    List<CatDiscovery> discoveries, {
+    Set<CatRarity> rarityFilter = const {},
+    bool eventOnly = false,
+    Set<String> eventDiscoveryIds = const {},
+  }) {
     final markers = <CatDexMapMarkerData>[];
     final seenDiscoveryIds = <String>{};
+    final matchedDiscoveryIds = <String>{};
     for (final discovery in discoveries) {
       if (!seenDiscoveryIds.add(discovery.id)) continue;
+      final hasEventArtwork = eventDiscoveryIds.contains(discovery.id);
+      if (!_matchesRarity(discovery.rarity, rarityFilter) ||
+          (eventOnly && !hasEventArtwork)) {
+        continue;
+      }
+      matchedDiscoveryIds.add(discovery.id);
       final location = discovery.captureLocation;
       if (location?.hasValidCoordinates != true) continue;
       markers.add(
-        CatDexMapMarkerData(discovery: discovery, location: location!),
+        CatDexMapMarkerData(
+          discovery: discovery,
+          location: location!,
+          hasEventArtwork: hasEventArtwork,
+        ),
       );
     }
     markers.sort(
@@ -31,11 +48,19 @@ class CatDexMapMarkerService {
 
     return CatDexMapMarkerPreparation(
       markers: List.unmodifiable(markers),
-      totalDiscoveryCount: seenDiscoveryIds.length,
-      missingLocationCount: seenDiscoveryIds.length - markers.length,
+      totalDiscoveryCount: matchedDiscoveryIds.length,
+      missingLocationCount: matchedDiscoveryIds.length - markers.length,
       initialViewport: _initialViewport(markers),
       nearbyClusterCount: _estimatedNearbyClusterCount(markers),
     );
+  }
+
+  bool _matchesRarity(CatRarity rarity, Set<CatRarity> filters) {
+    if (filters.isEmpty) return true;
+    final normalized = rarity == CatRarity.mythic
+        ? CatRarity.legendary
+        : rarity;
+    return filters.contains(normalized);
   }
 
   CatDexMapViewport _initialViewport(List<CatDexMapMarkerData> markers) {

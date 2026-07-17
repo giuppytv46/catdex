@@ -15,6 +15,9 @@ import 'package:catdex/features/events/presentation/home_event_banner.dart';
 import 'package:catdex/features/home/application/home_controller.dart';
 import 'package:catdex/features/home/domain/entities/home_dashboard.dart';
 import 'package:catdex/features/home/presentation/home_page.dart';
+import 'package:catdex/features/missions/application/daily_mission_controller.dart';
+import 'package:catdex/features/missions/domain/entities/daily_mission.dart';
+import 'package:catdex/features/missions/domain/entities/daily_mission_ledger.dart';
 import 'package:catdex/shared/images/catdex_image_resolver.dart';
 import 'package:catdex/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -507,6 +510,9 @@ Future<void> _pumpHomePage(
         activeEventUiStateProvider.overrideWith(
           (_) async => eventActive ? _activeEventState() : null,
         ),
+        dailyMissionControllerProvider.overrideWith(
+          () => _HomeDailyMissionController(_homeMissionLedger()),
+        ),
       ],
       child: MaterialApp(
         theme: AppTheme.light(),
@@ -573,7 +579,6 @@ HomeDashboard _homeDashboard() {
     nextLevelXp: 100,
     pawPoints: 0,
     collectionCompletion: 0.1,
-    dailyMissions: const [],
     recentDiscoveries: [_recentDiscovery()],
     currentEvent: const CurrentEvent(
       title: 'Halloween CatDex',
@@ -603,6 +608,49 @@ class _TestHomeController extends HomeController {
 
   @override
   HomeDashboard build() => dashboard;
+}
+
+class _HomeDailyMissionController extends DailyMissionController {
+  _HomeDailyMissionController(this.ledger);
+
+  final DailyMissionLedger ledger;
+
+  @override
+  Future<DailyMissionLedger> build() async => ledger;
+}
+
+DailyMissionLedger _homeMissionLedger() {
+  DailyMission mission(String id, DailyMissionType type, int order) {
+    return DailyMission(
+      missionId: id,
+      missionType: type,
+      localizedTitleKey: DailyMissionTextKey.discoverOneCatTitle,
+      localizedDescriptionKey: DailyMissionTextKey.discoverOneCatDescription,
+      targetValue: 1,
+      currentValue: 0,
+      rewardType: DailyMissionRewardType.xp,
+      rewardAmount: 50,
+      status: DailyMissionStatus.active,
+      assignedDate: '2026-07-17',
+      schemaVersion: DailyMission.currentSchemaVersion,
+      sortOrder: order,
+    );
+  }
+
+  return DailyMissionLedger(
+    playerId: 'local-explorer',
+    assignedDate: '2026-07-17',
+    lastResetDate: '2026-07-17',
+    missions: [
+      mission('home-discover', DailyMissionType.discoverCats, 0),
+      mission('home-card', DailyMissionType.generateNormalCard, 1),
+      mission('home-map', DailyMissionType.openMap, 2),
+    ],
+    expiredMissions: const [],
+    processedOperationIds: const {},
+    claimTransactions: const {},
+    schemaVersion: DailyMissionLedger.currentSchemaVersion,
+  );
 }
 
 double _contrastRatio(Color foreground, Color background) {

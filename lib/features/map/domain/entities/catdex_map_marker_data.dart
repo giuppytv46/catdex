@@ -5,10 +5,12 @@ class CatDexMapMarkerData {
   const CatDexMapMarkerData({
     required this.discovery,
     required this.location,
+    this.hasEventArtwork = false,
   });
 
   final CatDiscovery discovery;
   final CatDiscoveryLocation location;
+  final bool hasEventArtwork;
 
   String get discoveryId => discovery.id;
   double get latitude => location.latitude!;

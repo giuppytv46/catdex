@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:catdex/features/analysis/presentation/cat_display_data.dart';
 import 'package:catdex/features/cards/application/card_generation_performance.dart';
 import 'package:catdex/features/cards/application/cat_card_legacy_migration.dart';
@@ -8,11 +10,14 @@ import 'package:catdex/features/cards/presentation/card_image_cache_buster.dart'
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:catdex/features/catdex/application/local_discovery_session_controller.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
+import 'package:catdex/features/events/application/event_card_xp_reward_service.dart';
 import 'package:catdex/features/events/application/event_generation_coordinator.dart';
 import 'package:catdex/features/events/application/event_providers.dart';
 import 'package:catdex/features/events/domain/entities/catdex_event.dart';
 import 'package:catdex/features/events/domain/entities/event_card_generation.dart';
+import 'package:catdex/features/events/domain/entities/event_card_xp_reward.dart';
 import 'package:catdex/features/events/domain/repositories/event_usage_repository.dart';
+import 'package:catdex/features/missions/application/daily_mission_controller.dart';
 import 'package:catdex/features/premium/application/local_monetization_service.dart';
 import 'package:catdex/features/premium/domain/entities/premium_status.dart';
 import 'package:flutter/foundation.dart';
@@ -37,12 +42,14 @@ class CardGenerationResult {
     required this.discovery,
     this.failureReason,
     this.eventFailure,
+    this.eventXpAward,
   });
 
   final String? generatedCardPathOrUrl;
   final CatDiscovery discovery;
   final RemoteCardGenerationFailureReason? failureReason;
   final EventCardGenerationFailure? eventFailure;
+  final EventCardXpAwardResult? eventXpAward;
 
   bool get success =>
       generatedCardPathOrUrl != null &&
@@ -150,6 +157,7 @@ class CardGenerationPipeline {
     final persistedDiscovery = await _saveAndRefreshDiscovery(
       updatedDiscovery,
     );
+    unawaited(_trackNormalCardMission(persistedRecord.cardId));
     final persistedUrl = persistedRecord.finalCardUrl;
     debugPrint('CATDEX_CARD_IMAGE_SAVED_FINAL_URL $persistedUrl');
 
@@ -338,9 +346,14 @@ class CardGenerationPipeline {
       }
       reservationOpen = false;
       debugPrint('CATDEX_EVENT_CARD_USAGE_COMMITTED');
+      final eventXpAward = await _ref
+          .read(eventCardXpRewardServiceProvider)
+          .awardForPersistedEventCard(persisted!);
+      await _trackEventCardMission(persisted.cardId);
       return CardGenerationResult(
-        generatedCardPathOrUrl: generated.finalCardUrl,
+        generatedCardPathOrUrl: persisted.finalCardUrl,
         discovery: discovery,
+        eventXpAward: eventXpAward,
       );
     } on Object {
       if (reservationOpen) {
@@ -548,6 +561,32 @@ class CardGenerationPipeline {
     } on Object catch (error) {
       debugPrint('CATDEX_CARD_RECORD_READBACK_FAILED error=$error');
       return null;
+    }
+  }
+
+  Future<void> _trackNormalCardMission(String cardId) async {
+    try {
+      await _ref
+          .read(dailyMissionControllerProvider.notifier)
+          .trackNormalCardGenerated(cardId);
+    } on Object catch (error) {
+      debugPrint(
+        'CATDEX_MISSION_PROGRESS_TRACKING_SKIPPED '
+        'reason=${error.runtimeType}',
+      );
+    }
+  }
+
+  Future<void> _trackEventCardMission(String cardId) async {
+    try {
+      await _ref
+          .read(dailyMissionControllerProvider.notifier)
+          .trackEventCardGenerated(cardId);
+    } on Object catch (error) {
+      debugPrint(
+        'CATDEX_MISSION_PROGRESS_TRACKING_SKIPPED '
+        'reason=${error.runtimeType}',
+      );
     }
   }
 

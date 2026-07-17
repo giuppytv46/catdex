@@ -38,8 +38,8 @@ class CatDiscovery {
     this.captureLocation,
     this.locationConsentVersion,
     this.locationCapturedAt,
-  }) : suggestedName = suggestedName ?? nickname ?? 'Mochi',
-       customName = customName ?? nickname ?? suggestedName ?? 'Mochi',
+  }) : suggestedName = suggestedName ?? nickname ?? '',
+       customName = customName ?? nickname,
        originalPhotoPath = originalPhotoPath ?? photoPath,
        displayPhotoPath = displayPhotoPath ?? originalPhotoPath ?? photoPath,
        assert(friendshipPoints >= 0, 'friendshipPoints cannot be negative');

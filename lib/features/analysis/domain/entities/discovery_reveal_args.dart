@@ -5,7 +5,7 @@ class DiscoveryRevealArgs {
   const DiscoveryRevealArgs({
     required this.photo,
     required this.result,
-    this.suggestedName = 'Mochi',
+    this.suggestedName = '',
     this.usesEditedDetails = false,
   });
 

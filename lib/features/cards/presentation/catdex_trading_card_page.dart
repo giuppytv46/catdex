@@ -10,9 +10,13 @@ import 'package:catdex/features/cards/application/cat_card_legacy_migration.dart
 import 'package:catdex/features/cards/application/cat_card_repository_providers.dart';
 import 'package:catdex/features/cards/domain/cat_card_record.dart';
 import 'package:catdex/features/cards/presentation/card_image_cache_buster.dart';
+import 'package:catdex/features/cards/presentation/reveal/card_reveal_controller.dart';
+import 'package:catdex/features/cards/presentation/reveal/card_reveal_reward_bridge.dart';
+import 'package:catdex/features/cards/presentation/reveal/card_reveal_surface.dart';
 import 'package:catdex/features/cards/presentation/widgets/card_generation_status_panel.dart';
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
+import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/catdex_collection.dart';
 import 'package:catdex/theme/app_colors.dart';
 import 'package:catdex/theme/app_spacing.dart';
@@ -77,6 +81,7 @@ class _CatDexTradingCardPageState extends ConsumerState<CatDexTradingCardPage> {
   @override
   void initState() {
     super.initState();
+    attachCardRevealMissionBridge(ref);
     _discovery = widget.initialEntry?.discovery;
     _cardRecord = widget.initialEntry?.cardRecord;
     _localCacheBustVersion = widget.cacheBustVersion;
@@ -132,6 +137,7 @@ class _CatDexTradingCardPageState extends ConsumerState<CatDexTradingCardPage> {
     final generating = sharedGenerationState.isGenerating;
     final awaitingCompletedRefresh =
         sharedGenerationState.isCompleted && !hasGeneratedArtwork;
+    final rewardCue = ref.watch(cardRevealRewardCueProvider)[_discoveryId];
 
     return PopScope<void>(
       onPopInvokedWithResult: (didPop, result) => _handleRoutePop(didPop),
@@ -168,6 +174,29 @@ class _CatDexTradingCardPageState extends ConsumerState<CatDexTradingCardPage> {
                           children: [
                             _CardHeroFrame(
                               imageSource: imageSource,
+                              celebrationLabel: display == null
+                                  ? null
+                                  : CatDexLocalizations.of(
+                                      context,
+                                    ).localizeDisplayValue(
+                                      display.displayRarity,
+                                    ),
+                              revealEffect: cardRevealEffectFor(
+                                rarity:
+                                    _cardRecord?.rarity ??
+                                    discovery?.rarity ??
+                                    CatRarity.common,
+                                event:
+                                    _cardRecord?.cardType ==
+                                        CatCardType.event ||
+                                    discovery?.card?.isEventCard == true,
+                                premiumEvent:
+                                    _cardRecord?.isPremiumArtwork == true,
+                              ),
+                              rewardCue: rewardCue,
+                              onRewardSequenceCompleted: (cue) => ref
+                                  .read(cardRevealRewardCueProvider.notifier)
+                                  .consume(_discoveryId, cue.id),
                               entityMissing: _entityMissing,
                               repositoryLoading:
                                   _repositoryLoading ||
@@ -630,6 +659,10 @@ String _discoveredDate(CatDiscovery? discovery) {
 class _CardHeroFrame extends StatelessWidget {
   const _CardHeroFrame({
     required this.imageSource,
+    required this.celebrationLabel,
+    required this.revealEffect,
+    required this.rewardCue,
+    required this.onRewardSequenceCompleted,
     required this.entityMissing,
     required this.repositoryLoading,
     required this.imageLoadFailed,
@@ -643,6 +676,10 @@ class _CardHeroFrame extends StatelessWidget {
   });
 
   final String? imageSource;
+  final String? celebrationLabel;
+  final CardRevealEffect revealEffect;
+  final CardRevealRewardCue? rewardCue;
+  final ValueChanged<CardRevealRewardCue> onRewardSequenceCompleted;
   final bool entityMissing;
   final bool repositoryLoading;
   final bool imageLoadFailed;
@@ -656,6 +693,41 @@ class _CardHeroFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fallback = entityMissing
+        ? const _CardUnavailable()
+        : generating && imageSource == null
+        ? _MissingGeneratedCard(
+            generating: true,
+            generatingLabel: generatingLabel,
+            hasGenerationError: false,
+            onGenerate: null,
+          )
+        : repositoryLoading && imageSource == null
+        ? const _CardDetailLoading()
+        : imageSource == null
+        ? _MissingGeneratedCard(
+            generating: generating,
+            generatingLabel: generatingLabel,
+            hasGenerationError: hasGenerationError,
+            onGenerate: onGenerate,
+          )
+        : imageLoadFailed
+        ? _CardImageError(onRetry: onRetryImage)
+        : const _CardDetailLoading();
+    final artwork = imageSource == null || imageLoadFailed
+        ? null
+        : Stack(
+            fit: StackFit.expand,
+            children: [
+              _FinalCardImage(
+                source: imageSource!,
+                onError: onImageError,
+                onLoading: onImageLoading,
+              ),
+              if (generating)
+                _CardGenerationInProgress(stateLabel: generatingLabel),
+            ],
+          );
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
@@ -682,45 +754,36 @@ class _CardHeroFrame extends StatelessWidget {
           aspectRatio: 5 / 7,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(24),
-            child: entityMissing
-                ? const _CardUnavailable()
-                : generating && imageSource == null
-                ? _MissingGeneratedCard(
-                    generating: true,
-                    generatingLabel: generatingLabel,
-                    hasGenerationError: false,
-                    onGenerate: null,
-                  )
-                : repositoryLoading && imageSource == null
-                ? const _CardDetailLoading()
-                : imageSource == null
-                ? _MissingGeneratedCard(
-                    generating: generating,
-                    generatingLabel: generatingLabel,
-                    hasGenerationError: hasGenerationError,
-                    onGenerate: onGenerate,
-                  )
-                : imageLoadFailed
-                ? _CardImageError(onRetry: onRetryImage)
-                : Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _FinalCardImage(
-                        source: imageSource!,
-                        onError: onImageError,
-                        onLoading: onImageLoading,
-                      ),
-                      if (generating)
-                        _CardGenerationInProgress(
-                          stateLabel: generatingLabel,
-                        ),
-                    ],
-                  ),
+            child: CardRevealSurface(
+              revealKey: imageSource,
+              prepareArtwork: imageSource == null
+                  ? null
+                  : (context) => _preloadDetailCard(context, imageSource!),
+              onArtworkPreloadError: onImageError,
+              artwork: artwork,
+              fallback: fallback,
+              effect: revealEffect,
+              celebrationLabel: celebrationLabel,
+              rewardCue: rewardCue,
+              onRewardSequenceCompleted: onRewardSequenceCompleted,
+              isGenerating: generating,
+              hasError: hasGenerationError || imageLoadFailed,
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+Future<void> _preloadDetailCard(
+  BuildContext context,
+  String source,
+) {
+  final provider = isNetworkCardImageUrl(source)
+      ? NetworkImage(source)
+      : FileImage(File(source)) as ImageProvider<Object>;
+  return preloadCardArtwork(context, provider);
 }
 
 class _FinalCardImage extends StatefulWidget {

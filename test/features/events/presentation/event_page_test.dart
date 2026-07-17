@@ -443,6 +443,37 @@ void main() {
     );
   });
 
+  for (final entry in const <EventUiFailureReason, String>{
+    EventUiFailureReason.eventVariantInvalid:
+        'Questo artwork non è ancora disponibile sul server. '
+        'Aggiorna il servizio e riprova.',
+    EventUiFailureReason.eventVariantDisabled:
+        'Questo artwork è temporaneamente non disponibile.',
+    EventUiFailureReason.selectedVariantInvalid:
+        "L'artwork selezionato non è valido per questo evento.",
+  }.entries) {
+    testWidgets('${entry.key.name} does not display a network error', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        _generationPanel(
+          state: _state(discoveries: [_discovery()]),
+          generation: EventUiGenerationState(
+            phase: EventUiGenerationPhase.failed,
+            failureReason: entry.key,
+          ),
+        ),
+      );
+
+      expect(find.text(entry.value), findsOneWidget);
+      expect(
+        find.text('Connessione non disponibile. Controlla la rete e riprova.'),
+        findsNothing,
+      );
+    });
+  }
+
   testWidgets('completed event result opens by cardId', (tester) async {
     final card = _eventCard();
     String? openedCardId;

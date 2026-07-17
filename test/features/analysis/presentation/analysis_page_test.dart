@@ -66,7 +66,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
 
-    expect(find.text('✨ Nuova scoperta!'), findsOneWidget);
+    expect(find.text('✨ Nuova scoperta!'), findsNothing);
     expect(find.text('Specie'), findsOneWidget);
     expect(find.text('Gatto domestico tigrato'), findsWidgets);
     expect(find.text('Comune'), findsOneWidget);
@@ -131,6 +131,116 @@ void main() {
     await pumpAnalysisPage(tester);
 
     expect(find.text('Bicolore'), findsWidgets);
+  });
+
+  testWidgets('successful analysis plays one discovery reveal before CTA', (
+    tester,
+  ) async {
+    final messages = <String>[];
+    final previousDebugPrint = debugPrint;
+    debugPrint = (message, {wrapWidth}) {
+      if (message != null) messages.add(message);
+    };
+
+    try {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            catAnalysisRepositoryProvider.overrideWithValue(
+              _BackendValueRepository(_backendJson()),
+            ),
+          ],
+          child: MaterialApp(
+            locale: const Locale('it'),
+            theme: AppTheme.light(),
+            localizationsDelegates: CatDexLocalizations.localizationsDelegates,
+            supportedLocales: CatDexLocalizations.supportedLocales,
+            home: AnalysisPage(photo: _photo()),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 700));
+
+      expect(
+        find.byKey(const Key('analysis_discovery_scanning_light')),
+        findsOneWidget,
+      );
+      final emblemFinder = find.byKey(
+        const Key('analysis_discovery_emblem'),
+      );
+      for (
+        var frame = 0;
+        frame < 12 && emblemFinder.evaluate().isEmpty;
+        frame++
+      ) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(emblemFinder, findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('analysis_reveal_discovery_button')),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      final revealButtonFinder = find.byKey(
+        const Key('analysis_reveal_discovery_button'),
+      );
+      for (var frame = 0; frame < 24; frame++) {
+        final button = tester.widget<FilledButton>(revealButtonFinder);
+        if (button.onPressed != null) break;
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(
+        tester.widget<FilledButton>(revealButtonFinder).onPressed,
+        isNotNull,
+      );
+      await tester.pump();
+      expect(
+        messages.where(
+          (message) => message == 'CATDEX_DISCOVERY_REVEAL_STARTED',
+        ),
+        hasLength(1),
+      );
+    } finally {
+      debugPrint = previousDebugPrint;
+    }
+  });
+
+  testWidgets('failed analysis does not start discovery reveal', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          catAnalysisRepositoryProvider.overrideWithValue(
+            const _FailingRepository(),
+          ),
+        ],
+        child: MaterialApp(
+          locale: const Locale('it'),
+          theme: AppTheme.light(),
+          localizationsDelegates: CatDexLocalizations.localizationsDelegates,
+          supportedLocales: CatDexLocalizations.supportedLocales,
+          home: AnalysisPage(photo: _photo()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byKey(const Key('analysis_discovery_emblem')), findsNothing);
+    expect(
+      find.byKey(const Key('catdex_celebration_overlay')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const Key('analysis_reveal_discovery_button')),
+      findsNothing,
+    );
   });
 }
 
@@ -229,5 +339,14 @@ class _BackendValueRepository implements CatAnalysisRepository {
   @override
   Future<CatAnalysisResult> analyzePhoto(CapturedPhoto photo) async {
     return const CatAnalysisResultJsonParser().parse(json);
+  }
+}
+
+class _FailingRepository implements CatAnalysisRepository {
+  const _FailingRepository();
+
+  @override
+  Future<CatAnalysisResult> analyzePhoto(CapturedPhoto photo) {
+    throw StateError('analysis failed');
   }
 }

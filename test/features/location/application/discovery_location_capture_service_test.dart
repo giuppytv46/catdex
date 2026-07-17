@@ -11,11 +11,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('disabled collection never requests permission', () async {
+  test('explicitly disabled collection never requests permission', () async {
     final location = _FakeLocationRepository();
     final service = DiscoveryLocationCaptureService(
       privacyRepository: _FakePrivacyRepository(
-        const LocationPrivacyPreferences.defaults(),
+        const LocationPrivacyPreferences(
+          locationCollectionEnabled: false,
+          locationPrecisionMode: LocationPrecisionMode.approximate,
+          rememberLocationChoice: true,
+          locationConsentVersion: null,
+          lastPermissionStatus: LocationPermissionStatus.denied,
+        ),
       ),
       locationRepository: location,
     );
@@ -27,6 +33,29 @@ void main() {
     expect(location.requestPermissionCalls, 0);
     expect(location.currentLocationCalls, 0);
   });
+
+  test(
+    'granted OS permission automatically captures complete GPS metadata',
+    () async {
+      final location = _FakeLocationRepository();
+      final service = DiscoveryLocationCaptureService(
+        privacyRepository: _FakePrivacyRepository(
+          const LocationPrivacyPreferences.defaults(),
+        ),
+        locationRepository: location,
+      );
+
+      final outcome = await service.captureForDiscovery();
+
+      expect(outcome.location?.latitude, 45.46);
+      expect(outcome.location?.longitude, 9.19);
+      expect(outcome.location?.horizontalAccuracyMeters, 1500);
+      expect(outcome.location?.capturedAt, DateTime.utc(2026, 7, 16));
+      expect(outcome.locationConsentVersion, 'map-v2-os-permission');
+      expect(location.requestPermissionCalls, 0);
+      expect(location.currentLocationCalls, 1);
+    },
+  );
 
   test('permission denied returns typed failure without locating', () async {
     final location = _FakeLocationRepository(

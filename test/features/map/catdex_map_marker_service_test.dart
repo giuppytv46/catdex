@@ -145,6 +145,60 @@ void main() {
     expect(result.markers.first.discoveryId, 'new');
   });
 
+  test('rarity filter keeps only discoveries in the selected rarities', () {
+    final result = service.prepare(
+      [
+        mapTestDiscovery(
+          id: 'common',
+          latitude: 45,
+          longitude: 7,
+          rarity: CatRarity.common,
+        ),
+        mapTestDiscovery(
+          id: 'rare',
+          latitude: 46,
+          longitude: 8,
+          rarity: CatRarity.rare,
+        ),
+      ],
+      rarityFilter: const {CatRarity.rare},
+    );
+
+    expect(result.markers.map((marker) => marker.discoveryId), ['rare']);
+    expect(result.totalDiscoveryCount, 1);
+  });
+
+  test('event filter keeps only discoveries with completed event artwork', () {
+    final result = service.prepare(
+      [
+        mapTestDiscovery(id: 'normal', latitude: 45, longitude: 7),
+        mapTestDiscovery(id: 'event', latitude: 46, longitude: 8),
+      ],
+      eventOnly: true,
+      eventDiscoveryIds: const {'event'},
+    );
+
+    expect(result.markers, hasLength(1));
+    expect(result.markers.single.discoveryId, 'event');
+    expect(result.markers.single.hasEventArtwork, isTrue);
+  });
+
+  test('mythic discoveries match the legendary map filter', () {
+    final result = service.prepare(
+      [
+        mapTestDiscovery(
+          id: 'mythic',
+          latitude: 45,
+          longitude: 7,
+          rarity: CatRarity.mythic,
+        ),
+      ],
+      rarityFilter: const {CatRarity.legendary},
+    );
+
+    expect(result.markers.single.discoveryId, 'mythic');
+  });
+
   test(
     'map image provider uses the canonical resolver for a local file',
     () async {

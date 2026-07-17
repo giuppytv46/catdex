@@ -45,7 +45,13 @@ void main() {
     await openCommonAlbum(tester);
 
     expect(commonAlbumTitle, findsOneWidget);
-    expect(cardSemanticLabelContaining('Mochi,'), findsOneWidget);
+    expect(
+      cardSemanticLabelContaining(
+        'Gatto domestico tigrato, Gatto domestico tigrato',
+      ),
+      findsOneWidget,
+    );
+    expect(cardSemanticLabelContaining('Mochi,'), findsNothing);
     await scrollAlbumUntilVisible(
       tester,
       cardSemanticLabelContaining('Sole,'),
@@ -541,9 +547,12 @@ void main() {
     await openCommonAlbum(tester);
 
     expect(
-      cardSemanticLabelContaining('Mochi, Gatto domestico tigrato'),
+      cardSemanticLabelContaining(
+        'Gatto domestico tigrato, Gatto domestico tigrato',
+      ),
       findsOneWidget,
     );
+    expect(cardSemanticLabelContaining('Mochi,'), findsNothing);
   });
 
   testWidgets('missing card path does not block grid', (tester) async {
@@ -582,9 +591,17 @@ void main() {
     expect(cardSemanticLabelContaining('Sole,'), findsOneWidget);
     await scrollAlbumUntilVisible(
       tester,
-      cardSemanticLabelContaining('Mochi,'),
+      cardSemanticLabelContaining(
+        'Gatto domestico tigrato, Gatto domestico tigrato',
+      ),
     );
-    expect(cardSemanticLabelContaining('Mochi,'), findsOneWidget);
+    expect(
+      cardSemanticLabelContaining(
+        'Gatto domestico tigrato, Gatto domestico tigrato',
+      ),
+      findsOneWidget,
+    );
+    expect(cardSemanticLabelContaining('Mochi,'), findsNothing);
   });
 }
 

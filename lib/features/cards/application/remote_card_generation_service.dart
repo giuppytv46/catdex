@@ -955,6 +955,10 @@ class RemoteCardGenerationService {
       'eventInactive' => EventCardGenerationFailure.eventInactive,
       'eventVariantInvalid' => EventCardGenerationFailure.eventVariantInvalid,
       'eventVariantDisabled' => EventCardGenerationFailure.eventVariantDisabled,
+      'selectedVariantInvalid' =>
+        EventCardGenerationFailure.selectedVariantInvalid,
+      'selectedVariantDisabled' =>
+        EventCardGenerationFailure.selectedVariantDisabled,
       'freeEventLimitReached' =>
         EventCardGenerationFailure.freeEventLimitReached,
       'premiumRequired' => EventCardGenerationFailure.premiumRequired,

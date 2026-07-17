@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:catdex/features/premium/application/local_monetization_service.dart';
+import 'package:catdex/shared/celebrations/catdex_celebration_coordinator.dart';
+import 'package:catdex/shared/state/build_safe_refresh_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -27,26 +29,12 @@ final rewardedAdStateRefreshProvider =
       RewardedAdStateRefreshController.new,
     );
 
-class AdVisibilityRefreshController extends Notifier<int> {
-  @override
-  int build() {
-    return 0;
-  }
-
-  void refresh() {
-    state++;
-  }
+class AdVisibilityRefreshController extends BuildSafeRefreshController {
+  AdVisibilityRefreshController() : super('ad_visibility');
 }
 
-class RewardedAdStateRefreshController extends Notifier<int> {
-  @override
-  int build() {
-    return 0;
-  }
-
-  void refresh() {
-    state++;
-  }
+class RewardedAdStateRefreshController extends BuildSafeRefreshController {
+  RewardedAdStateRefreshController() : super('rewarded_ad_state');
 }
 
 enum RewardedCreditType {
@@ -148,8 +136,9 @@ class AdMobService {
     required bool isPremium,
     required bool safeForAds,
   }) {
-    final result = showAds && !isPremium && safeForAds;
-    final logKey = '$showAds|$isPremium|$safeForAds|$result';
+    final celebrationIdle = !CatDexCelebrationCoordinator.instance.isBusy;
+    final result = showAds && !isPremium && safeForAds && celebrationIdle;
+    final logKey = '$showAds|$isPremium|$safeForAds|$celebrationIdle|$result';
     final now = DateTime.now();
     final shouldLog =
         _lastVisibilityLogKey != logKey ||
@@ -168,7 +157,7 @@ class AdMobService {
       } else if (isPremium) {
         debugPrint('CATDEX_ADS_HIDDEN_PREMIUM_TRUE');
         debugPrint('CATDEX_AD_SKIPPED_PREMIUM_USER');
-      } else if (!safeForAds) {
+      } else if (!safeForAds || !celebrationIdle) {
         debugPrint('CATDEX_ADS_HIDDEN_UNSAFE_STATE');
       }
     }
@@ -460,6 +449,15 @@ class AdMobService {
       return false;
     }
 
+    // Give a success widget scheduled in the same frame time to acquire its
+    // celebration lease before an interstitial is allowed on screen.
+    await Future<void>.delayed(Duration.zero);
+    final celebrations = CatDexCelebrationCoordinator.instance;
+    if (celebrations.isBusy) {
+      debugPrint('CATDEX_CELEBRATION_AD_DEFERRED');
+      await celebrations.waitUntilIdle();
+    }
+
     final ad = _interstitialAd;
     _interstitialAd = null;
     if (ad == null) {
@@ -516,6 +514,13 @@ class AdMobService {
   }
 
   void _setRewardedState(RewardedAdLoadState state) {
+    if (_rewardedState == state) {
+      debugPrint(
+        'CATDEX_PROVIDER_UPDATE_DEDUPLICATED '
+        'provider=rewarded_ad_state reason=unchanged',
+      );
+      return;
+    }
     _rewardedState = state;
     _notifyRewardedStateChanged();
   }

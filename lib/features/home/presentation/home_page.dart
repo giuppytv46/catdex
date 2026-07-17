@@ -9,6 +9,7 @@ import 'package:catdex/features/catdex/presentation/catdex_page.dart';
 import 'package:catdex/features/events/presentation/home_event_banner.dart';
 import 'package:catdex/features/home/application/home_controller.dart';
 import 'package:catdex/features/home/domain/entities/home_dashboard.dart';
+import 'package:catdex/features/missions/presentation/daily_mission_widgets.dart';
 import 'package:catdex/routing/app_routes.dart';
 import 'package:catdex/shared/images/catdex_image_resolver.dart';
 import 'package:catdex/theme/app_colors.dart';
@@ -67,15 +68,12 @@ class HomePage extends ConsumerWidget {
             onOpen: (discovery) => _openDiscovery(context, discovery),
           ),
           const SizedBox(height: AppSpacing.lg),
+          DailyMissionsHomeSection(
+            onSeeAll: () => context.pushNamed(AppRoute.missions.name),
+          ),
+          const SizedBox(height: AppSpacing.lg),
           _PlayerHeader(dashboard: dashboard),
           const SizedBox(height: AppSpacing.lg),
-          _SectionTitle(title: l10n.dailyMissionsTitle),
-          const SizedBox(height: AppSpacing.md),
-          for (final mission in dashboard.dailyMissions) ...[
-            _MissionTile(mission: mission),
-            const SizedBox(height: AppSpacing.sm),
-          ],
-          const SizedBox(height: AppSpacing.md),
           _SectionTitle(
             key: const Key('home_quick_actions_title'),
             title: l10n.quickActionsTitle,
@@ -223,81 +221,6 @@ class _PlayerHeader extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _MissionTile extends StatelessWidget {
-  const _MissionTile({required this.mission});
-
-  final DailyMission mission;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = CatDexLocalizations.of(context);
-    final completed = mission.completed;
-    final statusColor = completed ? AppColors.success : AppColors.warning;
-    final statusLabel = completed
-        ? l10n.completedLabel
-        : l10n.notCompletedLabel;
-    final missionStatus =
-        '${mission.progress}/${mission.goal} • '
-        '${mission.xpReward} XP • '
-        '$statusLabel';
-
-    return DecoratedBox(
-      decoration: _softCardDecoration(
-        color: Theme.of(context).colorScheme.surface,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Icon(
-                completed ? Icons.check_circle_rounded : Icons.flag_rounded,
-                color: statusColor,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _missionTitle(l10n, mission.titleKey),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    missionStatus,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _missionTitle(
-    CatDexLocalizations l10n,
-    DailyMissionTitleKey titleKey,
-  ) {
-    return switch (titleKey) {
-      DailyMissionTitleKey.discoverOneCat => l10n.discoverOneCatMission,
-      DailyMissionTitleKey.importOnePhoto => l10n.importOnePhotoMission,
-      DailyMissionTitleKey.visitYourCatDex => l10n.visitCatDexMission,
-    };
   }
 }
 

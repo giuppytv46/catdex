@@ -19,6 +19,8 @@ import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_species.dart';
 import 'package:catdex/features/premium/presentation/monetization_limit_dialog.dart';
 import 'package:catdex/routing/app_routes.dart';
+import 'package:catdex/shared/celebrations/catdex_celebration_coordinator.dart';
+import 'package:catdex/shared/celebrations/catdex_celebration_theme.dart';
 import 'package:catdex/theme/app_colors.dart';
 import 'package:catdex/theme/app_spacing.dart';
 import 'package:flutter/material.dart';
@@ -37,8 +39,9 @@ class AnalysisPage extends ConsumerStatefulWidget {
 class _AnalysisPageState extends ConsumerState<AnalysisPage> {
   bool _limitDialogShown = false;
   bool _analysisInterstitialRecorded = false;
+  bool _celebrateAnalysisResult = false;
   CatAnalysisResult? _editedResult;
-  String _suggestedName = 'Mochi';
+  String _suggestedName = '';
   bool _usesEditedDetails = false;
 
   @override
@@ -57,9 +60,16 @@ class _AnalysisPageState extends ConsumerState<AnalysisPage> {
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
     ref.listen(catAnalysisControllerProvider, (previous, next) {
-      if (!_analysisInterstitialRecorded &&
+      final completedCurrentAnalysis =
           previous?.status != AnalysisStatus.success &&
-          next.status == AnalysisStatus.success) {
+          next.status == AnalysisStatus.success &&
+          next.photo?.bestLocalPath == widget.photo.bestLocalPath;
+      if (completedCurrentAnalysis) {
+        _celebrateAnalysisResult = true;
+      } else if (next.status != AnalysisStatus.success) {
+        _celebrateAnalysisResult = false;
+      }
+      if (!_analysisInterstitialRecorded && completedCurrentAnalysis) {
         _analysisInterstitialRecorded = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) {
@@ -117,6 +127,7 @@ class _AnalysisPageState extends ConsumerState<AnalysisPage> {
                   result: _editedResult ?? state.result!,
                   suggestedName: _suggestedName,
                   usesEditedDetails: _usesEditedDetails,
+                  playCelebration: _celebrateAnalysisResult,
                   onDetailsEdited: (edit) {
                     setState(() {
                       _editedResult = edit.result;
@@ -264,12 +275,13 @@ class _AnalysisStatusCard extends StatelessWidget {
   }
 }
 
-class _AnalysisResultCard extends StatelessWidget {
+class _AnalysisResultCard extends StatefulWidget {
   const _AnalysisResultCard({
     required this.photo,
     required this.result,
     required this.suggestedName,
     required this.usesEditedDetails,
+    required this.playCelebration,
     required this.onDetailsEdited,
   });
 
@@ -277,12 +289,129 @@ class _AnalysisResultCard extends StatelessWidget {
   final CatAnalysisResult result;
   final String suggestedName;
   final bool usesEditedDetails;
+  final bool playCelebration;
   final ValueChanged<_AnalysisDetailsEdit> onDetailsEdited;
+
+  @override
+  State<_AnalysisResultCard> createState() => _AnalysisResultCardState();
+}
+
+class _AnalysisResultCardState extends State<_AnalysisResultCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _revealController;
+  late CatDisplayData _displayData;
+  bool _mainImpactCompleted = false;
+  bool _revealCompleted = false;
+
+  bool get _reduceMotion {
+    final media = MediaQuery.maybeOf(context);
+    return (media?.disableAnimations ?? false) ||
+        (media?.accessibleNavigation ?? false);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _displayData = const CatDisplayFormatter().fromAnalysis(widget.result);
+    _revealController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1650),
+    )..addListener(_handleRevealProgress);
+    if (!widget.playCelebration) {
+      _revealController.value = 1;
+      _mainImpactCompleted = true;
+      _revealCompleted = true;
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_playReveal());
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnalysisResultCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.result != widget.result) {
+      _displayData = const CatDisplayFormatter().fromAnalysis(widget.result);
+    }
+  }
+
+  @override
+  void dispose() {
+    _revealController
+      ..removeListener(_handleRevealProgress)
+      ..dispose();
+    super.dispose();
+  }
+
+  Future<void> _playReveal() async {
+    debugPrint('CATDEX_DISCOVERY_REVEAL_STARTED');
+    final coordinator = CatDexCelebrationCoordinator.instance;
+    final lease = coordinator.acquire(
+      CatDexCelebrationType.discoveryComplete,
+    );
+    final l10n = CatDexLocalizations.of(context);
+    final revealName = l10n.localizeDisplayValue(_displayData.displaySpecies);
+    debugPrint('CATDEX_DISCOVERY_REVEAL_NAME_SOURCE source=species');
+    debugPrint('CATDEX_DISCOVERY_REVEAL_NAME value=$revealName');
+    final celebration = coordinator.celebrate(
+      context,
+      CatDexCelebrationRequest(
+        type: CatDexCelebrationType.discoveryComplete,
+        theme: CatDexCelebrationTheme.forPalette(
+          _celebrationPaletteForRarity(widget.result.rarity),
+        ),
+        title: l10n.analysisResultTitle,
+        subtitle: revealName,
+        semanticLabel: l10n.analysisResultTitle,
+        seed: _stableCelebrationSeed(widget.photo.bestLocalPath),
+        reduceMotion: _reduceMotion,
+      ),
+      onEssentialCompleted: _finishMainImpact,
+    );
+    _revealController.duration = _reduceMotion
+        ? const Duration(milliseconds: 420)
+        : const Duration(milliseconds: 2100);
+    try {
+      await Future.wait<void>([
+        _revealController.forward(from: 0),
+        celebration,
+      ]);
+      if (!mounted) return;
+      _finishMainImpact();
+      _finishReveal();
+    } on Object {
+      // Route disposal can cancel the local ticker; the celebration lease
+      // still has to be released without altering the successful analysis.
+    } finally {
+      lease.release();
+    }
+  }
+
+  void _finishMainImpact() {
+    if (!mounted || _mainImpactCompleted) return;
+    setState(() => _mainImpactCompleted = true);
+  }
+
+  void _handleRevealProgress() {
+    if (_revealController.value >= 0.34) _finishMainImpact();
+  }
+
+  void _finishReveal() {
+    if (_revealCompleted) return;
+    if (_revealController.value < 1) {
+      _revealController.value = 1;
+    }
+    setState(() => _revealCompleted = true);
+    debugPrint('CATDEX_DISCOVERY_REVEAL_COMPLETED');
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
-    final displayData = const CatDisplayFormatter().fromAnalysis(result);
+    final result = widget.result;
+    final displayData = _displayData;
     final traitDisplay =
         '${displayData.displayCoatColor}, '
         '${displayData.displayCoatPattern}, '
@@ -299,188 +428,281 @@ class _AnalysisResultCard extends StatelessWidget {
       '${_safeJson(_analysisUiDebugJson(result, displayData, traitDisplay))}',
     );
 
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 650),
-      curve: Curves.easeOutBack,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value.clamp(0, 1),
-          child: Transform.translate(
-            offset: Offset(0, 28 * (1 - value)),
-            child: Transform.scale(
-              scale: 0.94 + (0.06 * value),
-              child: child,
+    return AnimatedBuilder(
+      animation: _revealController,
+      builder: (context, _) {
+        final progress = Curves.easeOutCubic.transform(
+          _revealController.value,
+        );
+        final titleProgress = const Interval(
+          0.38,
+          0.72,
+          curve: Curves.easeOutCubic,
+        ).transform(progress);
+        final rarityProgress = const Interval(
+          0.58,
+          0.86,
+          curve: Curves.easeOutBack,
+        ).transform(progress);
+        final detailsProgress = const Interval(
+          0.76,
+          1,
+          curve: Curves.easeOut,
+        ).transform(progress);
+
+        return Semantics(
+          liveRegion: !_revealCompleted,
+          button: !_revealCompleted,
+          label: l10n.analysisResultTitle,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _mainImpactCompleted && !_revealCompleted
+                ? _finishReveal
+                : null,
+            child: Stack(
+              children: [
+                Transform.scale(
+                  scale: 0.92 + (0.08 * progress),
+                  child: Opacity(
+                    opacity: 0.72 + (0.28 * progress),
+                    child: _buildResultSurface(
+                      context: context,
+                      l10n: l10n,
+                      result: result,
+                      displayData: displayData,
+                      confidence: confidence,
+                      traitDisplay: traitDisplay,
+                      progress: progress,
+                      titleProgress: titleProgress,
+                      rarityProgress: rarityProgress,
+                      detailsProgress: detailsProgress,
+                    ),
+                  ),
+                ),
+                if (!_revealCompleted)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(40),
+                          color: AppColors.ink.withValues(
+                            alpha: 0.22 * (1 - progress),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         );
       },
-      child: DecoratedBox(
-        decoration: _analysisDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.white,
-              _rarityColor(result.rarity).withValues(alpha: 0.14),
-              AppColors.skyBlue.withValues(alpha: 0.16),
-              AppColors.primaryPurple.withValues(alpha: 0.16),
-            ],
-          ),
+    );
+  }
+
+  Widget _buildResultSurface({
+    required BuildContext context,
+    required CatDexLocalizations l10n,
+    required CatAnalysisResult result,
+    required CatDisplayData displayData,
+    required String confidence,
+    required String traitDisplay,
+    required double progress,
+    required double titleProgress,
+    required double rarityProgress,
+    required double detailsProgress,
+  }) {
+    return DecoratedBox(
+      decoration: _analysisDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.white,
+            _rarityColor(result.rarity).withValues(alpha: 0.14),
+            AppColors.skyBlue.withValues(alpha: 0.16),
+            AppColors.primaryPurple.withValues(alpha: 0.16),
+          ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _CollectiblePhoto(
-                photo: photo,
-                rarityColor: _rarityColor(result.rarity),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _CollectiblePhoto(
+              photo: widget.photo,
+              rarityColor: _rarityColor(result.rarity),
+              revealProgress: progress,
+              reduceMotion: _reduceMotion,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _RevealStage(
+              progress: titleProgress,
+              child: Column(
+                children: [
+                  Text(
+                    l10n.localizeDisplayValue(displayData.displaySpecies),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: AppColors.primaryPurple,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                '✨ ${l10n.analysisResultTitle}',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: AppColors.ink,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                l10n.localizeDisplayValue(displayData.displaySpecies),
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.primaryPurple,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Center(
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _RevealStage(
+              progress: rarityProgress,
+              verticalOffset: 8,
+              child: Center(
                 child: _RarityBadge(
-                  label: l10n.localizeDisplayValue(displayData.displayRarity),
+                  label: l10n.localizeDisplayValue(
+                    displayData.displayRarity,
+                  ),
                   color: _rarityColor(result.rarity),
                   icon: _rarityIcon(result.rarity),
                 ),
               ),
-              const SizedBox(height: AppSpacing.lg),
-              Row(
+            ),
+            _RevealStage(
+              progress: detailsProgress,
+              verticalOffset: 12,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Expanded(
-                    child: _RewardCard(
-                      label: 'XP',
-                      amount: 80,
-                      icon: Icons.bolt_rounded,
-                      color: AppColors.primaryGreen,
-                    ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: _RewardCard(
+                          label: 'XP',
+                          amount: 80,
+                          icon: Icons.bolt_rounded,
+                          color: AppColors.primaryGreen,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: _RewardCard(
+                          label: l10n.coinsLabel,
+                          amount: 15,
+                          icon: Icons.paid_rounded,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: _RewardCard(
-                      label: l10n.coinsLabel,
-                      amount: 15,
-                      icon: Icons.paid_rounded,
-                      color: AppColors.warning,
-                    ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      _PersonalityChip(
+                        icon: Icons.psychology_alt_rounded,
+                        label: l10n.localizeDisplayValue(
+                          displayData.displayPersonality,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                alignment: WrapAlignment.center,
-                children: [
-                  _PersonalityChip(
-                    icon: Icons.psychology_alt_rounded,
-                    label: l10n.localizeDisplayValue(
+                  const SizedBox(height: AppSpacing.lg),
+                  _InfoTile(
+                    icon: Icons.pets_rounded,
+                    title: l10n.speciesLabel,
+                    value: l10n.localizeDisplayValue(
+                      displayData.displaySpecies,
+                    ),
+                    color: AppColors.primaryPurple,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _InfoTile(
+                    icon: Icons.palette_rounded,
+                    title: l10n.furLabel,
+                    value: l10n.localizeDisplayValue(
+                      displayData.displayCoatColor,
+                    ),
+                    color: AppColors.skyBlue,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _InfoTile(
+                    icon: Icons.visibility_rounded,
+                    title: l10n.eyesLabel,
+                    value: l10n.localizeDisplayValue(
+                      displayData.displayEyeColor,
+                    ),
+                    color: AppColors.warning,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _InfoTile(
+                    icon: Icons.favorite_rounded,
+                    title: l10n.personalityLabel,
+                    value: l10n.localizeDisplayValue(
                       displayData.displayPersonality,
                     ),
+                    color: AppColors.primaryGreen,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _StoryCard(
+                    story: displayData.displayStory,
+                    funFact: displayData.displayFunFact,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _MoreDetailsSection(
+                    confidence: confidence,
+                    coatPattern: l10n.localizeDisplayValue(
+                      displayData.displayCoatPattern,
+                    ),
+                    hairLength: l10n.localizeDisplayValue(
+                      displayData.displayHairLength,
+                    ),
+                    estimatedAge: l10n.localizeDisplayValue(
+                      displayData.displayAge,
+                    ),
+                    traits: traitDisplay,
+                    variant: displayData.displayVariant,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  OutlinedButton.icon(
+                    onPressed: _mainImpactCompleted
+                        ? () => _editDetails(context)
+                        : null,
+                    icon: const Icon(Icons.edit_rounded),
+                    label: Text(l10n.editDetails),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryPurple,
+                      side: const BorderSide(
+                        color: AppColors.primaryPurple,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  FilledButton.icon(
+                    key: const Key('analysis_reveal_discovery_button'),
+                    onPressed: _mainImpactCompleted
+                        ? () {
+                            unawaited(
+                              context.pushNamed(
+                                AppRoute.discoveryReveal.name,
+                                extra: DiscoveryRevealArgs(
+                                  photo: widget.photo,
+                                  result: result,
+                                  suggestedName: widget.suggestedName,
+                                  usesEditedDetails: widget.usesEditedDetails,
+                                ),
+                              ),
+                            );
+                          }
+                        : null,
+                    icon: const Icon(Icons.auto_awesome_rounded),
+                    label: Text(l10n.revealDiscoveryAction),
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.lg),
-              _InfoTile(
-                icon: Icons.pets_rounded,
-                title: l10n.speciesLabel,
-                value: l10n.localizeDisplayValue(displayData.displaySpecies),
-                color: AppColors.primaryPurple,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _InfoTile(
-                icon: Icons.palette_rounded,
-                title: l10n.furLabel,
-                value: l10n.localizeDisplayValue(
-                  displayData.displayCoatColor,
-                ),
-                color: AppColors.skyBlue,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _InfoTile(
-                icon: Icons.visibility_rounded,
-                title: l10n.eyesLabel,
-                value: l10n.localizeDisplayValue(displayData.displayEyeColor),
-                color: AppColors.warning,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _InfoTile(
-                icon: Icons.favorite_rounded,
-                title: l10n.personalityLabel,
-                value: l10n.localizeDisplayValue(
-                  displayData.displayPersonality,
-                ),
-                color: AppColors.primaryGreen,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _StoryCard(
-                story: displayData.displayStory,
-                funFact: displayData.displayFunFact,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _MoreDetailsSection(
-                confidence: confidence,
-                coatPattern: l10n.localizeDisplayValue(
-                  displayData.displayCoatPattern,
-                ),
-                hairLength: l10n.localizeDisplayValue(
-                  displayData.displayHairLength,
-                ),
-                estimatedAge: l10n.localizeDisplayValue(
-                  displayData.displayAge,
-                ),
-                traits: traitDisplay,
-                variant: displayData.displayVariant,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              OutlinedButton.icon(
-                onPressed: () => _editDetails(context),
-                icon: const Icon(Icons.edit_rounded),
-                label: Text(l10n.editDetails),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primaryPurple,
-                  side: const BorderSide(color: AppColors.primaryPurple),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              FilledButton.icon(
-                onPressed: () {
-                  unawaited(
-                    context.pushNamed(
-                      AppRoute.discoveryReveal.name,
-                      extra: DiscoveryRevealArgs(
-                        photo: photo,
-                        result: result,
-                        suggestedName: suggestedName,
-                        usesEditedDetails: usesEditedDetails,
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.auto_awesome_rounded),
-                label: Text(l10n.revealDiscoveryAction),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -493,12 +715,12 @@ class _AnalysisResultCard extends StatelessWidget {
       isScrollControlled: true,
       useSafeArea: true,
       builder: (_) => _EditAnalysisDetailsSheet(
-        result: result,
-        suggestedName: suggestedName,
+        result: widget.result,
+        suggestedName: widget.suggestedName,
       ),
     );
     if (edit != null) {
-      onDetailsEdited(edit);
+      widget.onDetailsEdited(edit);
     }
   }
 
@@ -540,6 +762,25 @@ class _AnalysisResultCard extends StatelessWidget {
       return value.toString();
     }
   }
+}
+
+CatDexCelebrationPalette _celebrationPaletteForRarity(CatRarity rarity) {
+  return switch (rarity) {
+    CatRarity.common => CatDexCelebrationPalette.common,
+    CatRarity.uncommon => CatDexCelebrationPalette.uncommon,
+    CatRarity.rare => CatDexCelebrationPalette.rare,
+    CatRarity.epic => CatDexCelebrationPalette.epic,
+    CatRarity.legendary ||
+    CatRarity.mythic => CatDexCelebrationPalette.legendary,
+  };
+}
+
+int _stableCelebrationSeed(String value) {
+  var result = 17;
+  for (final codeUnit in value.codeUnits) {
+    result = ((result * 31) + codeUnit) & 0x7FFFFFFF;
+  }
+  return result;
 }
 
 class _AnalysisDetailsEdit {
@@ -653,10 +894,10 @@ class _EditAnalysisDetailsSheetState extends State<_EditAnalysisDetailsSheet> {
               controller: _nameController,
               textCapitalization: TextCapitalization.words,
               style: const TextStyle(color: Color(0xFF1E243B)),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Nome suggerito',
-                hintText: 'Mochi',
-                hintStyle: TextStyle(color: Color(0xFF9AA3B2)),
+                hintText: l10n.nameDiscoveryTitle,
+                hintStyle: const TextStyle(color: Color(0xFF9AA3B2)),
               ),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -848,10 +1089,14 @@ class _CollectiblePhoto extends StatelessWidget {
   const _CollectiblePhoto({
     required this.photo,
     required this.rarityColor,
+    required this.revealProgress,
+    required this.reduceMotion,
   });
 
   final CapturedPhoto photo;
   final Color rarityColor;
+  final double revealProgress;
+  final bool reduceMotion;
 
   @override
   Widget build(BuildContext context) {
@@ -862,51 +1107,178 @@ class _CollectiblePhoto extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         Positioned.fill(child: _StarField(color: rarityColor)),
-        Hero(
-          tag: 'catdex-photo-$imagePath',
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(36),
-              boxShadow: [
-                BoxShadow(
-                  color: rarityColor.withValues(alpha: 0.45),
-                  blurRadius: 36,
-                  spreadRadius: 3,
-                  offset: const Offset(0, 18),
-                ),
-              ],
-            ),
-            child: AspectRatio(
-              aspectRatio: 1,
-              child: ClipRRect(
+        Transform.scale(
+          scale: 0.92 + (0.08 * revealProgress),
+          child: Hero(
+            tag: 'catdex-photo-$imagePath',
+            child: Container(
+              decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(36),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [AppColors.skyBlue, AppColors.primaryPurple],
+                boxShadow: [
+                  BoxShadow(
+                    color: rarityColor.withValues(
+                      alpha: 0.18 + (0.27 * revealProgress),
                     ),
-                    border: Border.all(
-                      color: AppColors.white.withValues(
-                        alpha: 0.85,
-                      ),
-                      width: 3,
-                    ),
+                    blurRadius: 18 + (18 * revealProgress),
+                    spreadRadius: 1 + (2 * revealProgress),
+                    offset: const Offset(0, 18),
                   ),
-                  child: file.existsSync()
-                      ? Image.file(file, fit: BoxFit.cover)
-                      : const Icon(
-                          Icons.pets_rounded,
-                          color: AppColors.white,
-                          size: 96,
+                ],
+              ),
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(36),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              AppColors.skyBlue,
+                              AppColors.primaryPurple,
+                            ],
+                          ),
+                          border: Border.all(
+                            color: AppColors.white.withValues(alpha: 0.85),
+                            width: 3,
+                          ),
                         ),
+                        child: file.existsSync()
+                            ? Image.file(file, fit: BoxFit.cover)
+                            : const Icon(
+                                Icons.pets_rounded,
+                                color: AppColors.white,
+                                size: 96,
+                              ),
+                      ),
+                      if (!reduceMotion)
+                        Align(
+                          alignment: Alignment(
+                            -1.8 + (3.6 * revealProgress),
+                            0,
+                          ),
+                          child: FractionallySizedBox(
+                            widthFactor: 0.26,
+                            heightFactor: 1.35,
+                            child: Transform.rotate(
+                              angle: -0.22,
+                              child: DecoratedBox(
+                                key: const Key(
+                                  'analysis_discovery_scanning_light',
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.white.withValues(alpha: 0.42),
+                                      Colors.transparent,
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (!reduceMotion && revealProgress < 0.38)
+                        Center(
+                          child: FractionallySizedBox(
+                            widthFactor: 0.84,
+                            heightFactor: 0.84,
+                            child: Transform.scale(
+                              scale: 1.22 - (0.22 * revealProgress / 0.38),
+                              child: DecoratedBox(
+                                key: const Key(
+                                  'analysis_discovery_scanning_ring',
+                                ),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: rarityColor.withValues(
+                                      alpha: 0.9 * (1 - revealProgress / 0.38),
+                                    ),
+                                    width: 3,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (revealProgress >= 0.34)
+                        Center(
+                          child: Opacity(
+                            opacity: const Interval(
+                              0.34,
+                              0.58,
+                              curve: Curves.easeOut,
+                            ).transform(revealProgress),
+                            child: Transform.scale(
+                              scale:
+                                  0.76 +
+                                  (0.24 *
+                                      const Interval(
+                                        0.34,
+                                        0.58,
+                                        curve: Curves.easeOutBack,
+                                      ).transform(revealProgress)),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.ink.withValues(alpha: 0.48),
+                                  border: Border.all(
+                                    color: AppColors.white.withValues(
+                                      alpha: 0.86,
+                                    ),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(14),
+                                  child: Icon(
+                                    Icons.pets_rounded,
+                                    key: Key('analysis_discovery_emblem'),
+                                    color: AppColors.white,
+                                    size: 36,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _RevealStage extends StatelessWidget {
+  const _RevealStage({
+    required this.progress,
+    required this.child,
+    this.verticalOffset = 14,
+  });
+
+  final double progress;
+  final Widget child;
+  final double verticalOffset;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: progress.clamp(0, 1),
+      child: Transform.translate(
+        offset: Offset(0, verticalOffset * (1 - progress)),
+        child: child,
+      ),
     );
   }
 }

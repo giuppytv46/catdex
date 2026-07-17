@@ -81,13 +81,40 @@ class CatDisplayFormatter {
       'funFact': discovery.funFact,
     };
 
+    final staleMochiFallback =
+        _isMochiPlaceholder(discovery.customName) &&
+        _isMochiPlaceholder(discovery.suggestedName);
+    final customName = staleMochiFallback
+        ? null
+        : _cleanText(discovery.customName);
+    final persistedDisplayName = _nonPlaceholderName(discovery.suggestedName);
+    final fallbackDisplayName = _nonPlaceholderName(fallbackName);
+    final speciesDisplayName = _legacyFormatter.value(
+      canonicalSpeciesIdentifier,
+    );
+    final resolvedDisplayName =
+        customName ??
+        persistedDisplayName ??
+        fallbackDisplayName ??
+        speciesDisplayName;
+    if (staleMochiFallback) {
+      Zone.current.print('CATDEX_DISCOVERY_REVEAL_STALE_NAME_REJECTED');
+    }
+    Zone.current.print(
+      'CATDEX_DISCOVERY_REVEAL_NAME_SOURCE source='
+      '${customName != null
+          ? 'custom'
+          : resolvedDisplayName == speciesDisplayName
+          ? 'species'
+          : 'persisted'}',
+    );
+    Zone.current.print(
+      'CATDEX_DISCOVERY_REVEAL_NAME value=$resolvedDisplayName',
+    );
+
     return _normalize(
       raw: raw,
-      displayName:
-          _cleanText(discovery.customName) ??
-          _cleanText(discovery.suggestedName) ??
-          fallbackName ??
-          _legacyFormatter.value(canonicalSpeciesIdentifier),
+      displayName: resolvedDisplayName,
       rawSpeciesIdentifier: discovery.speciesId,
       speciesId: canonicalSpeciesIdentifier,
       coatColor: discovery.coatColor,
@@ -101,6 +128,14 @@ class CatDisplayFormatter {
       story: discovery.story,
       funFact: discovery.funFact,
     );
+  }
+
+  static bool _isMochiPlaceholder(String? value) =>
+      value?.trim().toLowerCase() == 'mochi';
+
+  String? _nonPlaceholderName(String? value) {
+    if (_isMochiPlaceholder(value)) return null;
+    return _cleanText(value);
   }
 
   CatDisplayData _normalize({

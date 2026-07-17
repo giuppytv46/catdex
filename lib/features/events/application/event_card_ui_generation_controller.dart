@@ -1,13 +1,15 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:catdex/features/analysis/presentation/cat_display_formatter.dart';
 import 'package:catdex/features/cards/application/card_generation_pipeline.dart';
 import 'package:catdex/features/cards/application/card_generation_state_controller.dart';
 import 'package:catdex/features/cards/application/cat_card_repository_providers.dart';
 import 'package:catdex/features/cards/application/remote_card_generation_service.dart';
+import 'package:catdex/features/cards/presentation/reveal/card_reveal_controller.dart';
+import 'package:catdex/features/cards/presentation/reveal/card_reveal_reward_bridge.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/events/application/event_providers.dart';
-import 'package:catdex/features/events/application/event_ui_state.dart';
 import 'package:catdex/features/events/domain/entities/catdex_event.dart';
 import 'package:catdex/features/events/domain/entities/event_card_generation.dart';
 import 'package:flutter/foundation.dart';
@@ -38,6 +40,8 @@ enum EventUiFailureReason {
   storagePermissionDenied,
   signedUrlFailed,
   variantSelectionRequired,
+  eventVariantInvalid,
+  eventVariantDisabled,
   selectedVariantInvalid,
   selectedVariantDisabled,
   selectedVariantAlreadyOwned,
@@ -213,11 +217,13 @@ class EventCardUiGenerationController
         return _terminal(
           key,
           EventUiGenerationPhase.failed,
-          _mapFailure(result.eventFailure, result.failureReason),
+          mapEventGenerationFailureToUiReason(
+            eventFailure: result.eventFailure,
+            remoteFailure: result.failureReason,
+          ),
         );
       }
 
-      await ref.read(catCardCollectionProvider.notifier).refresh();
       final cards = await ref
           .read(catCardRepositoryProvider)
           .getEventCards(event.id, event.edition);
@@ -240,22 +246,37 @@ class EventCardUiGenerationController
         );
       }
       final cardId = matches.first.cardId;
+      final xpAward = result.eventXpAward;
+      if (xpAward?.newlyGranted == true) {
+        ref
+            .read(cardRevealRewardCueProvider.notifier)
+            .queue(
+              discovery.id,
+              CardRevealRewardCue(
+                id: xpAward!.transactionId,
+                earnedXp: xpAward.awardedAmount,
+                newLevel: xpAward.causedLevelUp ? xpAward.updatedLevel : null,
+              ),
+            );
+      }
       final completed = EventUiGenerationState(
         phase: EventUiGenerationPhase.completed,
         cardId: cardId,
       );
       _set(key, completed);
       globalGeneration.complete(discovery.id);
-      ref.read(eventUiRefreshProvider.notifier).refresh();
       debugPrint('CATDEX_EVENT_UI_RESULT_CARD_ID $cardId');
       return completed;
-    } on Object {
+    } on Object catch (error) {
       globalGeneration.fail(discovery.id);
-      debugPrint('CATDEX_EVENT_UI_ERROR reason=network');
+      final failureReason = error is SocketException || error is HttpException
+          ? EventUiFailureReason.network
+          : EventUiFailureReason.unknown;
+      debugPrint('CATDEX_EVENT_UI_ERROR reason=${_safeReason(failureReason)}');
       return _terminal(
         key,
         EventUiGenerationPhase.failed,
-        EventUiFailureReason.network,
+        failureReason,
       );
     }
   }
@@ -302,59 +323,6 @@ class EventCardUiGenerationController
     debugPrint('CATDEX_EVENT_UI_GENERATION_STATE ${value.phase.name}');
   }
 
-  EventUiFailureReason _mapFailure(
-    EventCardGenerationFailure? eventFailure,
-    RemoteCardGenerationFailureReason? remoteFailure,
-  ) {
-    if (eventFailure != null) {
-      return switch (eventFailure) {
-        EventCardGenerationFailure.eventInactive =>
-          EventUiFailureReason.eventInactive,
-        EventCardGenerationFailure.freeEventLimitReached =>
-          EventUiFailureReason.freeEventLimitReached,
-        EventCardGenerationFailure.premiumRequired =>
-          EventUiFailureReason.premiumRequired,
-        EventCardGenerationFailure.premiumVerificationUnavailable =>
-          EventUiFailureReason.premiumVerificationUnavailable,
-        EventCardGenerationFailure.eventGenerationPending ||
-        EventCardGenerationFailure.eventReservationConflict =>
-          EventUiFailureReason.eventGenerationPending,
-        EventCardGenerationFailure.eventArtworkValidationFailed =>
-          EventUiFailureReason.eventArtworkValidationFailed,
-        EventCardGenerationFailure.eventPersistenceFailed =>
-          EventUiFailureReason.eventPersistenceFailed,
-        EventCardGenerationFailure.variantSelectionRequired =>
-          EventUiFailureReason.variantSelectionRequired,
-        EventCardGenerationFailure.selectedVariantInvalid =>
-          EventUiFailureReason.selectedVariantInvalid,
-        EventCardGenerationFailure.selectedVariantDisabled =>
-          EventUiFailureReason.selectedVariantDisabled,
-        EventCardGenerationFailure.selectedVariantAlreadyOwned =>
-          EventUiFailureReason.selectedVariantAlreadyOwned,
-        EventCardGenerationFailure.eventVariantInvalid ||
-        EventCardGenerationFailure.eventVariantDisabled ||
-        EventCardGenerationFailure.rendererFailure =>
-          EventUiFailureReason.unknown,
-      };
-    }
-    return switch (remoteFailure) {
-      RemoteCardGenerationFailureReason.missingEndpoint =>
-        EventUiFailureReason.rendererUnavailable,
-      RemoteCardGenerationFailureReason.invalidPhotoUrl ||
-      RemoteCardGenerationFailureReason.missingPhoto =>
-        EventUiFailureReason.missingPhoto,
-      RemoteCardGenerationFailureReason.photoUploadFailed =>
-        EventUiFailureReason.photoUploadFailed,
-      RemoteCardGenerationFailureReason.storagePermissionDenied =>
-        EventUiFailureReason.storagePermissionDenied,
-      RemoteCardGenerationFailureReason.signedUrlFailed =>
-        EventUiFailureReason.signedUrlFailed,
-      RemoteCardGenerationFailureReason.network => EventUiFailureReason.network,
-      RemoteCardGenerationFailureReason.remoteApiFailure ||
-      null => EventUiFailureReason.unknown,
-    };
-  }
-
   String _safeReason(EventUiFailureReason reason) => switch (reason) {
     EventUiFailureReason.eventInactive => 'event_inactive',
     EventUiFailureReason.freeEventLimitReached => 'free_limit_reached',
@@ -372,11 +340,68 @@ class EventCardUiGenerationController
     EventUiFailureReason.signedUrlFailed => 'signed_url_failed',
     EventUiFailureReason.variantSelectionRequired =>
       'variant_selection_required',
+    EventUiFailureReason.eventVariantInvalid => 'event_variant_invalid',
+    EventUiFailureReason.eventVariantDisabled => 'event_variant_disabled',
     EventUiFailureReason.selectedVariantInvalid => 'selected_variant_invalid',
     EventUiFailureReason.selectedVariantDisabled => 'selected_variant_disabled',
     EventUiFailureReason.selectedVariantAlreadyOwned =>
       'selected_variant_already_owned',
     EventUiFailureReason.network => 'network',
     EventUiFailureReason.unknown => 'unknown',
+  };
+}
+
+EventUiFailureReason mapEventGenerationFailureToUiReason({
+  EventCardGenerationFailure? eventFailure,
+  RemoteCardGenerationFailureReason? remoteFailure,
+}) {
+  if (eventFailure != null) {
+    return switch (eventFailure) {
+      EventCardGenerationFailure.eventInactive =>
+        EventUiFailureReason.eventInactive,
+      EventCardGenerationFailure.freeEventLimitReached =>
+        EventUiFailureReason.freeEventLimitReached,
+      EventCardGenerationFailure.premiumRequired =>
+        EventUiFailureReason.premiumRequired,
+      EventCardGenerationFailure.premiumVerificationUnavailable =>
+        EventUiFailureReason.premiumVerificationUnavailable,
+      EventCardGenerationFailure.eventGenerationPending ||
+      EventCardGenerationFailure.eventReservationConflict =>
+        EventUiFailureReason.eventGenerationPending,
+      EventCardGenerationFailure.eventArtworkValidationFailed =>
+        EventUiFailureReason.eventArtworkValidationFailed,
+      EventCardGenerationFailure.eventPersistenceFailed =>
+        EventUiFailureReason.eventPersistenceFailed,
+      EventCardGenerationFailure.variantSelectionRequired =>
+        EventUiFailureReason.variantSelectionRequired,
+      EventCardGenerationFailure.eventVariantInvalid =>
+        EventUiFailureReason.eventVariantInvalid,
+      EventCardGenerationFailure.eventVariantDisabled =>
+        EventUiFailureReason.eventVariantDisabled,
+      EventCardGenerationFailure.selectedVariantInvalid =>
+        EventUiFailureReason.selectedVariantInvalid,
+      EventCardGenerationFailure.selectedVariantDisabled =>
+        EventUiFailureReason.selectedVariantDisabled,
+      EventCardGenerationFailure.selectedVariantAlreadyOwned =>
+        EventUiFailureReason.selectedVariantAlreadyOwned,
+      EventCardGenerationFailure.rendererFailure =>
+        EventUiFailureReason.unknown,
+    };
+  }
+  return switch (remoteFailure) {
+    RemoteCardGenerationFailureReason.missingEndpoint =>
+      EventUiFailureReason.rendererUnavailable,
+    RemoteCardGenerationFailureReason.invalidPhotoUrl ||
+    RemoteCardGenerationFailureReason.missingPhoto =>
+      EventUiFailureReason.missingPhoto,
+    RemoteCardGenerationFailureReason.photoUploadFailed =>
+      EventUiFailureReason.photoUploadFailed,
+    RemoteCardGenerationFailureReason.storagePermissionDenied =>
+      EventUiFailureReason.storagePermissionDenied,
+    RemoteCardGenerationFailureReason.signedUrlFailed =>
+      EventUiFailureReason.signedUrlFailed,
+    RemoteCardGenerationFailureReason.network => EventUiFailureReason.network,
+    RemoteCardGenerationFailureReason.remoteApiFailure ||
+    null => EventUiFailureReason.unknown,
   };
 }

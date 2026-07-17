@@ -406,6 +406,38 @@ void main() {
     );
   });
 
+  for (final entry in const <String, EventCardGenerationFailure>{
+    'eventVariantInvalid': EventCardGenerationFailure.eventVariantInvalid,
+    'eventVariantDisabled': EventCardGenerationFailure.eventVariantDisabled,
+    'selectedVariantInvalid': EventCardGenerationFailure.selectedVariantInvalid,
+  }.entries) {
+    test('HTTP 400 ${entry.key} remains a typed event failure', () async {
+      final service = RemoteCardGenerationService(
+        endpoint: _endpoint,
+        postJson: ({required uri, required payload}) async =>
+            _errorResponse(400, entry.key),
+      );
+
+      final generated = await service.generateCard(
+        discovery: _discovery(displayPhotoPath: _signedPhotoUrl),
+        displayData: _displayData,
+        collectionNumber: 1,
+        eventRequest: _eventRequest,
+      );
+
+      expect(generated, isNull);
+      expect(service.lastEventFailure, entry.value);
+      expect(
+        service.lastFailureReason,
+        RemoteCardGenerationFailureReason.remoteApiFailure,
+      );
+      expect(
+        service.lastFailureReason,
+        isNot(RemoteCardGenerationFailureReason.network),
+      );
+    });
+  }
+
   test('event 504 recovery reuses the same idempotency payload', () async {
     final idempotencyKeys = <Object?>[];
     final responses = <RemoteCardGenerationHttpResponse>[

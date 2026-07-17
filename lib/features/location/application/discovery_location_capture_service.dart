@@ -60,7 +60,10 @@ class DiscoveryLocationCaptureService {
       'CATDEX_LOCATION_COLLECTION_ENABLED '
       '${preferences.locationCollectionEnabled}',
     );
-    if (!preferences.locationCollectionEnabled) {
+    final explicitlyDisabled =
+        preferences.rememberLocationChoice &&
+        !preferences.locationCollectionEnabled;
+    if (explicitlyDisabled) {
       return const DiscoveryLocationCaptureOutcome();
     }
 
@@ -104,11 +107,12 @@ class DiscoveryLocationCaptureService {
             preferences.locationConsentVersion,
           );
         }
+        final timestampedLocation = _withCaptureTimestamp(location);
         final persistedLocation =
             preferences.locationPrecisionMode ==
                 LocationPrecisionMode.approximate
-            ? location.toApproximate()
-            : location;
+            ? timestampedLocation.toApproximate()
+            : timestampedLocation;
         if (persistedLocation.isApproximate) {
           debugPrint('CATDEX_LOCATION_APPROXIMATED');
         }
@@ -119,9 +123,29 @@ class DiscoveryLocationCaptureService {
         );
         return DiscoveryLocationCaptureOutcome(
           location: persistedLocation,
-          locationConsentVersion: preferences.locationConsentVersion,
+          locationConsentVersion:
+              preferences.locationConsentVersion ?? 'map-v2-os-permission',
         );
     }
+  }
+
+  CatDiscoveryLocation _withCaptureTimestamp(
+    CatDiscoveryLocation location,
+  ) {
+    if (location.capturedAt != null) return location;
+    return CatDiscoveryLocation.tryCreate(
+          latitude: location.latitude,
+          longitude: location.longitude,
+          horizontalAccuracyMeters: location.horizontalAccuracyMeters,
+          capturedAt: DateTime.now().toUtc(),
+          source: location.source,
+          locality: location.locality,
+          administrativeArea: location.administrativeArea,
+          countryCode: location.countryCode,
+          isApproximate: location.isApproximate,
+          schemaVersion: location.schemaVersion,
+        ) ??
+        location;
   }
 
   bool _canRequest(

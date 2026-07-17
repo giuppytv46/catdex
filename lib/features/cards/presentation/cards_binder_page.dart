@@ -9,9 +9,13 @@ import 'package:catdex/features/cards/application/card_generation_pipeline.dart'
 import 'package:catdex/features/cards/application/card_generation_state_controller.dart';
 import 'package:catdex/features/cards/application/cat_card_repository_providers.dart';
 import 'package:catdex/features/cards/application/remote_card_generation_service.dart';
+import 'package:catdex/features/cards/domain/cat_card_record.dart';
 import 'package:catdex/features/cards/presentation/card_image_cache_buster.dart';
 import 'package:catdex/features/cards/presentation/catdex_trading_card_page.dart';
 import 'package:catdex/features/cards/presentation/rarity_debug_controls.dart';
+import 'package:catdex/features/cards/presentation/reveal/card_reveal_reward_bridge.dart';
+import 'package:catdex/features/cards/presentation/reveal/card_reveal_session.dart';
+import 'package:catdex/features/cards/presentation/reveal/card_reveal_session_presenter.dart';
 import 'package:catdex/features/cards/presentation/widgets/catdex_card_preview.dart';
 import 'package:catdex/features/catdex/application/catdex_controller.dart';
 import 'package:catdex/features/catdex/application/local_discovery_session_controller.dart';
@@ -62,6 +66,7 @@ class _CardsBinderPageState extends ConsumerState<CardsBinderPage> {
   @override
   void initState() {
     super.initState();
+    attachCardRevealMissionBridge(ref);
     if (widget.autoGenerateMissingCards) {
       debugPrint(
         'CATDEX_CARD_GENERATION_AUTO_START_BLOCKED '
@@ -1254,6 +1259,7 @@ class _RarityCardsAlbumPageState extends ConsumerState<RarityCardsAlbumPage> {
                   : generationStates[discoveryId] ??
                         CardGenerationSharedState.idle;
               return _CardsBinderTile(
+                key: ValueKey('card-tile-$discoveryId'),
                 entry: entry,
                 generating: generationState.isGenerating,
                 generatingLabel: generationState.label,
@@ -1322,6 +1328,8 @@ class _RarityCardsAlbumPageState extends ConsumerState<RarityCardsAlbumPage> {
     if (discoveryId == null) {
       return;
     }
+    final rootOverlay = Overlay.of(context, rootOverlay: true);
+    final mediaQuery = MediaQuery.of(context);
 
     final generationController = ref.read(
       cardGenerationStateProvider.notifier,
@@ -1363,23 +1371,20 @@ class _RarityCardsAlbumPageState extends ConsumerState<RarityCardsAlbumPage> {
       return;
     }
 
-    final version = DateTime.now().millisecondsSinceEpoch;
-    await ref
-        .read(localDiscoverySessionProvider.notifier)
-        .refreshDiscoveryById(discoveryId);
-    if (!mounted) {
-      return;
-    }
     final persistedCards = await ref
         .read(catCardRepositoryProvider)
         .getCardsForDiscovery(discoveryId);
     if (!mounted) {
       return;
     }
-    final persistedResult = persistedCards.any(
-      (card) => card.isCompleted && card.finalCardUrl == result,
-    );
-    if (!persistedResult) {
+    CatCardRecord? persistedCard;
+    for (final card in persistedCards) {
+      if (card.isCompleted && card.finalCardUrl == result) {
+        persistedCard = card;
+        break;
+      }
+    }
+    if (persistedCard == null) {
       generationController.fail(discoveryId);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.cardGenerationError)),
@@ -1389,12 +1394,40 @@ class _RarityCardsAlbumPageState extends ConsumerState<RarityCardsAlbumPage> {
     if (generationController.forDiscovery(discoveryId).isGenerating) {
       generationController.complete(discoveryId);
     }
+    final rewardCue = ref.read(cardRevealRewardCueProvider)[discoveryId];
+    final revealSession = CardRevealSession.fromRecord(
+      card: persistedCard,
+      localizedRarityLabel: l10n.localizeDisplayValue(
+        _rarityLabel(persistedCard.rarity),
+      ),
+      mediaQuery: mediaQuery,
+      rewardCue: rewardCue,
+    );
+    debugPrint('CATDEX_CARD_REVEAL_ALBUM_REFRESH_DEFERRED');
+    final action = await CardRevealSessionPresenter.instance.show(
+      rootOverlay: rootOverlay,
+      session: revealSession,
+      onRewardSequenceCompleted: (cue) {
+        ref
+            .read(cardRevealRewardCueProvider.notifier)
+            .consume(discoveryId, cue.id);
+      },
+    );
+    if (!mounted) return;
+    debugPrint('CATDEX_CARD_REVEAL_ALBUM_REFRESH_STARTED');
+    await ref
+        .read(localDiscoverySessionProvider.notifier)
+        .refreshDiscoveryById(discoveryId);
+    await ref.read(catCardCollectionProvider.notifier).refresh();
+    if (!mounted) return;
+    debugPrint('CATDEX_CARD_REVEAL_ALBUM_REFRESH_COMPLETED');
+    final version = DateTime.now().millisecondsSinceEpoch;
     setState(() {
       _localCacheBustVersions[discoveryId] = version;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.cardUpdatedMessage)),
-    );
+    if (action == CardRevealSessionAction.openCard) {
+      widget.onOpenCard(entry);
+    }
   }
 
   void _startLongWaitMessage(String discoveryId) {
@@ -1681,6 +1714,7 @@ class _CardsBinderTile extends StatelessWidget {
     required this.onRegenerate,
     required this.onTap,
     this.generateLabel,
+    super.key,
   });
 
   final CatDexCollectionEntry entry;

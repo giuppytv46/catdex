@@ -40,6 +40,100 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(DiscoveryRevealPage), findsOneWidget);
   });
+
+  testWidgets('Add to CatDex animates only after persistence success', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localDiscoverySaveControllerProvider.overrideWith(
+            _SuccessfulLocalDiscoverySaveController.new,
+          ),
+        ],
+        child: MaterialApp(
+          locale: const Locale('it'),
+          theme: AppTheme.light(),
+          localizationsDelegates: CatDexLocalizations.localizationsDelegates,
+          supportedLocales: CatDexLocalizations.supportedLocales,
+          home: DiscoveryRevealPage(args: _args()),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await _scrollToAddButton(tester);
+    await tester.tap(find.byKey(const Key('discovery_reveal_add_button')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('name_discovery_save_button')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('catdex_add_success_label')), findsNothing);
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(
+      find.byKey(const Key('catdex_add_success_label')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('catdex_add_rectangular_discovery_card')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('catdex_collection_target')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('catdex_celebration_painter')), findsOneWidget);
+    expect(find.text('AGGIUNTO AL CATDEX!'), findsOneWidget);
+    expect(find.text('+100 XP'), findsOneWidget);
+    expect(find.byType(DiscoveryRevealPage), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byType(DiscoveryRevealPage), findsOneWidget);
+  });
+
+  testWidgets('failed persistence does not show CatDex success animation', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          localDiscoverySaveControllerProvider.overrideWith(
+            _FailingLocalDiscoverySaveController.new,
+          ),
+        ],
+        child: MaterialApp(
+          locale: const Locale('it'),
+          theme: AppTheme.light(),
+          localizationsDelegates: CatDexLocalizations.localizationsDelegates,
+          supportedLocales: CatDexLocalizations.supportedLocales,
+          home: DiscoveryRevealPage(args: _args()),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await _scrollToAddButton(tester);
+    await tester.tap(find.byKey(const Key('discovery_reveal_add_button')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('name_discovery_save_button')));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byKey(const Key('catdex_add_success_label')), findsNothing);
+    expect(
+      find.byKey(const Key('catdex_celebration_overlay')),
+      findsNothing,
+    );
+    expect(find.text('+100 XP'), findsNothing);
+  });
+}
+
+Future<void> _scrollToAddButton(WidgetTester tester) async {
+  await tester.dragUntilVisible(
+    find.byKey(const Key('discovery_reveal_add_button')),
+    find.byType(Scrollable).first,
+    const Offset(0, -300),
+  );
+  await tester.pump();
 }
 
 class _ResettingLocalDiscoverySaveController
@@ -65,6 +159,71 @@ class _ResettingLocalDiscoverySaveController
   @override
   void reset() {
     state = const AsyncData(LocalDiscoverySaveState.idle());
+  }
+}
+
+class _SuccessfulLocalDiscoverySaveController
+    extends LocalDiscoverySaveController {
+  @override
+  Future<LocalDiscoverySaveState> build() async {
+    return const LocalDiscoverySaveState.idle();
+  }
+
+  @override
+  Future<void> save(
+    CatAnalysisResult result, {
+    String? photoPath,
+    String? cloudStoragePath,
+    String customName = 'Mochi',
+    String suggestedName = 'Mochi',
+    String? nickname,
+    bool usesEditedDetails = false,
+  }) async {
+    state = const AsyncData(
+      LocalDiscoverySaveState(status: LocalDiscoverySaveStatus.saving),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    state = const AsyncData(
+      LocalDiscoverySaveState(
+        status: LocalDiscoverySaveStatus.saved,
+        reward: DiscoveryReward(
+          xp: 100,
+          coins: 10,
+          friendshipPoints: 20,
+          duplicate: false,
+        ),
+      ),
+    );
+  }
+}
+
+class _FailingLocalDiscoverySaveController
+    extends LocalDiscoverySaveController {
+  @override
+  Future<LocalDiscoverySaveState> build() async {
+    return const LocalDiscoverySaveState.idle();
+  }
+
+  @override
+  Future<void> save(
+    CatAnalysisResult result, {
+    String? photoPath,
+    String? cloudStoragePath,
+    String customName = 'Mochi',
+    String suggestedName = 'Mochi',
+    String? nickname,
+    bool usesEditedDetails = false,
+  }) async {
+    state = const AsyncData(
+      LocalDiscoverySaveState(status: LocalDiscoverySaveStatus.saving),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    state = const AsyncData(
+      LocalDiscoverySaveState(
+        status: LocalDiscoverySaveStatus.failure,
+        message: 'save failed',
+      ),
+    );
   }
 }
 

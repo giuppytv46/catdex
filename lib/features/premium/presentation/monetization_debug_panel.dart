@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:catdex/features/achievements/presentation/achievement_debug_controls.dart';
 import 'package:catdex/features/ads/application/admob_service.dart';
+import 'package:catdex/features/missions/presentation/daily_mission_debug_controls.dart';
 import 'package:catdex/features/premium/application/local_monetization_service.dart';
 import 'package:catdex/features/premium/presentation/monetization_debug_controls.dart';
 import 'package:catdex/theme/app_colors.dart';
@@ -22,12 +24,16 @@ class _MonetizationDebugPanelState
   int _analysisInterstitialCounter = 0;
   int _cardInterstitialCounter = 0;
   bool _loading = true;
+  bool _refreshScheduled = false;
 
   @override
   void initState() {
     super.initState();
     if (showMonetizationDebug) {
       debugPrint('CATDEX_MONETIZATION_DEBUG_PANEL_VISIBLE true');
+      ref.listenManual<int>(monetizationRefreshProvider, (_, _) {
+        _scheduleRefresh();
+      });
       unawaited(_refresh());
     } else {
       _loading = false;
@@ -61,7 +67,6 @@ class _MonetizationDebugPanelState
       final service = ref.read(monetizationServiceProvider);
       await action(service);
       ref.read(adVisibilityRefreshProvider.notifier).refresh();
-      await _refresh();
     }();
   }
 
@@ -80,12 +85,6 @@ class _MonetizationDebugPanelState
     if (!showMonetizationDebug) {
       return const SizedBox.shrink();
     }
-    ref.listen<int>(monetizationRefreshProvider, (_, _) {
-      if (mounted) {
-        unawaited(_refresh());
-      }
-    });
-
     final status = _status;
     final premium = status?.isPremium == true;
 
@@ -299,11 +298,29 @@ class _MonetizationDebugPanelState
                   ),
                 ],
               ),
+              const DailyMissionDebugControls(),
+              const AchievementDebugControls(),
             ],
           ],
         ),
       ),
     );
+  }
+
+  void _scheduleRefresh() {
+    if (_refreshScheduled) {
+      debugPrint(
+        'CATDEX_PROVIDER_UPDATE_DEDUPLICATED '
+        'provider=monetization_debug_panel reason=already_scheduled',
+      );
+      return;
+    }
+    _refreshScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshScheduled = false;
+      if (!mounted) return;
+      unawaited(_refresh());
+    });
   }
 }
 

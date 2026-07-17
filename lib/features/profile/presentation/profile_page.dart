@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:catdex/core/localization/app_locale_controller.dart';
 import 'package:catdex/core/localization/catdex_localizations.dart';
+import 'package:catdex/features/achievements/presentation/achievement_profile_section.dart';
 import 'package:catdex/features/ads/presentation/catdex_banner_ad_widget.dart';
 import 'package:catdex/features/auth/application/auth_controller.dart';
 import 'package:catdex/features/auth/domain/entities/auth_session.dart';
@@ -148,6 +149,8 @@ class ProfilePage extends ConsumerWidget {
             const CatDexBannerAdWidget(
               placementLog: 'CATDEX_AD_BANNER_PLACEMENT_TOP_PROFILE',
             ),
+            const SizedBox(height: AppSpacing.lg),
+            const AchievementProfileSection(),
             const SizedBox(height: AppSpacing.lg),
             _AlphaTesterInfoCard(selectedLocale: selectedLocale),
             if (showMonetizationDebug) ...[

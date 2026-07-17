@@ -1,3 +1,4 @@
+import 'package:catdex/shared/state/build_safe_refresh_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,7 +17,6 @@ final monetizationServiceProvider = Provider<MonetizationService>((ref) {
 final monetizationStatusSummaryProvider =
     FutureProvider<MonetizationStatusSummary>((ref) async {
       ref.watch(monetizationRefreshProvider);
-      debugPrint('CATDEX_USAGE_UI_REFRESH_REQUESTED');
       return ref
           .watch(monetizationServiceProvider)
           .getMonetizationStatusSummary();
@@ -26,19 +26,16 @@ final monetizationStatusProvider = FutureProvider<MonetizationStatus>((
   ref,
 ) async {
   ref.watch(monetizationRefreshProvider);
-  debugPrint('CATDEX_USAGE_UI_REFRESH_REQUESTED');
   return ref.watch(monetizationServiceProvider).getStatus();
 });
 
-class MonetizationRefreshController extends Notifier<int> {
-  @override
-  int build() {
-    return 0;
-  }
+class MonetizationRefreshController extends BuildSafeRefreshController {
+  MonetizationRefreshController() : super('monetization_status');
 
+  @override
   void refresh() {
     debugPrint('CATDEX_MONETIZATION_NOTIFY_LISTENERS');
-    state++;
+    super.refresh();
   }
 }
 
@@ -169,6 +166,8 @@ class MonetizationService {
       'catdex_monetization_last_limit_reset_date';
   static String? _lastStatusLog;
   static DateTime? _lastStatusLogAt;
+  String? _lastNotifiedStatusSignature;
+  int _refreshTransactionSequence = 0;
 
   Future<bool> canAnalyzeCat() async {
     final preferences = await _preparedPreferences();
@@ -532,6 +531,25 @@ class MonetizationService {
       'max=${status.maxDailyCardGenerations} '
       'credits=${status.extraCardGenerationCredits}',
     );
+    final signature = [
+      status.isPremium,
+      status.dailyAnalysisCount,
+      status.dailyCardGenerationCount,
+      status.extraAnalysisCredits,
+      status.extraCardGenerationCredits,
+      status.lastLimitResetDate,
+    ].join(':');
+    if (_lastNotifiedStatusSignature == signature) {
+      debugPrint('CATDEX_MONETIZATION_REFRESH_SKIPPED_DUPLICATE');
+      return;
+    }
+
+    _lastNotifiedStatusSignature = signature;
+    final transaction = 'monetization-${++_refreshTransactionSequence}';
+    debugPrint(
+      'CATDEX_MONETIZATION_REFRESH_COMMITTED transaction=$transaction',
+    );
+    debugPrint('CATDEX_USAGE_UI_REFRESH_REQUESTED transaction=$transaction');
     _notifyListeners();
   }
 }

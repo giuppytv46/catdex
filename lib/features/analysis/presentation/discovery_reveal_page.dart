@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:catdex/core/localization/catdex_localizations.dart';
 import 'package:catdex/features/analysis/application/discovery_reveal_sound_hooks.dart';
@@ -9,6 +10,8 @@ import 'package:catdex/features/analysis/domain/entities/discovery_reveal_args.d
 import 'package:catdex/features/analysis/presentation/cat_display_formatter.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/routing/app_routes.dart';
+import 'package:catdex/shared/celebrations/catdex_celebration_coordinator.dart';
+import 'package:catdex/shared/celebrations/catdex_celebration_theme.dart';
 import 'package:catdex/theme/app_colors.dart';
 import 'package:catdex/theme/app_spacing.dart';
 import 'package:flutter/material.dart';
@@ -26,11 +29,14 @@ class DiscoveryRevealPage extends ConsumerStatefulWidget {
 }
 
 class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _controller;
+  late final AnimationController _collectionController;
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _scaleAnimation;
   bool _saveFlowActive = false;
+  bool _showCollectionSuccess = false;
+  int _savedXp = 0;
 
   @override
   void initState() {
@@ -46,6 +52,10 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
     _scaleAnimation = Tween<double>(begin: 0.88, end: 1).animate(
       CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
     );
+    _collectionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
     unawaited(_controller.forward());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -60,97 +70,149 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
   @override
   void dispose() {
     _controller.dispose();
+    _collectionController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
-    final result = widget.args.result;
+    final displayData = const CatDisplayFormatter().fromAnalysis(
+      widget.args.result,
+    );
     final saveState = ref.watch(localDiscoverySaveControllerProvider);
     final currentSaveState = switch (saveState) {
       AsyncData(:final value) => value,
       _ => const LocalDiscoverySaveState.idle(),
     };
-    final previewReward = ref
-        .read(localDiscoverySaveControllerProvider.notifier)
-        .previewReward(result);
-    final reward = currentSaveState.reward ?? previewReward;
     final saving = currentSaveState.status == LocalDiscoverySaveStatus.saving;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.discoveryRevealTitle)),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
-            120,
-          ),
+        child: Stack(
           children: [
-            FadeTransition(
-              opacity: _fadeAnimation,
-              child: ScaleTransition(
-                scale: _scaleAnimation,
-                child: _RevealCard(args: widget.args),
+            ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.lg,
+                AppSpacing.lg,
+                120,
               ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: _RewardPanel(
-                key: ValueKey('${reward.xp}-${reward.coins}'),
-                xp: reward.xp,
-                coins: reward.coins,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            _ResultDetails(args: widget.args),
-            const SizedBox(height: AppSpacing.lg),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: currentSaveState.status == LocalDiscoverySaveStatus.saved
-                  ? FilledButton.icon(
-                      key: const Key('discovery_reveal_continue_button'),
-                      onPressed: () => context.goNamed(AppRoute.home.name),
-                      icon: const Icon(Icons.arrow_forward_rounded),
-                      label: Text(l10n.continueAction),
-                    )
-                  : FilledButton.icon(
-                      key: const Key('discovery_reveal_add_button'),
-                      onPressed: saving ? null : () => _saveDiscovery(context),
-                      icon: saving
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.add_circle_rounded),
-                      label: Text(
-                        currentSaveState.status ==
-                                LocalDiscoverySaveStatus.failure
-                            ? l10n.retrySaveAction
-                            : l10n.addToCatDexAction,
-                      ),
+              children: [
+                FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: ScaleTransition(
+                    scale: _scaleAnimation,
+                    child: _RevealCard(args: widget.args),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _ResultDetails(args: widget.args),
+                const SizedBox(height: AppSpacing.lg),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: FilledButton.icon(
+                    key: const Key('discovery_reveal_add_button'),
+                    onPressed: saving || _saveFlowActive
+                        ? null
+                        : () => _saveDiscovery(context),
+                    icon: saving || _saveFlowActive
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add_circle_rounded),
+                    label: Text(
+                      currentSaveState.status ==
+                              LocalDiscoverySaveStatus.failure
+                          ? l10n.retrySaveAction
+                          : l10n.addToCatDexAction,
                     ),
+                  ),
+                ),
+                if (currentSaveState.status ==
+                    LocalDiscoverySaveStatus.failure) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    currentSaveState.pendingSync == null
+                        ? currentSaveState.message ?? l10n.globalErrorTitle
+                        : l10n.saveToCatDexFailedLabel,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: AppColors.danger),
+                  ),
+                ],
+              ],
             ),
-            if (currentSaveState.status ==
-                LocalDiscoverySaveStatus.failure) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                currentSaveState.pendingSync == null
-                    ? currentSaveState.message ?? l10n.globalErrorTitle
-                    : l10n.saveToCatDexFailedLabel,
-                textAlign: TextAlign.center,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: AppColors.danger),
+            if (_showCollectionSuccess)
+              Positioned.fill(
+                child: _CatDexAddSuccessOverlay(
+                  animation: _collectionController,
+                  photoPath: widget.args.photo.bestLocalPath,
+                  species: l10n.localizeDisplayValue(
+                    displayData.displaySpecies,
+                  ),
+                  rarity: l10n.localizeDisplayValue(
+                    displayData.displayRarity,
+                  ),
+                  xp: _savedXp,
+                ),
               ),
-            ],
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _playCollectionSuccess(int xp) async {
+    if (!mounted) return;
+    debugPrint('CATDEX_CATDEX_ADD_ANIMATION_STARTED');
+    final coordinator = CatDexCelebrationCoordinator.instance;
+    final lease = coordinator.acquire(CatDexCelebrationType.addedToCatDex);
+    final l10n = CatDexLocalizations.of(context);
+    setState(() {
+      _savedXp = xp;
+      _showCollectionSuccess = true;
+    });
+    _collectionController.duration = _reduceMotion
+        ? const Duration(milliseconds: 420)
+        : const Duration(milliseconds: 2050);
+    final celebration = coordinator.celebrate(
+      context,
+      CatDexCelebrationRequest(
+        type: CatDexCelebrationType.addedToCatDex,
+        theme: CatDexCelebrationTheme.forPalette(
+          CatDexCelebrationPalette.catDex,
+        ),
+        title: l10n.catDexAddedSuccess,
+        subtitle: xp > 0 ? '+$xp XP' : null,
+        semanticLabel: l10n.catDexAddedSuccess,
+        seed: _stableAddCelebrationSeed(widget.args.photo.bestLocalPath),
+        reduceMotion: _reduceMotion,
+      ),
+    );
+    debugPrint('CATDEX_CELEBRATION_NAVIGATION_DEFERRED');
+    try {
+      await Future.wait<void>([
+        _collectionController.forward(from: 0),
+        celebration,
+      ]);
+      if (!mounted) return;
+      debugPrint('CATDEX_CATDEX_ADD_ANIMATION_COMPLETED');
+    } on Object {
+      // A disposed route can cancel the local ticker; persistence is already
+      // complete and must not be changed by presentation cleanup.
+    } finally {
+      lease.release();
+    }
+  }
+
+  bool get _reduceMotion {
+    final media = MediaQuery.maybeOf(context);
+    return (media?.disableAnimations ?? false) ||
+        (media?.accessibleNavigation ?? false);
   }
 
   Future<void> _saveDiscovery(BuildContext context) async {
@@ -158,7 +220,7 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
       return;
     }
     setState(() => _saveFlowActive = true);
-    final suggestedName = widget.args.suggestedName;
+    final suggestedName = widget.args.suggestedName.trim();
     final catName = await showDialog<String>(
       context: context,
       builder: (_) {
@@ -197,7 +259,7 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
       photoPath: widget.args.photo.bestLocalPath,
       cloudStoragePath: widget.args.photo.storagePath,
       customName: catName,
-      suggestedName: suggestedName,
+      suggestedName: displayData.displaySpecies,
       usesEditedDetails: widget.args.usesEditedDetails,
     );
 
@@ -209,6 +271,9 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
       return;
     }
 
+    final savedXp = state?.reward?.xp ?? 0;
+    await _playCollectionSuccess(savedXp);
+    if (!context.mounted) return;
     ref.read(discoveryRevealSoundHooksProvider).playLevelUp();
     context.goNamed(AppRoute.catDex.name);
   }
@@ -228,6 +293,287 @@ class _DiscoveryRevealPageState extends ConsumerState<DiscoveryRevealPage>
     }
 
     hooks.playCommonReveal();
+  }
+}
+
+int _stableAddCelebrationSeed(String value) {
+  var result = 29;
+  for (final codeUnit in value.codeUnits) {
+    result = ((result * 37) + codeUnit) & 0x7FFFFFFF;
+  }
+  return result;
+}
+
+class _CatDexAddSuccessOverlay extends StatelessWidget {
+  const _CatDexAddSuccessOverlay({
+    required this.animation,
+    required this.photoPath,
+    required this.species,
+    required this.rarity,
+    required this.xp,
+  });
+
+  final Animation<double> animation;
+  final String photoPath;
+  final String species;
+  final String rarity;
+  final int xp;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = CatDexLocalizations.of(context);
+    final reduceMotion =
+        MediaQuery.disableAnimationsOf(context) ||
+        MediaQuery.accessibleNavigationOf(context);
+    return Semantics(
+      liveRegion: true,
+      label: l10n.catDexAddedSuccess,
+      child: Material(
+        color: AppColors.ink.withValues(alpha: 0.88),
+        child: AnimatedBuilder(
+          animation: animation,
+          builder: (context, _) {
+            final progress = Curves.easeOutCubic.transform(animation.value);
+            final moveProgress = const Interval(
+              0.08,
+              0.62,
+              curve: Curves.easeInOutCubic,
+            ).transform(progress);
+            final pulse = reduceMotion
+                ? 1.0
+                : 0.92 +
+                      (0.08 *
+                          Curves.easeOutBack.transform(
+                            const Interval(0.46, 0.82).transform(progress),
+                          ));
+            final successProgress = const Interval(
+              0.56,
+              1,
+              curve: Curves.easeOutBack,
+            ).transform(progress);
+            final curveX = reduceMotion
+                ? 0.0
+                : math.sin(math.pi * moveProgress) * 68;
+            final curveY = reduceMotion ? 68.0 : -72 + (178 * moveProgress);
+            final cardScale = reduceMotion ? 0.56 : 1 - (0.44 * moveProgress);
+            final cardTilt = reduceMotion ? 0.0 : -0.08 + (0.12 * moveProgress);
+            return SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 390),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.xl),
+                    child: SizedBox(
+                      height: 500,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Align(
+                            alignment: const Alignment(0, 0.30),
+                            child: Transform.scale(
+                              scale: pulse,
+                              child: _CatDexCollectionSlot(
+                                completed: successProgress > 0.56,
+                              ),
+                            ),
+                          ),
+                          Align(
+                            alignment: const Alignment(0, -0.36),
+                            child: Transform.translate(
+                              offset: Offset(curveX, curveY),
+                              child: Transform.rotate(
+                                angle: cardTilt,
+                                child: Transform.scale(
+                                  scale: cardScale,
+                                  child: _DiscoveryCollectionCard(
+                                    cardKey: const Key(
+                                      'catdex_add_rectangular_discovery_card',
+                                    ),
+                                    photoPath: photoPath,
+                                    species: species,
+                                    rarity: rarity,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Align(
+                            alignment: const Alignment(0, 0.92),
+                            child: Opacity(
+                              opacity: successProgress.clamp(0, 1),
+                              child: Transform.translate(
+                                offset: Offset(0, 12 * (1 - successProgress)),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      l10n.catDexAddedSuccess.toUpperCase(),
+                                      key: const Key(
+                                        'catdex_add_success_label',
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(
+                                            color: AppColors.white,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                    ),
+                                    if (xp > 0) ...[
+                                      const SizedBox(height: AppSpacing.xs),
+                                      Text(
+                                        '+$xp XP',
+                                        key: const Key(
+                                          'catdex_add_success_xp',
+                                        ),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleLarge
+                                            ?.copyWith(
+                                              color: AppColors.primaryGreen,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscoveryCollectionCard extends StatelessWidget {
+  const _DiscoveryCollectionCard({
+    required this.cardKey,
+    required this.photoPath,
+    required this.species,
+    required this.rarity,
+  });
+
+  final Key cardKey;
+  final String photoPath;
+  final String species;
+  final String rarity;
+
+  @override
+  Widget build(BuildContext context) {
+    final file = File(photoPath);
+    return Container(
+      key: cardKey,
+      width: 250,
+      height: 230,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFB7A7FF), width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x66000000),
+            blurRadius: 24,
+            offset: Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: file.existsSync()
+                  ? Image.file(file, fit: BoxFit.cover)
+                  : const ColoredBox(
+                      color: Color(0xFFE5E7EB),
+                      child: Icon(Icons.pets_rounded, color: Color(0xFF6B7280)),
+                    ),
+            ),
+          ),
+          if (species.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              species,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFF111827),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+          if (rarity.isNotEmpty)
+            Text(
+              rarity,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFF7C3AED),
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CatDexCollectionSlot extends StatelessWidget {
+  const _CatDexCollectionSlot({required this.completed});
+
+  final bool completed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('catdex_collection_target'),
+      width: 112,
+      height: 112,
+      decoration: BoxDecoration(
+        color: AppColors.primaryPurple,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFFF8FAFC), width: 3),
+        boxShadow: const [
+          BoxShadow(color: Color(0x667C3AED), blurRadius: 28, spreadRadius: 3),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Icon(
+            Icons.collections_bookmark_rounded,
+            color: Colors.white,
+            size: 48,
+          ),
+          if (completed)
+            const Positioned(
+              right: 8,
+              bottom: 8,
+              child: Icon(
+                Icons.check_circle_rounded,
+                key: Key('catdex_add_success_check'),
+                color: AppColors.primaryGreen,
+                size: 28,
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 
@@ -292,21 +638,6 @@ class _RevealCard extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        args.suggestedName,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              color: rarityColor,
-                              fontWeight: FontWeight.w900,
-                            ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Hero(
-                        tag: 'catdex-photo-${args.photo.bestLocalPath}',
-                        child: _PhotoMedallion(path: args.photo.bestLocalPath),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
                         l10n.localizeDisplayValue(displayData.displaySpecies),
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.headlineSmall
@@ -314,6 +645,16 @@ class _RevealCard extends StatelessWidget {
                               color: AppColors.ink,
                               fontWeight: FontWeight.w900,
                             ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Hero(
+                        tag: 'catdex-photo-${args.photo.bestLocalPath}',
+                        child: _DiscoveryCollectionCard(
+                          cardKey: const Key('discovery_reveal_photo_card'),
+                          photoPath: args.photo.bestLocalPath,
+                          species: '',
+                          rarity: '',
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Wrap(
@@ -469,6 +810,7 @@ class _NameCatDialogState extends State<_NameCatDialog> {
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: FilledButton.icon(
+                      key: const Key('name_discovery_save_button'),
                       onPressed: _submitted ? null : () => _save(context),
                       style: FilledButton.styleFrom(
                         foregroundColor: const Color(0xFF2A2352),
@@ -584,120 +926,6 @@ bool _isShinyVariant(String variantId) {
     'shiny' || 'golden' || 'event_edition' => true,
     _ => false,
   };
-}
-
-class _PhotoMedallion extends StatelessWidget {
-  const _PhotoMedallion({required this.path});
-
-  final String path;
-
-  @override
-  Widget build(BuildContext context) {
-    final file = File(path);
-
-    return Container(
-      width: 168,
-      height: 168,
-      decoration: const BoxDecoration(
-        color: AppColors.primaryGreen,
-        shape: BoxShape.circle,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: file.existsSync()
-          ? Image.file(file, fit: BoxFit.cover)
-          : const Icon(Icons.pets_rounded, color: AppColors.white, size: 92),
-    );
-  }
-}
-
-class _RewardPanel extends StatelessWidget {
-  const _RewardPanel({
-    required this.xp,
-    required this.coins,
-    super.key,
-  });
-
-  final int xp;
-  final int coins;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = CatDexLocalizations.of(context);
-
-    return Row(
-      children: [
-        Expanded(
-          child: _RewardTile(
-            label: l10n.xpEarnedLabel,
-            value: '+$xp XP',
-            icon: Icons.bolt_rounded,
-            color: AppColors.warning,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _RewardTile(
-            label: l10n.coinsEarnedLabel,
-            value: '+$coins',
-            icon: Icons.stars_rounded,
-            color: AppColors.primaryGreen,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RewardTile extends StatelessWidget {
-  const _RewardTile({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.18),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _ResultDetails extends StatelessWidget {

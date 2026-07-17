@@ -13,16 +13,19 @@ class CatDiscoveryFactory {
     required int friendshipPoints,
     required int xpEarned,
     required int coinsEarned,
-    String customName = 'Mochi',
-    String suggestedName = 'Mochi',
+    String customName = '',
+    String suggestedName = '',
     String? originalPhotoPath,
     String? displayPhotoPath,
     CatDiscoveryLocation? captureLocation,
     String? locationConsentVersion,
   }) {
-    final trimmedSuggestedName = _safeName(suggestedName);
+    final trimmedSuggestedName = _safeName(
+      suggestedName,
+      fallback: _speciesFallback(result),
+    );
     final trimmedCustomName = customName.trim().isEmpty
-        ? trimmedSuggestedName
+        ? null
         : customName.trim();
     final resolvedOriginalPhotoPath = originalPhotoPath?.trim().isEmpty ?? true
         ? null
@@ -92,10 +95,25 @@ class CatDiscoveryFactory {
     );
   }
 
-  String _safeName(String value) {
+  String _safeName(String value, {required String fallback}) {
     final trimmed = value.trim();
+    if (trimmed.isNotEmpty) return trimmed;
+    final safeFallback = fallback.trim();
+    return safeFallback.isEmpty ? 'Nuovo gatto' : safeFallback;
+  }
 
-    return trimmed.isEmpty ? 'Mochi' : trimmed;
+  String _speciesFallback(CatAnalysisResult result) {
+    final backendBreed = result.backendBreed?.trim() ?? '';
+    final normalizedBackendBreed = backendBreed.toLowerCase();
+    final backendIsUsable =
+        backendBreed.isNotEmpty &&
+        backendBreed != '-' &&
+        normalizedBackendBreed != 'unknown' &&
+        normalizedBackendBreed != 'non rilevato';
+    if (backendIsUsable) return backendBreed;
+
+    final speciesName = result.primaryBreed.species.displayName.trim();
+    return speciesName.isEmpty ? 'Nuovo gatto' : speciesName;
   }
 
   String _frameStyleForRarity(String rarityName) {

@@ -1,3 +1,5 @@
+import 'package:catdex/features/achievements/application/achievement_bootstrap_scope.dart';
+import 'package:catdex/features/achievements/presentation/achievements_page.dart';
 import 'package:catdex/features/analysis/domain/entities/discovery_reveal_args.dart';
 import 'package:catdex/features/analysis/presentation/analysis_page.dart';
 import 'package:catdex/features/analysis/presentation/discovery_reveal_page.dart';
@@ -12,6 +14,7 @@ import 'package:catdex/features/friends/presentation/friends_page.dart';
 import 'package:catdex/features/home/presentation/home_page.dart';
 import 'package:catdex/features/login/presentation/login_page.dart';
 import 'package:catdex/features/map/presentation/catdex_map_page.dart';
+import 'package:catdex/features/missions/presentation/daily_missions_page.dart';
 import 'package:catdex/features/offline/presentation/offline_page.dart';
 import 'package:catdex/features/onboarding/presentation/onboarding_page.dart';
 import 'package:catdex/features/premium/presentation/premium_page.dart';
@@ -98,6 +101,14 @@ final appRouterProvider = Provider<GoRouter>((_) {
       _animatedRoute(route: AppRoute.profile, child: const ProfilePage()),
       _animatedRoute(route: AppRoute.settings, child: const SettingsPage()),
       _animatedRoute(route: AppRoute.premium, child: const PremiumPage()),
+      _animatedRoute(
+        route: AppRoute.missions,
+        child: const DailyMissionsPage(),
+      ),
+      _animatedRoute(
+        route: AppRoute.achievements,
+        child: const AchievementsPage(),
+      ),
       GoRoute(
         path: AppRoute.event.path,
         name: AppRoute.event.name,
@@ -205,7 +216,9 @@ Widget _buildShell(
   GoRouterState _,
   StatefulNavigationShell navigationShell,
 ) {
-  return CatDexAppShell(navigationShell: navigationShell);
+  return AchievementBootstrapScope(
+    child: CatDexAppShell(navigationShell: navigationShell),
+  );
 }
 
 Widget _slideTransition(

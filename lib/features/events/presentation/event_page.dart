@@ -6,6 +6,10 @@ import 'package:catdex/features/capture/data/supabase_cat_photo_storage_reposito
 import 'package:catdex/features/cards/application/cat_card_repository_providers.dart';
 import 'package:catdex/features/cards/domain/cat_card_record.dart';
 import 'package:catdex/features/cards/presentation/catdex_trading_card_page.dart';
+import 'package:catdex/features/cards/presentation/reveal/card_reveal_controller.dart';
+import 'package:catdex/features/cards/presentation/reveal/card_reveal_reward_bridge.dart';
+import 'package:catdex/features/cards/presentation/reveal/card_reveal_session.dart';
+import 'package:catdex/features/cards/presentation/reveal/card_reveal_session_presenter.dart';
 import 'package:catdex/features/catdex/application/catdex_photo_recovery_service.dart';
 import 'package:catdex/features/catdex/application/catdex_repository_providers.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
@@ -37,6 +41,7 @@ class _EventPageState extends ConsumerState<EventPage> {
   @override
   void initState() {
     super.initState();
+    attachCardRevealMissionBridge(ref);
     debugPrint('CATDEX_EVENT_UI_PAGE_OPENED eventKey=${widget.eventKey}');
   }
 
@@ -67,6 +72,8 @@ class _EventPageState extends ConsumerState<EventPage> {
   }
 
   Widget _buildEvent(EventUiState state) {
+    final rewardCues = ref.watch(cardRevealRewardCueProvider);
+    final showRevealRewards = ModalRoute.of(context)?.isCurrent ?? true;
     final generationStates = ref.watch(eventCardUiGenerationProvider);
     final selectedId =
         state.discoveries.any(
@@ -278,6 +285,15 @@ class _EventPageState extends ConsumerState<EventPage> {
                     onOpenExistingCard: selectedVariantCard == null
                         ? null
                         : () => _openCard(selectedVariantCard),
+                    rewardCue: selectedId == null || !showRevealRewards
+                        ? null
+                        : rewardCues[selectedId],
+                    onRewardSequenceCompleted:
+                        selectedId == null || !showRevealRewards
+                        ? null
+                        : (cue) => ref
+                              .read(cardRevealRewardCueProvider.notifier)
+                              .consume(selectedId, cue.id),
                   ),
                 ),
               ),
@@ -344,7 +360,9 @@ class _EventPageState extends ConsumerState<EventPage> {
     required String? selectedVariantId,
   }) async {
     debugPrint('CATDEX_EVENT_UI_GENERATE_TAPPED');
-    await ref
+    final rootOverlay = Overlay.of(context, rootOverlay: true);
+    final mediaQuery = MediaQuery.of(context);
+    final result = await ref
         .read(eventCardUiGenerationProvider.notifier)
         .generate(
           event: state.event,
@@ -352,6 +370,43 @@ class _EventPageState extends ConsumerState<EventPage> {
           collectionNumber: state.discoveries.indexOf(discovery) + 1,
           selectedVariantId: selectedVariantId,
         );
+    if (!mounted ||
+        result.phase != EventUiGenerationPhase.completed ||
+        result.cardId == null) {
+      return;
+    }
+    final card = await ref
+        .read(catCardRepositoryProvider)
+        .getCardById(result.cardId!);
+    if (!mounted || card == null || !card.isCompleted) return;
+    final rewardCue = ref.read(cardRevealRewardCueProvider)[discovery.id];
+    final l10n = CatDexLocalizations.of(context);
+    final session = CardRevealSession.fromRecord(
+      card: card,
+      localizedRarityLabel: card.isPremiumArtwork
+          ? '${l10n.eventCardBadge} ${l10n.eventPremiumBadge}'
+          : l10n.eventCardBadge,
+      mediaQuery: mediaQuery,
+      rewardCue: rewardCue,
+    );
+    debugPrint('CATDEX_CARD_REVEAL_ALBUM_REFRESH_DEFERRED');
+    final action = await CardRevealSessionPresenter.instance.show(
+      rootOverlay: rootOverlay,
+      session: session,
+      onRewardSequenceCompleted: (cue) {
+        ref
+            .read(cardRevealRewardCueProvider.notifier)
+            .consume(discovery.id, cue.id);
+      },
+    );
+    if (!mounted) return;
+    debugPrint('CATDEX_CARD_REVEAL_ALBUM_REFRESH_STARTED');
+    await ref.read(catCardCollectionProvider.notifier).refresh();
+    ref.read(eventUiRefreshProvider.notifier).refresh();
+    debugPrint('CATDEX_CARD_REVEAL_ALBUM_REFRESH_COMPLETED');
+    if (action == CardRevealSessionAction.openCard) {
+      _openCard(card);
+    }
   }
 
   void _openCard(CatCardRecord card) {
@@ -965,6 +1020,8 @@ class EventGenerationPanel extends StatelessWidget {
     this.selectedVariantId,
     this.existingSelectedVariantCard,
     this.onOpenExistingCard,
+    this.rewardCue,
+    this.onRewardSequenceCompleted,
     super.key,
   });
 
@@ -979,6 +1036,8 @@ class EventGenerationPanel extends StatelessWidget {
   final String? selectedVariantId;
   final CatCardRecord? existingSelectedVariantCard;
   final VoidCallback? onOpenExistingCard;
+  final CardRevealRewardCue? rewardCue;
+  final ValueChanged<CardRevealRewardCue>? onRewardSequenceCompleted;
 
   @override
   Widget build(BuildContext context) {
@@ -992,6 +1051,8 @@ class EventGenerationPanel extends StatelessWidget {
         discovery: selectedDiscovery,
         onOpenCard: onOpenCard,
         onBackToEvent: onBackToEvent,
+        rewardCue: rewardCue,
+        onRewardSequenceCompleted: onRewardSequenceCompleted,
       );
     }
     if (generation.phase == EventUiGenerationPhase.failed ||
@@ -1134,12 +1195,16 @@ class _GenerationSuccess extends StatelessWidget {
     required this.discovery,
     required this.onOpenCard,
     required this.onBackToEvent,
+    required this.rewardCue,
+    required this.onRewardSequenceCompleted,
   });
 
   final CatCardRecord? card;
   final CatDiscovery? discovery;
   final VoidCallback? onOpenCard;
   final VoidCallback? onBackToEvent;
+  final CardRevealRewardCue? rewardCue;
+  final ValueChanged<CardRevealRewardCue>? onRewardSequenceCompleted;
 
   @override
   Widget build(BuildContext context) {
@@ -1990,6 +2055,9 @@ String _failureMessage(
     EventUiFailureReason.eventPersistenceFailed => l10n.eventPersistenceError,
     EventUiFailureReason.variantSelectionRequired =>
       l10n.eventSelectArtworkFirst,
+    EventUiFailureReason.eventVariantInvalid => l10n.eventVariantInvalidServer,
+    EventUiFailureReason.eventVariantDisabled =>
+      l10n.eventVariantDisabledServer,
     EventUiFailureReason.selectedVariantInvalid =>
       l10n.eventSelectedVariantInvalid,
     EventUiFailureReason.selectedVariantDisabled =>
@@ -2002,9 +2070,8 @@ String _failureMessage(
     EventUiFailureReason.storagePermissionDenied =>
       l10n.eventStoragePermissionError,
     EventUiFailureReason.signedUrlFailed => l10n.eventSignedUrlError,
-    EventUiFailureReason.network ||
-    EventUiFailureReason.unknown ||
-    null => l10n.eventNetworkError,
+    EventUiFailureReason.network => l10n.eventNetworkError,
+    EventUiFailureReason.unknown || null => l10n.eventGenerationUnknownError,
   };
 }
 
@@ -2019,6 +2086,8 @@ bool _canRetry(EventUiFailureReason? reason) {
     EventUiFailureReason.photoUploadFailed ||
     EventUiFailureReason.storagePermissionDenied ||
     EventUiFailureReason.signedUrlFailed ||
+    EventUiFailureReason.eventVariantInvalid ||
+    EventUiFailureReason.eventVariantDisabled ||
     EventUiFailureReason.unknown => true,
     _ => false,
   };

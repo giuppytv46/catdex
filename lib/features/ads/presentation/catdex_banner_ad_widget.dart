@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:catdex/features/ads/application/admob_service.dart';
 import 'package:catdex/features/premium/application/local_monetization_service.dart';
+import 'package:catdex/shared/celebrations/catdex_celebration_coordinator.dart';
 import 'package:catdex/theme/app_colors.dart';
 import 'package:catdex/theme/app_spacing.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +29,8 @@ class _CatDexBannerAdWidgetState extends ConsumerState<CatDexBannerAdWidget> {
   bool _loading = false;
   bool _loaded = false;
   bool _failed = false;
+  bool _loadScheduled = false;
+  bool _disposeScheduled = false;
 
   @override
   void initState() {
@@ -50,46 +53,52 @@ class _CatDexBannerAdWidgetState extends ConsumerState<CatDexBannerAdWidget> {
   @override
   Widget build(BuildContext context) {
     final refreshVersion = ref.watch(adVisibilityRefreshProvider);
+    return ValueListenableBuilder<int>(
+      valueListenable: CatDexCelebrationCoordinator.instance.activityListenable,
+      builder: (context, celebrationVersion, _) {
+        return FutureBuilder<bool>(
+          key: ValueKey('$refreshVersion:$celebrationVersion'),
+          future: ref.read(monetizationServiceProvider).isPremiumUser(),
+          builder: (context, snapshot) {
+            final isPremium = snapshot.data == true;
+            final visible = ref
+                .read(adMobServiceProvider)
+                .shouldShowAds(
+                  isPremium: isPremium,
+                  safeForAds: widget.safeForAds,
+                );
 
-    return FutureBuilder<bool>(
-      key: ValueKey(refreshVersion),
-      future: ref.read(monetizationServiceProvider).isPremiumUser(),
-      builder: (context, snapshot) {
-        final isPremium = snapshot.data == true;
-        final visible = ref
-            .read(adMobServiceProvider)
-            .shouldShowAds(
-              isPremium: isPremium,
-              safeForAds: widget.safeForAds,
-            );
-
-        if (!visible) {
-          _disposeBanner();
-          return const SizedBox.shrink();
-        }
-
-        if (snapshot.connectionState == ConnectionState.done &&
-            !_loading &&
-            !_loaded &&
-            !_failed) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              _loadBanner();
+            if (!visible) {
+              _scheduleBannerDisposal();
+              return const SizedBox.shrink();
             }
-          });
-        }
 
-        return _BannerFrame(
-          child: _loaded && _bannerAd != null
-              ? AdWidget(ad: _bannerAd!)
-              : Text(
-                  _failed ? 'Banner Ad failed' : 'Banner Ad loading...',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.primaryPurple,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+            if (snapshot.connectionState == ConnectionState.done &&
+                !_loading &&
+                !_loaded &&
+                !_failed &&
+                !_loadScheduled) {
+              _loadScheduled = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _loadScheduled = false;
+                if (!mounted) return;
+                _loadBanner();
+              });
+            }
+
+            return _BannerFrame(
+              child: _loaded && _bannerAd != null
+                  ? AdWidget(ad: _bannerAd!)
+                  : Text(
+                      _failed ? 'Banner Ad failed' : 'Banner Ad loading...',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: AppColors.primaryPurple,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+            );
+          },
         );
       },
     );
@@ -147,6 +156,16 @@ class _CatDexBannerAdWidgetState extends ConsumerState<CatDexBannerAdWidget> {
     _loading = false;
     _loaded = false;
     _failed = false;
+  }
+
+  void _scheduleBannerDisposal() {
+    if (_disposeScheduled || _bannerAd == null) return;
+    _disposeScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _disposeScheduled = false;
+      if (!mounted) return;
+      _disposeBanner();
+    });
   }
 }
 

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:catdex/core/localization/catdex_localizations.dart';
 import 'package:catdex/features/analysis/presentation/cat_display_formatter.dart';
+import 'package:catdex/features/cards/application/cat_card_repository_providers.dart';
+import 'package:catdex/features/cards/domain/cat_card_record.dart';
 import 'package:catdex/features/catdex/application/local_discovery_session_controller.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
@@ -12,6 +14,7 @@ import 'package:catdex/features/location/domain/entities/location_service_result
 import 'package:catdex/features/map/application/catdex_map_controller.dart';
 import 'package:catdex/features/map/application/map_discovery_image_provider.dart';
 import 'package:catdex/features/map/domain/entities/catdex_map_marker_data.dart';
+import 'package:catdex/features/missions/application/daily_mission_controller.dart';
 import 'package:catdex/routing/app_routes.dart';
 import 'package:catdex/shared/images/catdex_image_resolver.dart';
 import 'package:catdex/theme/app_colors.dart';
@@ -43,12 +46,27 @@ class _CatDexMapPageState extends ConsumerState<CatDexMapPage> {
   void initState() {
     super.initState();
     debugPrint('CATDEX_MAP_OPENED');
+    unawaited(_trackMapMission());
+  }
+
+  Future<void> _trackMapMission() async {
+    try {
+      await ref.read(dailyMissionControllerProvider.notifier).trackMapOpened();
+    } on Object catch (error) {
+      debugPrint(
+        'CATDEX_MISSION_PROGRESS_TRACKING_SKIPPED '
+        'reason=${error.runtimeType}',
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = CatDexLocalizations.of(context);
     final preparation = ref.watch(catDexMapPreparationProvider);
+    final unfilteredPreparation = ref.watch(
+      catDexMapUnfilteredPreparationProvider,
+    );
     final loadState = ref.watch(catDexMapLoadProvider);
     final currentPosition = ref.watch(mapCurrentPositionControllerProvider);
     final lastKnownLocation = ref.watch(catDexMapLastKnownLocationProvider);
@@ -149,11 +167,11 @@ class _CatDexMapPageState extends ConsumerState<CatDexMapPage> {
             top: AppSpacing.md,
             left: AppSpacing.md,
             right: AppSpacing.md,
-            child: _MapSummaryPill(preparation: preparation),
+            child: _MapTopControls(preparation: preparation),
           ),
-          if (loadState.isLoading && preparation.markers.isEmpty)
+          if (loadState.isLoading && unfilteredPreparation.markers.isEmpty)
             const Positioned.fill(child: _MapLoadingState()),
-          if (loadState.hasError && preparation.markers.isEmpty)
+          if (loadState.hasError && unfilteredPreparation.markers.isEmpty)
             Positioned.fill(
               child: _MapErrorState(
                 onRetry: () => ref.invalidate(catDexMapLoadProvider),
@@ -161,12 +179,23 @@ class _CatDexMapPageState extends ConsumerState<CatDexMapPage> {
             ),
           if (!loadState.isLoading &&
               !loadState.hasError &&
-              preparation.markers.isEmpty)
+              unfilteredPreparation.markers.isEmpty)
             Positioned.fill(
               child: CatDexMapEmptyState(
                 onCapture: () => context.goNamed(AppRoute.capture.name),
                 onPreferences: () => _showLocationPreferences(context),
               ),
+            ),
+          if (!loadState.isLoading &&
+              !loadState.hasError &&
+              unfilteredPreparation.markers.isNotEmpty &&
+              preparation.markers.isEmpty)
+            const Positioned(
+              top: 112,
+              left: AppSpacing.lg,
+              right: AppSpacing.lg,
+              bottom: 128,
+              child: _MapFilterEmptyState(),
             ),
           Positioned(
             right: AppSpacing.md,
@@ -345,16 +374,13 @@ class CatDexMapMarkerLayer extends StatelessWidget {
       for (final marker in markers)
         Marker(
           point: LatLng(marker.latitude, marker.longitude),
-          width: 46,
-          height: 54,
+          width: 58,
+          height: 58,
           child: GestureDetector(
             key: ValueKey('map-marker-${marker.discoveryId}'),
             behavior: HitTestBehavior.opaque,
             onTap: () => onMarkerTap(marker),
-            child: _CatMapPin(
-              color: _rarityColor(marker.discovery.rarity),
-              approximate: marker.isApproximate,
-            ),
+            child: _CatMapMarkerThumbnail(marker: marker),
           ),
         ),
     ];
@@ -429,33 +455,228 @@ class _MapAttribution extends StatelessWidget {
   }
 }
 
-class _CatMapPin extends StatelessWidget {
-  const _CatMapPin({required this.color, required this.approximate});
+class _CatMapMarkerThumbnail extends ConsumerWidget {
+  const _CatMapMarkerThumbnail({required this.marker});
 
-  final Color color;
-  final bool approximate;
+  final CatDexMapMarkerData marker;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rarityColor = mapRarityColor(marker.discovery.rarity);
+    final image = ref.watch(mapDiscoveryImageProvider(marker.discovery));
     return Stack(
-      alignment: Alignment.topCenter,
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
       children: [
-        Icon(Icons.location_pin, color: color, size: 54),
-        const Positioned(
-          top: 8,
-          child: Icon(Icons.pets_rounded, color: AppColors.white, size: 21),
+        DecoratedBox(
+          key: ValueKey('map-marker-thumbnail-${marker.discoveryId}'),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            shape: BoxShape.circle,
+            border: Border.all(color: rarityColor, width: 4),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x42000000),
+                blurRadius: 9,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(3),
+            child: ClipOval(
+              child: SizedBox.square(
+                dimension: 43,
+                child: image.when(
+                  loading: () => const _MapMarkerImagePlaceholder(
+                    loading: true,
+                  ),
+                  error: (error, _) {
+                    debugPrint(
+                      'CATDEX_MAP_MARKER_IMAGE_ERROR '
+                      'id=${marker.discoveryId} error=$error',
+                    );
+                    return const _MapMarkerImagePlaceholder();
+                  },
+                  data: (resolved) {
+                    final provider = resolved.provider;
+                    if (provider == null) {
+                      return const _MapMarkerImagePlaceholder();
+                    }
+                    return Image(
+                      key: ValueKey('map-marker-image-${marker.discoveryId}'),
+                      image: provider,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, error, _) {
+                        debugPrint(
+                          'CATDEX_MAP_MARKER_IMAGE_ERROR '
+                          'id=${marker.discoveryId} error=$error',
+                        );
+                        return const _MapMarkerImagePlaceholder();
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
         ),
-        if (approximate)
-          const Positioned(
-            right: 1,
-            top: 1,
-            child: Icon(
-              Icons.blur_circular_rounded,
-              color: AppColors.skyBlue,
-              size: 15,
+        if (marker.isApproximate)
+          Positioned(
+            right: -1,
+            top: -1,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                shape: BoxShape.circle,
+              ),
+              child: const Padding(
+                padding: EdgeInsets.all(2),
+                child: Icon(
+                  Icons.blur_circular_rounded,
+                  color: AppColors.skyBlue,
+                  size: 14,
+                ),
+              ),
+            ),
+          ),
+        if (marker.hasEventArtwork)
+          Positioned(
+            right: -1,
+            bottom: -1,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: rarityColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.white, width: 1.5),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.all(2),
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  color: AppColors.white,
+                  size: 12,
+                ),
+              ),
             ),
           ),
       ],
+    );
+  }
+}
+
+class _MapMarkerImagePlaceholder extends StatelessWidget {
+  const _MapMarkerImagePlaceholder({this.loading = false});
+
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: loading
+            ? const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(
+                Icons.pets_rounded,
+                size: 20,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+      ),
+    );
+  }
+}
+
+class _MapTopControls extends StatelessWidget {
+  const _MapTopControls({required this.preparation});
+
+  final CatDexMapMarkerPreparation preparation;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (preparation.markers.isNotEmpty) ...[
+          _MapSummaryPill(preparation: preparation),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+        const _MapFilterChips(),
+      ],
+    );
+  }
+}
+
+class _MapFilterChips extends ConsumerWidget {
+  const _MapFilterChips();
+
+  static const List<CatRarity> _filterRarities = [
+    CatRarity.common,
+    CatRarity.uncommon,
+    CatRarity.rare,
+    CatRarity.epic,
+    CatRarity.legendary,
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = CatDexLocalizations.of(context);
+    final filters = ref.watch(catDexMapFiltersProvider);
+    final controller = ref.read(catDexMapFiltersProvider.notifier);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(color: Color(0x26000000), blurRadius: 12),
+        ],
+      ),
+      child: SizedBox(
+        height: 48,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          scrollDirection: Axis.horizontal,
+          children: [
+            Center(
+              child: ChoiceChip(
+                key: const ValueKey('map-filter-all'),
+                label: Text(l10n.mapFilterAll),
+                selected: !filters.isActive,
+                onSelected: (_) => controller.clear(),
+              ),
+            ),
+            for (final rarity in _filterRarities) ...[
+              const SizedBox(width: AppSpacing.xs),
+              Center(
+                child: FilterChip(
+                  key: ValueKey('map-filter-${rarity.name}'),
+                  label: Text(l10n.rarityName(rarity.name)),
+                  selected: filters.rarities.contains(rarity),
+                  avatar: Icon(
+                    Icons.circle,
+                    size: 11,
+                    color: mapRarityColor(rarity),
+                  ),
+                  onSelected: (_) => controller.toggleRarity(rarity),
+                ),
+              ),
+            ],
+            const SizedBox(width: AppSpacing.xs),
+            Center(
+              child: FilterChip(
+                key: const ValueKey('map-filter-event'),
+                label: Text(l10n.mapFilterEvent),
+                selected: filters.eventOnly,
+                avatar: const Icon(Icons.auto_awesome_rounded, size: 16),
+                onSelected: (_) => controller.toggleEventOnly(),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -494,6 +715,40 @@ class _MapSummaryPill extends StatelessWidget {
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MapFilterEmptyState extends StatelessWidget {
+  const _MapFilterEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = CatDexLocalizations.of(context);
+    return IgnorePointer(
+      child: Center(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Theme.of(
+              context,
+            ).colorScheme.surface.withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(color: Color(0x26000000), blurRadius: 12),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Text(
+              l10n.mapNoFilterResults,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
@@ -644,6 +899,10 @@ class CatDexMapDiscoveryPreview extends ConsumerWidget {
     final display = const CatDisplayFormatter().fromDiscovery(discovery);
     final location = discovery.captureLocation;
     final image = ref.watch(mapDiscoveryImageProvider(discovery));
+    final artwork = _preferredArtworkForDiscovery(
+      ref.watch(catCardCollectionProvider),
+      discovery.id,
+    );
     final date = MaterialLocalizations.of(
       context,
     ).formatCompactDate(discovery.discoveredAt.toLocal());
@@ -661,12 +920,41 @@ class CatDexMapDiscoveryPreview extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    display.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: l10n.mapRemoveLocation,
+                  onPressed: () => _removeLocation(context, ref),
+                  icon: const Icon(Icons.location_off_outlined),
+                ),
+              ],
+            ),
+            Text(
+              l10n.localizeDisplayValue(display.displaySpecies),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _RarityChip(rarity: discovery.rarity),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox.square(
-                  dimension: 94,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
+                Expanded(
+                  child: _MapPreviewMedia(
+                    label: l10n.mapPhotoLabel,
                     child: image.when(
                       loading: _MapPhotoPlaceholder.loading,
                       error: (_, _) => const _MapPhotoPlaceholder(),
@@ -679,32 +967,14 @@ class CatDexMapDiscoveryPreview extends ConsumerWidget {
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        display.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        l10n.localizeDisplayValue(display.displaySpecies),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      _RarityChip(rarity: discovery.rarity),
-                    ],
+                  child: _MapPreviewMedia(
+                    label: l10n.mapArtworkLabel,
+                    child: artwork == null
+                        ? _MapArtworkPlaceholder(
+                            message: l10n.mapArtworkUnavailable,
+                          )
+                        : _MapArtworkImage(card: artwork),
                   ),
-                ),
-                IconButton(
-                  tooltip: l10n.mapRemoveLocation,
-                  onPressed: () => _removeLocation(context, ref),
-                  icon: const Icon(Icons.location_off_outlined),
                 ),
               ],
             ),
@@ -805,6 +1075,95 @@ class _MapResolvedPhoto extends StatelessWidget {
   }
 }
 
+class _MapPreviewMedia extends StatelessWidget {
+  const _MapPreviewMedia({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        AspectRatio(
+          aspectRatio: 1.15,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: child,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MapArtworkImage extends StatelessWidget {
+  const _MapArtworkImage({required this.card});
+
+  final CatCardRecord card;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = CatDexLocalizations.of(context);
+    return Image.network(
+      card.finalCardUrl,
+      key: ValueKey('map-artwork-${card.cardId}'),
+      fit: BoxFit.cover,
+      loadingBuilder: (_, child, progress) =>
+          progress == null ? child : const _MapPhotoPlaceholder.loading(),
+      errorBuilder: (_, error, _) {
+        debugPrint(
+          'CATDEX_MAP_ARTWORK_IMAGE_ERROR cardId=${card.cardId} error=$error',
+        );
+        return _MapArtworkPlaceholder(message: l10n.mapArtworkUnavailable);
+      },
+    );
+  }
+}
+
+class _MapArtworkPlaceholder extends StatelessWidget {
+  const _MapArtworkPlaceholder({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.collections_bookmark_outlined,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              message,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MapPhotoPlaceholder extends StatelessWidget {
   const _MapPhotoPlaceholder();
 
@@ -832,9 +1191,9 @@ class _RarityChip extends StatelessWidget {
     final normalized = rarity == CatRarity.mythic ? 'legendary' : rarity.name;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: _rarityColor(rarity).withValues(alpha: 0.16),
+        color: mapRarityColor(rarity).withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _rarityColor(rarity)),
+        border: Border.all(color: mapRarityColor(rarity)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1003,12 +1362,27 @@ CatDiscovery? _discoveryById(
   return null;
 }
 
-Color _rarityColor(CatRarity rarity) {
+CatCardRecord? _preferredArtworkForDiscovery(
+  List<CatCardRecord> cards,
+  String discoveryId,
+) {
+  final completed = cards
+      .where((card) => card.discoveryId == discoveryId && card.isCompleted)
+      .toList(growable: false);
+  for (final card in completed) {
+    if (card.cardType == CatCardType.normal) return card;
+  }
+  if (completed.isEmpty) return null;
+  completed.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  return completed.first;
+}
+
+Color mapRarityColor(CatRarity rarity) {
   return switch (rarity) {
     CatRarity.common => AppColors.primaryGreen,
-    CatRarity.uncommon => AppColors.skyBlue,
-    CatRarity.rare => AppColors.primaryPurple,
-    CatRarity.epic => const Color(0xFF2563C9),
-    CatRarity.legendary || CatRarity.mythic => AppColors.warning,
+    CatRarity.uncommon => const Color(0xFF22D3EE),
+    CatRarity.rare => const Color(0xFF3B82F6),
+    CatRarity.epic => const Color(0xFF8B5CF6),
+    CatRarity.legendary || CatRarity.mythic => const Color(0xFFF4C542),
   };
 }

@@ -45,7 +45,8 @@ void main() {
     expect(discovery.eyeColor, result.visualTraits.eyeColor);
     expect(discovery.hairLength, result.visualTraits.hairLength);
     expect(discovery.estimatedAge, result.estimatedAge);
-    expect(discovery.suggestedName, 'Mochi');
+    expect(discovery.suggestedName, result.primaryBreed.species.displayName);
+    expect(discovery.suggestedName, isNot('Mochi'));
     expect(discovery.nickname, 'Nebbia');
     expect(discovery.originalPhotoPath, '/tmp/original-cat.jpg');
     expect(discovery.displayPhotoPath, '/tmp/display-cat.jpg');

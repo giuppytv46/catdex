@@ -1,6 +1,9 @@
 import 'dart:async';
 
+import 'package:catdex/features/cards/application/cat_card_repository_providers.dart';
+import 'package:catdex/features/cards/domain/cat_card_record.dart';
 import 'package:catdex/features/catdex/application/local_discovery_session_controller.dart';
+import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/location/application/discovery_location_capture_service.dart';
 import 'package:catdex/features/location/application/discovery_location_service.dart';
 import 'package:catdex/features/location/domain/entities/cat_discovery_location.dart';
@@ -16,13 +19,79 @@ final catDexMapMarkerServiceProvider = Provider<CatDexMapMarkerService>((_) {
   return const CatDexMapMarkerService();
 });
 
+@immutable
+class CatDexMapFilters {
+  const CatDexMapFilters({
+    this.rarities = const {},
+    this.eventOnly = false,
+  });
+
+  final Set<CatRarity> rarities;
+  final bool eventOnly;
+
+  bool get isActive => rarities.isNotEmpty || eventOnly;
+}
+
+final catDexMapFiltersProvider =
+    NotifierProvider<CatDexMapFiltersController, CatDexMapFilters>(
+      CatDexMapFiltersController.new,
+    );
+
+class CatDexMapFiltersController extends Notifier<CatDexMapFilters> {
+  @override
+  CatDexMapFilters build() => const CatDexMapFilters();
+
+  void toggleRarity(CatRarity rarity) {
+    final normalized = rarity == CatRarity.mythic
+        ? CatRarity.legendary
+        : rarity;
+    final next = {...state.rarities};
+    next.contains(normalized) ? next.remove(normalized) : next.add(normalized);
+    state = CatDexMapFilters(
+      rarities: Set.unmodifiable(next),
+      eventOnly: state.eventOnly,
+    );
+    debugPrint('CATDEX_MAP_RARITY_FILTER ${normalized.name}');
+  }
+
+  void toggleEventOnly() {
+    state = CatDexMapFilters(
+      rarities: state.rarities,
+      eventOnly: !state.eventOnly,
+    );
+    debugPrint('CATDEX_MAP_EVENT_FILTER ${state.eventOnly}');
+  }
+
+  void clear() {
+    state = const CatDexMapFilters();
+    debugPrint('CATDEX_MAP_FILTERS_CLEARED');
+  }
+}
+
+final catDexMapUnfilteredPreparationProvider =
+    Provider<CatDexMapMarkerPreparation>((ref) {
+      final discoveries = ref.watch(localDiscoverySessionProvider);
+      return ref.watch(catDexMapMarkerServiceProvider).prepare(discoveries);
+    });
+
 final catDexMapPreparationProvider = Provider<CatDexMapMarkerPreparation>((
   ref,
 ) {
   final discoveries = ref.watch(localDiscoverySessionProvider);
+  final filters = ref.watch(catDexMapFiltersProvider);
+  final eventDiscoveryIds = ref
+      .watch(catCardCollectionProvider)
+      .where((card) => card.cardType == CatCardType.event && card.isCompleted)
+      .map((card) => card.discoveryId)
+      .toSet();
   final preparation = ref
       .watch(catDexMapMarkerServiceProvider)
-      .prepare(discoveries);
+      .prepare(
+        discoveries,
+        rarityFilter: filters.rarities,
+        eventOnly: filters.eventOnly,
+        eventDiscoveryIds: eventDiscoveryIds,
+      );
   debugPrint('CATDEX_MAP_DISCOVERY_TOTAL ${preparation.totalDiscoveryCount}');
   debugPrint(
     'CATDEX_MAP_LOCATED_DISCOVERY_COUNT ${preparation.markers.length}',

@@ -96,16 +96,125 @@ class CatDexLocalizations {
   String get notDetectedLabel => _coreValue('notDetected');
   String get unknownLabel => _coreValue('unknown');
 
+  String get achievementsTitle =>
+      _mapValue(en: 'Achievements', it: 'Traguardi');
+  String get achievementsSummaryTitle =>
+      _mapValue(en: 'Your collection', it: 'La tua collezione');
+  String get achievementsUnlockedLabel =>
+      _mapValue(en: 'Unlocked', it: 'Sbloccati');
+  String get achievementsInProgressLabel =>
+      _mapValue(en: 'In progress', it: 'In corso');
+  String get achievementsLockedLabel => _mapValue(en: 'Locked', it: 'Bloccati');
+  String get achievementsAllFilter => _mapValue(en: 'All', it: 'Tutti');
+  String get achievementsProgressLabel =>
+      _mapValue(en: 'Progress', it: 'Progresso');
+  String get achievementsRewardLabel =>
+      _mapValue(en: 'Reward', it: 'Ricompensa');
+  String get achievementsPremiumLabel =>
+      _mapValue(en: 'Premium', it: 'Premium');
+  String get achievementsProfileTitle =>
+      _mapValue(en: 'Achievements', it: 'Traguardi');
+  String get achievementsProfileAction =>
+      _mapValue(en: 'View all achievements', it: 'Vedi tutti i traguardi');
+  String get achievementsProfileEmpty => _mapValue(
+    en: 'Your first achievement is waiting for you.',
+    it: 'Il tuo primo traguardo ti sta aspettando.',
+  );
+  String get achievementUnlockedCelebration =>
+      _mapValue(en: 'Achievement unlocked', it: 'Traguardo sbloccato');
+  String achievementHistoricalSummary(int count) => _mapValue(
+    en: 'New achievements unlocked: $count',
+    it: 'Nuovi traguardi sbloccati: $count',
+  );
+  String achievementXpReward(int xp) => '+$xp XP';
+
+  String achievementCategoryLabel(String category) {
+    const en = {
+      'discoveries': 'Discoveries',
+      'collection': 'Collection',
+      'cards': 'Cards',
+      'rarity': 'Rarity',
+      'exploration': 'Exploration',
+      'missions': 'Missions',
+      'events': 'Events',
+      'progression': 'Progression',
+    };
+    const it = {
+      'discoveries': 'Scoperte',
+      'collection': 'Collezione',
+      'cards': 'Carte',
+      'rarity': 'Rarità',
+      'exploration': 'Esplorazione',
+      'missions': 'Missioni',
+      'events': 'Eventi',
+      'progression': 'Progressione',
+    };
+    return (locale.languageCode == 'it' ? it : en)[category] ?? category;
+  }
+
+  String achievementTierLabel(String tier) {
+    const en = {
+      'bronze': 'Bronze',
+      'silver': 'Silver',
+      'gold': 'Gold',
+      'platinum': 'Platinum',
+    };
+    const it = {
+      'bronze': 'Bronzo',
+      'silver': 'Argento',
+      'gold': 'Oro',
+      'platinum': 'Platino',
+    };
+    return (locale.languageCode == 'it' ? it : en)[tier] ?? tier;
+  }
+
+  String achievementText(String key) {
+    final parts = key.split('.');
+    if (parts.length != 3 || parts.first != 'achievement') return key;
+    final copy = (locale.languageCode == 'it'
+        ? _achievementCopyIt
+        : _achievementCopyEn)[parts[1]];
+    if (copy == null) return key;
+    return switch (parts[2]) {
+      'title' => copy.$1,
+      'description' || 'hint' => copy.$2,
+      _ => key,
+    };
+  }
+
+  String get catDexAddedSuccess => _mapValue(
+    en: 'Added to CatDex!',
+    it: 'Aggiunto al CatDex!',
+  );
+
   String get mapTitle => _mapValue(en: 'Map', it: 'Mappa');
 
   String get mapEmptyTitle => _mapValue(
-    en: 'No cats on the map yet',
-    it: 'Ancora nessun gatto sulla mappa',
+    en: 'No geolocated cats yet.',
+    it: 'Nessun gatto geolocalizzato.',
   );
 
   String get mapEmptyMessage => _mapValue(
-    en: 'Enable location when saving a discovery to find it here.',
-    it: 'Attiva la posizione quando salvi una scoperta per ritrovarla qui.',
+    en: 'Your next discoveries will be saved automatically on the map.',
+    it: 'Le prossime scoperte verranno salvate automaticamente sulla mappa.',
+  );
+
+  String get mapFilterAll => _mapValue(en: 'All', it: 'Tutti');
+
+  String get mapFilterEvent => _mapValue(en: 'Event', it: 'Evento');
+
+  String get mapNoFilterResults => _mapValue(
+    en: 'No geolocated cats match these filters.',
+    it: 'Nessun gatto geolocalizzato corrisponde a questi filtri.',
+  );
+
+  String get mapPhotoLabel => _mapValue(en: 'Photo', it: 'Foto');
+
+  String get mapArtworkLabel => _mapValue(en: 'Artwork', it: 'Artwork');
+
+  String get mapArtworkUnavailable => _mapValue(
+    en: 'No artwork yet',
+    it: 'Artwork non ancora generato',
   );
 
   String get mapOpenInCatDex => _mapValue(
@@ -1826,6 +1935,116 @@ class CatDexLocalizations {
     ja: 'Daily Missions',
   );
 
+  String get dailyMissionsTodayTitle =>
+      _mapValue(en: "Today's missions", it: 'Missioni di oggi');
+
+  String get dailyMissionsSubtitle => _mapValue(
+    en: 'Complete activities and earn rewards.',
+    it: 'Completa le attività e ottieni ricompense.',
+  );
+
+  String get dailyMissionsSeeAll => _mapValue(en: 'See all', it: 'Vedi tutte');
+
+  String get dailyMissionsNewTomorrow =>
+      _mapValue(en: 'New missions tomorrow', it: 'Nuove missioni domani');
+
+  String get dailyMissionsLoadError => _mapValue(
+    en: 'Daily missions could not be loaded. Try again.',
+    it: 'Impossibile caricare le missioni di oggi. Riprova.',
+  );
+
+  String get dailyMissionClaim => _mapValue(en: 'Claim', it: 'Riscatta');
+
+  String get dailyMissionClaimed => _mapValue(en: 'Claimed', it: 'Riscattata');
+
+  String get dailyMissionCompleted =>
+      _mapValue(en: 'Mission completed', it: 'Missione completata');
+
+  String get dailyMissionClaimError => _mapValue(
+    en: 'Unable to claim the reward. Try again.',
+    it: 'Impossibile riscattare la ricompensa. Riprova.',
+  );
+
+  String get dailyMissionDiscoverOneCat =>
+      _mapValue(en: 'Discover one cat', it: 'Scopri un gatto');
+
+  String get dailyMissionDiscoverOneCatDescription => _mapValue(
+    en: 'Save one new discovery in your CatDex.',
+    it: 'Salva una nuova scoperta nel tuo CatDex.',
+  );
+
+  String get dailyMissionDiscoverTwoCats =>
+      _mapValue(en: 'Discover two cats', it: 'Scopri due gatti');
+
+  String get dailyMissionDiscoverTwoCatsDescription => _mapValue(
+    en: 'Save two new discoveries in your CatDex.',
+    it: 'Salva due nuove scoperte nel tuo CatDex.',
+  );
+
+  String get dailyMissionGenerateCard =>
+      _mapValue(en: 'Generate a card', it: 'Genera una carta');
+
+  String get dailyMissionGenerateCardDescription => _mapValue(
+    en: 'Successfully generate one normal collectible card.',
+    it: 'Genera con successo una carta collezionabile normale.',
+  );
+
+  String get dailyMissionOpenMap =>
+      _mapValue(en: 'Open the Map', it: 'Apri la Mappa');
+
+  String get dailyMissionOpenMapDescription => _mapValue(
+    en: 'Explore your geolocated discoveries on the Map.',
+    it: 'Esplora sulla Mappa le tue scoperte geolocalizzate.',
+  );
+
+  String get dailyMissionDiscoverWithLocation => _mapValue(
+    en: 'Save a discovery with location',
+    it: 'Salva una scoperta con posizione',
+  );
+
+  String get dailyMissionDiscoverWithLocationDescription => _mapValue(
+    en: 'Save a discovery containing a valid location.',
+    it: 'Salva una scoperta che contiene una posizione valida.',
+  );
+
+  String get dailyMissionDiscoverCommon =>
+      _mapValue(en: 'Find a Common cat', it: 'Trova un gatto Comune');
+
+  String get dailyMissionDiscoverCommonDescription => _mapValue(
+    en: 'Save one discovery with Common rarity.',
+    it: 'Salva una scoperta di rarità Comune.',
+  );
+
+  String get dailyMissionDiscoverUncommon => _mapValue(
+    en: 'Find an Uncommon cat',
+    it: 'Trova un gatto Non comune',
+  );
+
+  String get dailyMissionDiscoverUncommonDescription => _mapValue(
+    en: 'Save one discovery with Uncommon rarity.',
+    it: 'Salva una scoperta di rarità Non comune.',
+  );
+
+  String get dailyMissionGenerateEventCard => _mapValue(
+    en: 'Generate an event card',
+    it: 'Genera una carta evento',
+  );
+
+  String get dailyMissionGenerateEventCardDescription => _mapValue(
+    en: 'Successfully generate one card for the active event.',
+    it: "Genera con successo una carta per l'evento attivo.",
+  );
+
+  String dailyMissionAnalysisCreditReward(int amount) => _mapValue(
+    en: '$amount analysis credit',
+    it: '$amount credito analisi',
+  );
+
+  String dailyMissionCardCreditReward(int amount) => _mapValue(
+    en: '$amount card credit',
+    it: '$amount credito carta',
+  );
+
   String get discoverOneCatMission => _localizedValue(
     en: 'Discover 1 cat',
     it: 'Scopri 1 gatto',
@@ -1974,6 +2193,7 @@ class CatDexLocalizations {
       _eventValue(en: 'Not collected yet', it: 'Non ancora raccolto');
   String get eventFreeBadge => _eventValue(en: 'FREE', it: 'FREE');
   String get eventPremiumBadge => _eventValue(en: 'PREMIUM', it: 'PREMIUM');
+  String get eventCardBadge => _eventValue(en: 'EVENT', it: 'EVENTO');
   String get eventChooseCat =>
       _eventValue(en: 'Choose your cat', it: 'Scegli il gatto');
   String get eventFreeVariantsAutomatic => _eventValue(
@@ -2005,6 +2225,18 @@ class CatDexLocalizations {
   String get eventSelectedVariantDisabled => _eventValue(
     en: 'The selected artwork is not available right now.',
     it: "L'artwork selezionato non è disponibile in questo momento.",
+  );
+  String get eventVariantInvalidServer => _eventValue(
+    en:
+        'This artwork is not available on the server yet. '
+        'Update the service and try again.',
+    it:
+        'Questo artwork non è ancora disponibile sul server. '
+        'Aggiorna il servizio e riprova.',
+  );
+  String get eventVariantDisabledServer => _eventValue(
+    en: 'This artwork is temporarily unavailable.',
+    it: 'Questo artwork è temporaneamente non disponibile.',
   );
   String get eventGenerateCard => _eventValue(
     en: 'Generate event card',
@@ -2140,6 +2372,10 @@ class CatDexLocalizations {
   String get eventNetworkError => _eventValue(
     en: 'No connection. Check your network and try again.',
     it: 'Connessione non disponibile. Controlla la rete e riprova.',
+  );
+  String get eventGenerationUnknownError => _eventValue(
+    en: 'We could not generate the event card. Try again.',
+    it: 'Non siamo riusciti a generare la carta evento. Riprova.',
   );
 
   String get quickActionsTitle => _localizedValue(
@@ -2336,12 +2572,12 @@ class CatDexLocalizations {
   );
 
   String get catNamePlaceholder => _localizedValue(
-    en: 'Mochi',
-    it: 'Mochi',
-    es: 'Mochi',
-    fr: 'Mochi',
-    de: 'Mochi',
-    ja: 'Mochi',
+    en: 'New cat',
+    it: 'Nuovo gatto',
+    es: 'Nuevo gato',
+    fr: 'Nouveau chat',
+    de: 'Neue Katze',
+    ja: '新しい猫',
   );
 
   String get confidenceLabel => _localizedValue(
@@ -2973,6 +3209,111 @@ class CatDexLocalizations {
         ? locale.languageCode
         : '${locale.languageCode}_$countryCode';
   }
+
+  static const _achievementCopyEn = <String, (String, String)>{
+    'first_discovery': ('First encounter', 'Save your first cat discovery.'),
+    'discovery_5': ('Curious explorer', 'Save 5 different discoveries.'),
+    'discovery_10': ('Sharp eye', 'Save 10 different discoveries.'),
+    'discovery_25': ('Neighborhood guide', 'Save 25 different discoveries.'),
+    'discovery_50': ('Cat tracker', 'Save 50 different discoveries.'),
+    'discovery_100': ('CatDex legend', 'Save 100 different discoveries.'),
+    'first_normal_card': ('First card', 'Generate your first normal card.'),
+    'normal_cards_10': ('Card collector', 'Generate 10 normal cards.'),
+    'normal_cards_25': ('Album curator', 'Generate 25 normal cards.'),
+    'normal_cards_50': ('Master collector', 'Generate 50 normal cards.'),
+    'first_uncommon': ('Something unusual', 'Discover an Uncommon cat.'),
+    'first_rare': ('Rare encounter', 'Discover a Rare cat.'),
+    'first_epic': ('Epic encounter', 'Discover an Epic cat.'),
+    'first_legendary': ('A living legend', 'Discover a Legendary cat.'),
+    'first_geolocated_discovery': ('First pin', 'Save a discovery on the map.'),
+    'geolocated_discoveries_5': (
+      'Local explorer',
+      'Save 5 discoveries on the map.',
+    ),
+    'geolocated_discoveries_20': (
+      'World of cats',
+      'Save 20 discoveries on the map.',
+    ),
+    'first_daily_mission': (
+      'Mission complete',
+      'Claim your first daily mission.',
+    ),
+    'daily_missions_10': ('Reliable helper', 'Claim 10 daily missions.'),
+    'daily_missions_30': ('Mission specialist', 'Claim 30 daily missions.'),
+    'first_event_card': ('Event souvenir', 'Collect your first event card.'),
+    'halloween_free_collection': (
+      'Halloween trio',
+      'Collect all three free Halloween artworks.',
+    ),
+    'halloween_premium_collection': (
+      'Enchanted Halloween',
+      'Collect all three Premium Halloween artworks.',
+    ),
+    'level_5': ('Rising explorer', 'Reach player level 5.'),
+    'level_10': ('Seasoned explorer', 'Reach player level 10.'),
+    'level_25': ('CatDex expert', 'Reach player level 25.'),
+    'level_50': ('CatDex master', 'Reach player level 50.'),
+  };
+
+  static const _achievementCopyIt = <String, (String, String)>{
+    'first_discovery': (
+      'Prima scoperta',
+      'Salva la tua prima scoperta felina.',
+    ),
+    'discovery_5': ('Piccolo esploratore', 'Salva 5 scoperte diverse.'),
+    'discovery_10': ('Occhio felino', 'Salva 10 scoperte diverse.'),
+    'discovery_25': ('Esploratore CatDex', 'Salva 25 scoperte diverse.'),
+    'discovery_50': ('Grande osservatore', 'Salva 50 scoperte diverse.'),
+    'discovery_100': ('Maestro dei gatti', 'Salva 100 scoperte diverse.'),
+    'first_normal_card': ('Prima carta', 'Genera la tua prima carta normale.'),
+    'normal_cards_10': ('Collezionista', 'Genera 10 carte normali.'),
+    'normal_cards_25': ('Album prezioso', 'Genera 25 carte normali.'),
+    'normal_cards_50': ('Maestro delle carte', 'Genera 50 carte normali.'),
+    'first_uncommon': ('Qualcosa di speciale', 'Scopri un gatto Non comune.'),
+    'first_rare': ('Scoperta rara', 'Scopri un gatto Raro.'),
+    'first_epic': ('Incontro epico', 'Scopri un gatto Epico.'),
+    'first_legendary': ('Leggenda felina', 'Scopri un gatto Leggendario.'),
+    'first_geolocated_discovery': (
+      'Primo passo',
+      'Salva una scoperta sulla mappa.',
+    ),
+    'geolocated_discoveries_5': (
+      'Esploratore urbano',
+      'Salva 5 scoperte sulla mappa.',
+    ),
+    'geolocated_discoveries_20': (
+      'Cartografo felino',
+      'Salva 20 scoperte sulla mappa.',
+    ),
+    'first_daily_mission': (
+      'Missione compiuta',
+      'Riscuoti la prima missione giornaliera.',
+    ),
+    'daily_missions_10': (
+      'Costanza felina',
+      'Riscuoti 10 missioni giornaliere.',
+    ),
+    'daily_missions_30': (
+      'Esploratore instancabile',
+      'Riscuoti 30 missioni giornaliere.',
+    ),
+    'first_event_card': (
+      'Ricordo speciale',
+      'Colleziona la prima carta evento.',
+    ),
+    'halloween_free_collection': (
+      'Notte di Halloween',
+      'Colleziona tutti e tre gli artwork Halloween gratuiti.',
+    ),
+    'halloween_premium_collection': (
+      'Maestro di Halloween',
+      'Colleziona tutti e tre gli artwork Halloween Premium.',
+    ),
+    'level_5': ('Livello 5', 'Raggiungi il livello giocatore 5.'),
+    'level_10': ('Livello 10', 'Raggiungi il livello giocatore 10.'),
+    'level_25': ('Livello 25', 'Raggiungi il livello giocatore 25.'),
+    'level_50': ('Livello 50', 'Raggiungi il livello giocatore 50.'),
+  };
 
   static const _coreTranslations = <String, Map<String, String>>{
     'en_US': {

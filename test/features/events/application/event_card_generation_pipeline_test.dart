@@ -11,11 +11,14 @@ import 'package:catdex/features/catdex/domain/entities/cat_discovery.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_personality.dart';
 import 'package:catdex/features/catdex/domain/entities/cat_rarity.dart';
 import 'package:catdex/features/catdex/domain/repositories/discovery_repository.dart';
+import 'package:catdex/features/events/application/event_card_ui_generation_controller.dart';
 import 'package:catdex/features/events/application/event_generation_coordinator.dart';
 import 'package:catdex/features/events/application/event_providers.dart';
 import 'package:catdex/features/events/data/shared_preferences_event_usage_repository.dart';
 import 'package:catdex/features/events/domain/entities/catdex_event.dart';
 import 'package:catdex/features/events/domain/entities/event_card_generation.dart';
+import 'package:catdex/features/events/domain/entities/event_card_xp_reward.dart';
+import 'package:catdex/features/events/domain/repositories/event_usage_repository.dart';
 import 'package:catdex/features/events/domain/services/halloween_event_catalog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,6 +30,25 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
+
+  for (final entry in const <EventCardGenerationFailure, EventUiFailureReason>{
+    EventCardGenerationFailure.eventVariantInvalid:
+        EventUiFailureReason.eventVariantInvalid,
+    EventCardGenerationFailure.eventVariantDisabled:
+        EventUiFailureReason.eventVariantDisabled,
+    EventCardGenerationFailure.selectedVariantInvalid:
+        EventUiFailureReason.selectedVariantInvalid,
+  }.entries) {
+    test('${entry.key.name} maps to a typed non-network UI failure', () {
+      final result = mapEventGenerationFailureToUiReason(
+        eventFailure: entry.key,
+        remoteFailure: RemoteCardGenerationFailureReason.remoteApiFailure,
+      );
+
+      expect(result, entry.value);
+      expect(result, isNot(EventUiFailureReason.network));
+    });
+  }
 
   test('event usage commits only after persistence readback', () async {
     const usage = SharedPreferencesEventUsageRepository();
@@ -62,6 +84,8 @@ void main() {
     expect(cards.savedCards.single.cardType, CatCardType.event);
     expect(cards.savedCards.single.eventArtworkVariantId, 'halloween_pumpkins');
     expect(result.discovery.card, isNull);
+    expect(result.eventXpAward?.newlyGranted, isTrue);
+    expect(result.eventXpAward?.awardedAmount, eventCardGenerationXp);
   });
 
   test(
@@ -104,8 +128,45 @@ void main() {
       );
       expect(await cards.getNormalCardForDiscovery(_discovery().id), normal);
       expect(await cards.getEventCards('halloween_2026', '2026'), isEmpty);
+      expect(
+        (await SharedPreferences.getInstance()).getString(
+          'catdex_event_card_xp_ledger_v1',
+        ),
+        isNull,
+      );
     },
   );
+
+  test('event usage commit failure awards no XP', () async {
+    const usage = SharedPreferencesEventUsageRepository();
+    final coordinator = _CommitFailingCoordinator(usage);
+    final container = _container(
+      repository: _MemoryDiscoveryRepository(_discovery()),
+      cards: _MemoryCatCardRepository(),
+      remote: _EventRemoteCardGenerationService(),
+      usage: usage,
+      coordinator: coordinator,
+    );
+    addTearDown(container.dispose);
+
+    final result = await container
+        .read(cardGenerationPipelineProvider)
+        .generateEventCard(
+          event: _activeTestEvent,
+          discovery: _discovery(),
+          displayData: _displayData,
+          collectionNumber: 1,
+        );
+
+    expect(result.success, isFalse);
+    expect(result.eventXpAward, isNull);
+    expect(
+      (await SharedPreferences.getInstance()).getString(
+        'catdex_event_card_xp_ledger_v1',
+      ),
+      isNull,
+    );
+  });
 
   for (final failureReason in [
     RemoteCardGenerationFailureReason.missingPhoto,
@@ -525,6 +586,7 @@ ProviderContainer _container({
   required SharedPreferencesEventUsageRepository usage,
   CatCardRepository? cards,
   bool premium = false,
+  EventGenerationCoordinator? coordinator,
 }) {
   return ProviderContainer(
     overrides: [
@@ -535,13 +597,21 @@ ProviderContainer _container({
       remoteCardGenerationServiceProvider.overrideWithValue(remote),
       eventUsageRepositoryProvider.overrideWithValue(usage),
       eventGenerationCoordinatorProvider.overrideWithValue(
-        EventGenerationCoordinator(usageRepository: usage),
+        coordinator ?? EventGenerationCoordinator(usageRepository: usage),
       ),
       eventRuntimeConfigurationProvider.overrideWithValue(
         _AlwaysActiveEventRuntime(premium: premium),
       ),
     ],
   );
+}
+
+class _CommitFailingCoordinator extends EventGenerationCoordinator {
+  _CommitFailingCoordinator(EventUsageRepository usageRepository)
+    : super(usageRepository: usageRepository);
+
+  @override
+  Future<bool> commit(EventGenerationReservation reservation) async => false;
 }
 
 class _AlwaysActiveEventRuntime extends EventRuntimeConfiguration {

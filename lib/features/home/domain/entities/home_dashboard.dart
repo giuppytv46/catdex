@@ -9,7 +9,6 @@ class HomeDashboard {
     required this.nextLevelXp,
     required this.pawPoints,
     required this.collectionCompletion,
-    required this.dailyMissions,
     required this.recentDiscoveries,
     required this.currentEvent,
   });
@@ -20,7 +19,6 @@ class HomeDashboard {
   final int nextLevelXp;
   final int pawPoints;
   final double collectionCompletion;
-  final List<DailyMission> dailyMissions;
   final List<RecentDiscovery> recentDiscoveries;
   final CurrentEvent currentEvent;
 
@@ -33,28 +31,6 @@ class HomeDashboard {
     final earnedInLevel = playerProgress.totalXp - currentLevelXp;
     return (earnedInLevel / levelRange).clamp(0, 1);
   }
-}
-
-class DailyMission {
-  const DailyMission({
-    required this.titleKey,
-    required this.progress,
-    required this.goal,
-    required this.xpReward,
-    required this.completed,
-  });
-
-  final DailyMissionTitleKey titleKey;
-  final int progress;
-  final int goal;
-  final int xpReward;
-  final bool completed;
-}
-
-enum DailyMissionTitleKey {
-  discoverOneCat,
-  importOnePhoto,
-  visitYourCatDex,
 }
 
 class RecentDiscovery {

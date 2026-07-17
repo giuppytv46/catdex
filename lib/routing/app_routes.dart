@@ -7,6 +7,8 @@ enum AppRoute {
   capture('/capture'),
   cards('/cards'),
   map('/map'),
+  missions('/missions'),
+  achievements('/achievements'),
   event('/events/:eventKey'),
   discoveryDetail('/catdex/discovery/:discoveryId'),
   analysis('/analysis'),

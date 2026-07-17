@@ -14,6 +14,7 @@ import 'package:catdex/features/catdex/domain/entities/pending_discovery_sync.da
 import 'package:catdex/features/catdex/domain/entities/player_progress.dart';
 import 'package:catdex/features/catdex/domain/services/discovery_reward.dart';
 import 'package:catdex/features/location/application/discovery_location_capture_service.dart';
+import 'package:catdex/features/missions/application/daily_mission_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -39,8 +40,8 @@ class LocalDiscoverySaveController
     CatAnalysisResult result, {
     String? photoPath,
     String? cloudStoragePath,
-    String customName = 'Mochi',
-    String suggestedName = 'Mochi',
+    String customName = '',
+    String suggestedName = '',
     String? nickname,
     bool usesEditedDetails = false,
   }) async {
@@ -93,7 +94,7 @@ class LocalDiscoverySaveController
         friendshipPoints: reward.friendshipPoints,
         xpEarned: reward.xp,
         coinsEarned: reward.coins,
-        customName: chosenName.trim().isEmpty ? suggestedName : chosenName,
+        customName: chosenName,
         suggestedName: suggestedName,
         originalPhotoPath: stablePhotoPath,
         displayPhotoPath: stablePhotoPath,
@@ -185,6 +186,7 @@ class LocalDiscoverySaveController
       );
       await (discoverySession..addDiscovery(discovery)).refreshFromRepository();
       ref.read(localPlayerProgressSessionProvider.notifier).progress = progress;
+      await _trackMissionProgressAfterSave(discovery);
       state = AsyncData(
         LocalDiscoverySaveState(
           status: LocalDiscoverySaveStatus.saved,
@@ -223,6 +225,21 @@ class LocalDiscoverySaveController
 
   void reset() {
     state = const AsyncData(LocalDiscoverySaveState.idle());
+  }
+
+  Future<void> _trackMissionProgressAfterSave(
+    CatDiscovery discovery,
+  ) async {
+    try {
+      await ref
+          .read(dailyMissionControllerProvider.notifier)
+          .trackDiscoverySaved(discovery);
+    } on Object catch (error) {
+      debugPrint(
+        'CATDEX_MISSION_PROGRESS_TRACKING_SKIPPED '
+        'reason=${error.runtimeType}',
+      );
+    }
   }
 
   Future<PlayerProgress> _applyProgressReward(DiscoveryReward reward) async {

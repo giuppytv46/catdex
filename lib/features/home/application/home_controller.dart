@@ -57,29 +57,6 @@ class HomeController extends Notifier<HomeDashboard> {
       pawPoints: progress.coins,
       collectionCompletion:
           discoveredSpeciesIds.length / CatDexSeedData.species.length,
-      dailyMissions: const [
-        DailyMission(
-          titleKey: DailyMissionTitleKey.discoverOneCat,
-          progress: 1,
-          goal: 1,
-          xpReward: 100,
-          completed: true,
-        ),
-        DailyMission(
-          titleKey: DailyMissionTitleKey.importOnePhoto,
-          progress: 0,
-          goal: 1,
-          xpReward: 75,
-          completed: false,
-        ),
-        DailyMission(
-          titleKey: DailyMissionTitleKey.visitYourCatDex,
-          progress: 0,
-          goal: 1,
-          xpReward: 50,
-          completed: false,
-        ),
-      ],
       recentDiscoveries: localDiscoveries.isEmpty
           ? _mockRecentDiscoveries()
           : localDiscoveries.take(3).map(_recentLocalDiscovery).toList(),
@@ -119,7 +96,9 @@ class HomeController extends Notifier<HomeDashboard> {
 
   RecentDiscovery _recentLocalDiscovery(CatDiscovery discovery) {
     return _recentDiscovery(
-      catName: discovery.nickname ?? 'Mochi',
+      catName: discovery.nickname?.trim().isNotEmpty == true
+          ? discovery.nickname!.trim()
+          : _speciesById(discovery.speciesId).displayName,
       speciesId: discovery.speciesId,
       variantId: discovery.variantId,
       rarity: discovery.rarity,

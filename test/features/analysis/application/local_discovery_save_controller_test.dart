@@ -24,6 +24,7 @@ import 'package:catdex/features/home/application/home_controller.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +33,7 @@ void main() {
   late Directory documentsDirectory;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     tempDirectory = Directory.systemTemp.createTempSync('catdex_save_test_');
     documentsDirectory = Directory('${tempDirectory.path}/documents')
       ..createSync(recursive: true);
@@ -93,14 +95,26 @@ void main() {
       _analysisResult().primaryBreed.species.id,
     );
     expect(discoveries.single.nickname, 'Nebbia');
-    expect(discoveries.single.suggestedName, 'Mochi');
+    expect(
+      discoveries.single.suggestedName,
+      _analysisResult().primaryBreed.species.displayName,
+    );
+    expect(discoveries.single.suggestedName, isNot('Mochi'));
     expect(
       discoveries.single.originalPhotoPath,
-      contains('/catdex/originals/'),
+      startsWith('catdex/originals/'),
     );
-    expect(discoveries.single.displayPhotoPath, contains('/catdex/originals/'));
-    expect(discoveries.single.photoPath, contains('/catdex/originals/'));
-    expect(File(discoveries.single.displayPhotoPath!).existsSync(), isTrue);
+    expect(
+      discoveries.single.displayPhotoPath,
+      startsWith('catdex/originals/'),
+    );
+    expect(discoveries.single.photoPath, startsWith('catdex/originals/'));
+    expect(
+      File(
+        '${documentsDirectory.path}/${discoveries.single.displayPhotoPath}',
+      ).existsSync(),
+      isTrue,
+    );
     expect(discoveries.single.story, _analysisResult().story);
     expect(discoveries.single.funFact, _analysisResult().funFact);
     expect(discoveries.single.coatColor, 'Black');
@@ -177,9 +191,14 @@ void main() {
 
       expect(
         discoveries.single.displayPhotoPath,
-        contains('/catdex/originals/'),
+        startsWith('catdex/originals/'),
       );
-      expect(File(discoveries.single.displayPhotoPath!).existsSync(), isTrue);
+      expect(
+        File(
+          '${documentsDirectory.path}/${discoveries.single.displayPhotoPath}',
+        ).existsSync(),
+        isTrue,
+      );
       expect(
         discoveries.single.originalPhotoPath,
         discoveries.single.displayPhotoPath,
